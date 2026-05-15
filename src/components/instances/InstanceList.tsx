@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,25 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { 
+  Loader2, 
+  Plus, 
+  RefreshCw, 
+  Trash2, 
+  QrCode, 
+  LogOut,
+  CheckCircle2,
+  XCircle
+} from "lucide-react";
 import { toast } from "sonner";
 import { CreateInstanceDialog } from "./CreateInstanceDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 export function InstanceList() {
   const queryClient = useQueryClient();
