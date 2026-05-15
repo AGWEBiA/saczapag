@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      assignment_rules: {
+        Row: {
+          agent_ids: string[] | null
+          created_at: string
+          description: string | null
+          id: string
+          instance_id: string | null
+          is_active: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          agent_ids?: string[] | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          instance_id?: string | null
+          is_active?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          agent_ids?: string[] | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          instance_id?: string | null
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignment_rules_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -82,6 +123,7 @@ export type Database = {
       }
       conversations: {
         Row: {
+          assigned_at: string | null
           assigned_to: string | null
           contact_id: string
           created_at: string
@@ -95,6 +137,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_at?: string | null
           assigned_to?: string | null
           contact_id: string
           created_at?: string
@@ -108,6 +151,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_at?: string | null
           assigned_to?: string | null
           contact_id?: string
           created_at?: string
@@ -279,6 +323,7 @@ export type Database = {
       }
       whatsapp_instances: {
         Row: {
+          auto_assign_enabled: boolean | null
           created_at: string
           created_by: string | null
           evolution_instance_name: string
@@ -292,6 +337,7 @@ export type Database = {
           webhook_url: string | null
         }
         Insert: {
+          auto_assign_enabled?: boolean | null
           created_at?: string
           created_by?: string | null
           evolution_instance_name: string
@@ -305,6 +351,7 @@ export type Database = {
           webhook_url?: string | null
         }
         Update: {
+          auto_assign_enabled?: boolean | null
           created_at?: string
           created_by?: string | null
           evolution_instance_name?: string
