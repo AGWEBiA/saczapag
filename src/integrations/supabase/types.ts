@@ -89,6 +89,7 @@ export type Database = {
           instance_id: string
           is_group: boolean | null
           last_message_at: string | null
+          last_message_content: string | null
           status: Database["public"]["Enums"]["conversation_status"]
           unread_count: number
           updated_at: string
@@ -101,6 +102,7 @@ export type Database = {
           instance_id: string
           is_group?: boolean | null
           last_message_at?: string | null
+          last_message_content?: string | null
           status?: Database["public"]["Enums"]["conversation_status"]
           unread_count?: number
           updated_at?: string
@@ -113,6 +115,7 @@ export type Database = {
           instance_id?: string
           is_group?: boolean | null
           last_message_at?: string | null
+          last_message_content?: string | null
           status?: Database["public"]["Enums"]["conversation_status"]
           unread_count?: number
           updated_at?: string
