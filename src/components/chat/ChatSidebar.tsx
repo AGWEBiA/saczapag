@@ -15,6 +15,7 @@ interface ChatSidebarProps {
 }
 
 export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
+  const queryClient = useQueryClient();
   const { data: conversations, isLoading } = useQuery({
     queryKey: ["conversations"],
     queryFn: async () => {
