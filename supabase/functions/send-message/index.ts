@@ -30,7 +30,6 @@ serve(async (req) => {
       throw new Error("WhatsApp API credentials not configured");
     }
 
-    // Call WhatsApp Cloud API
     const response = await fetch(
       `https://graph.facebook.com/v17.0/${PHONE_NUMBER_ID}/messages`,
       {
@@ -57,7 +56,6 @@ serve(async (req) => {
 
     const whatsappMessageId = result.messages?.[0]?.id;
 
-    // Save to database
     const { data: message, error: dbError } = await supabase
       .from("messages")
       .insert({
@@ -72,7 +70,6 @@ serve(async (req) => {
 
     if (dbError) throw dbError;
 
-    // Update conversation
     await supabase
       .from("conversations")
       .update({ last_message_at: new Date().toISOString() })
@@ -89,4 +86,3 @@ serve(async (req) => {
     });
   }
 });
-",file_path:
