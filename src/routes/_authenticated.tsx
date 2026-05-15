@@ -1,5 +1,7 @@
-import { createFileRoute, redirect, Outlet, Link } from "@tanstack/react-router";
+import { createFileRoute, redirect, Outlet, Link, useRouter } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { LogOut, LayoutDashboard, Smartphone, Users, Settings } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
@@ -12,6 +14,7 @@ export const Route = createFileRoute("/_authenticated")({
         },
       });
     }
+    return { user: data.user };
   },
   component: AuthenticatedLayout,
 });
