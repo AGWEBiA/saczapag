@@ -77,7 +77,7 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
 
   useEffect(() => {
     const channel = supabase
-      .channel('schema-db-changes')
+      .channel('schema-db-changes-sidebar')
       .on(
         'postgres_changes',
         {
@@ -150,7 +150,7 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
               key={conv.id}
               onClick={() => onSelect(conv.id)}
               className={cn(
-                "w-full flex items-center gap-3 p-4 hover:bg-accent transition-colors text-left border-b",
+                "w-full flex items-center gap-3 p-4 hover:bg-accent transition-colors text-left border-b relative",
                 selectedId === conv.id && "bg-accent"
               )}
             >
@@ -172,8 +172,8 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
                     </span>
                   )}
                 </div>
-                <div className="flex flex-col gap-1">
-                  <p className="text-xs text-muted-foreground truncate font-medium">
+                <div className="flex flex-col gap-0.5">
+                  <p className="text-sm text-foreground/80 truncate font-medium">
                     {conv.last_message_content || conv.contact?.phone_number}
                   </p>
                   {conv.last_message_content && (
@@ -182,12 +182,11 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
                     </p>
                   )}
                 </div>
-                  {conv.unread_count > 0 && (
-                    <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                      {conv.unread_count}
-                    </span>
-                  )}
-                </div>
+                {conv.unread_count > 0 && (
+                  <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full absolute right-4 bottom-4">
+                    {conv.unread_count}
+                  </span>
+                )}
               </div>
             </button>
           ))
