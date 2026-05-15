@@ -89,7 +89,7 @@ export function ChatInterface() {
               
               <MessageList 
                 conversationId={selectedConversationId} 
-                isGroup={selectedConversation?.is_group} 
+                isGroup={!!selectedConversation?.is_group} 
               />
               
               <MessageInput conversationId={selectedConversationId} />
