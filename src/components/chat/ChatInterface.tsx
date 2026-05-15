@@ -79,6 +79,47 @@ export function ChatInterface() {
     }
   };
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('schema-db-changes-chat-interface')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversations',
+          filter: `id=eq.${selectedConversationId}`
+        },
+        (payload) => {
+          if (payload.new && (payload.new as any).assigned_to === selectedConversation?.assigned_to) return;
+          refetch();
+          
+          // Show toast if conversation is assigned to current user
+          supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user && (payload.new as any).assigned_to === user.id) {
+              toast.info("Uma conversa foi atribuída a você!");
+            }
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversations'
+        },
+        () => {
+          toast.info("Nova conversa recebida!");
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedConversationId, selectedConversation?.assigned_to, refetch]);
+
   const handleUpdateContactNote = async () => {
     if (!selectedConversation?.contact?.id) return;
     const { error } = await supabase
