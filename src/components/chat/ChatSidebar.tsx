@@ -30,6 +30,38 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
     },
   });
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversations'
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["conversations"] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["conversations"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   return (
     <div className="flex flex-col h-full border-r bg-card">
       <div className="p-4 border-b">
