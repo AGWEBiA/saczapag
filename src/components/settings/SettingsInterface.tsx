@@ -57,22 +57,26 @@ export function SettingsInterface() {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[600px]">
+        <TabsList className="grid w-full grid-cols-5 lg:w-[750px]">
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <User className="h-4 w-4" />
             Perfil
           </TabsTrigger>
+          <TabsTrigger value="team" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Time
+          </TabsTrigger>
+          <TabsTrigger value="assignment" className="flex items-center gap-2">
+            <Wand2 className="h-4 w-4" />
+            Atribuição
+          </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center gap-2">
             <Bell className="h-4 w-4" />
-            Notificações
-          </TabsTrigger>
-          <TabsTrigger value="security" className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            Segurança
+            Alertas
           </TabsTrigger>
           <TabsTrigger value="api" className="flex items-center gap-2">
             <Globe className="h-4 w-4" />
-            Integrações
+            API
           </TabsTrigger>
         </TabsList>
 
@@ -178,6 +182,8 @@ export function SettingsInterface() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="notifications" className="mt-6">
           <Card>
             <CardHeader>
               <CardTitle>Preferências de Notificação</CardTitle>
@@ -200,30 +206,6 @@ export function SettingsInterface() {
                 </div>
                 <Switch defaultChecked />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="security" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Segurança</CardTitle>
-              <CardDescription>
-                Gerencie sua senha e autenticação.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="current-password">Senha Atual</Label>
-                <Input id="current-password" type="password" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="new-password">Nova Senha</Label>
-                <Input id="new-password" type="password" />
-              </div>
-              <Button onClick={handleSave} disabled={loading}>
-                Atualizar Senha
-              </Button>
             </CardContent>
           </Card>
         </TabsContent>
