@@ -7,10 +7,19 @@ export const getRouter = () => {
 
   const router = createRouter({
     routeTree,
-    context: { queryClient },
+    context: { 
+      queryClient,
+      auth: undefined!, // Injected at render time
+    },
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
   });
 
   return router;
 };
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: ReturnType<typeof getRouter>;
+  }
+}
