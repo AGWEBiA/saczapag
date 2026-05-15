@@ -35,6 +35,8 @@ import {
 export function InstanceList() {
   const queryClient = useQueryClient();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [qrCodeData, setQrCodeData] = useState<{ name: string; base64: string } | null>(null);
+  const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
 
   const { data: instances, isLoading, refetch } = useQuery({
     queryKey: ["whatsapp_instances"],
@@ -47,10 +49,21 @@ export function InstanceList() {
       if (error) throw error;
       return data;
     },
+    refetchInterval: 10000, // Refresh every 10 seconds to catch status changes
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, evolutionName }: { id: string; evolutionName: string }) => {
+      // 1. Delete from Evolution API
+      try {
+        await supabase.functions.invoke("evolution-api", {
+          body: { action: "delete-instance", instanceName: evolutionName },
+        });
+      } catch (err) {
+        console.error("Failed to delete from Evolution API, proceeding anyway", err);
+      }
+
+      // 2. Delete from Supabase
       const { error } = await supabase
         .from("whatsapp_instances")
         .delete()
@@ -63,6 +76,48 @@ export function InstanceList() {
     },
     onError: (error) => {
       toast.error("Erro ao remover instância: " + error.message);
+    },
+  });
+
+  const logoutMutation = useMutation({
+    mutationFn: async (evolutionName: string) => {
+      const { data, error } = await supabase.functions.invoke("evolution-api", {
+        body: { action: "logout-instance", instanceName: evolutionName },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["whatsapp_instances"] });
+      toast.success("Logout realizado com sucesso");
+    },
+    onError: (error) => {
+      toast.error("Erro ao realizar logout: " + error.message);
+    },
+  });
+
+  const getQrMutation = useMutation({
+    mutationFn: async (evolutionName: string) => {
+      const { data, error } = await supabase.functions.invoke("evolution-api", {
+        body: { action: "get-qr-code", instanceName: evolutionName },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data, variables) => {
+      if (data?.base64) {
+        setQrCodeData({ name: variables, base64: data.base64 });
+        setIsQrDialogOpen(true);
+      } else if (data?.instance?.state === "open") {
+        toast.success("Instância já está conectada!");
+        queryClient.invalidateQueries({ queryKey: ["whatsapp_instances"] });
+      } else {
+        toast.error("Não foi possível gerar o QR code no momento.");
+      }
+    },
+    onError: (error) => {
+      toast.error("Erro ao buscar QR code: " + error.message);
     },
   });
 
