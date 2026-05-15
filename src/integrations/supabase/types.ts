@@ -49,6 +49,7 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           id: string
+          internal_note: string | null
           metadata: Json | null
           name: string | null
           phone_number: string
@@ -59,6 +60,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           id?: string
+          internal_note?: string | null
           metadata?: Json | null
           name?: string | null
           phone_number: string
@@ -69,6 +71,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           id?: string
+          internal_note?: string | null
           metadata?: Json | null
           name?: string | null
           phone_number?: string
@@ -220,6 +223,33 @@ export type Database = {
           role?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      quick_replies: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string | null
+          id: string
+          shortcut: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          shortcut: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          shortcut?: string
+          updated_at?: string
         }
         Relationships: []
       }
