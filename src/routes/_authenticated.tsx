@@ -30,6 +30,7 @@ function AuthenticatedLayout() {
 
   const navItems = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { to: "/chat", label: "Chat", icon: MessageSquare },
     { to: "/instances", label: "Instâncias", icon: Smartphone },
     { to: "/contacts", label: "Contatos", icon: Users },
     { to: "/settings", label: "Configurações", icon: Settings },
