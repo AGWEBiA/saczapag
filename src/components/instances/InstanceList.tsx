@@ -97,7 +97,7 @@ export function InstanceList() {
                   <TableCell className="font-medium">{instance.name}</TableCell>
                   <TableCell>{instance.evolution_instance_name}</TableCell>
                   <TableCell>
-                    <Badge variant={instance.status === "open" ? "default" : "secondary"}>
+                    <Badge variant={instance.status === "connected" ? "default" : "secondary"}>
                       {instance.status}
                     </Badge>
                   </TableCell>
