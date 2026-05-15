@@ -175,7 +175,7 @@ export function SettingsInterface() {
                       <h4 className="font-semibold">{rule.name}</h4>
                       <p className="text-xs text-muted-foreground">Instância: {(rule as any).instance?.name}</p>
                     </div>
-                    <Switch defaultChecked={rule.is_active} />
+                    <Switch defaultChecked={!!rule.is_active} />
                   </div>
                 ))}
               </div>
