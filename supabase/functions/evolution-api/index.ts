@@ -114,6 +114,87 @@ serve(async (req) => {
             })
             .eq("evolution_instance_name", instanceName);
         }
+
+        if (event === "messages.upsert") {
+          const message = data.message;
+          if (!message || data.key.fromMe) break;
+
+          const remoteJid = data.key.remoteJid;
+          const isGroup = remoteJid.endsWith("@g.us");
+          const pushName = data.pushName || "Unknown";
+          const content = message.conversation || message.extendedTextMessage?.text || "Mensagem de mídia";
+          
+          // 1. Get Instance
+          const { data: instance } = await supabaseClient
+            .from("whatsapp_instances")
+            .select("id")
+            .eq("evolution_instance_name", instanceName)
+            .single();
+
+          if (!instance) break;
+
+          // 2. Get or Create Contact
+          let { data: contact } = await supabaseClient
+            .from("contacts")
+            .select("id")
+            .eq("phone_number", remoteJid)
+            .single();
+
+          if (!contact) {
+            const { data: newContact } = await supabaseClient
+              .from("contacts")
+              .insert({ 
+                phone_number: remoteJid, 
+                name: isGroup ? (data.groupName || remoteJid) : pushName 
+              })
+              .select("id")
+              .single();
+            contact = newContact;
+          }
+
+          // 3. Get or Create Conversation
+          let { data: conversation } = await supabaseClient
+            .from("conversations")
+            .select("id")
+            .eq("contact_id", contact.id)
+            .eq("instance_id", instance.id)
+            .single();
+
+          if (!conversation) {
+            const { data: newConv } = await supabaseClient
+              .from("conversations")
+              .insert({ 
+                contact_id: contact.id, 
+                instance_id: instance.id,
+                is_group: isGroup,
+                status: "aberta"
+              })
+              .select("id")
+              .single();
+            conversation = newConv;
+          }
+
+          // 4. Insert Message
+          await supabaseClient
+            .from("messages")
+            .insert({
+              conversation_id: conversation.id,
+              direction: "inbound",
+              content: content,
+              evolution_message_id: data.key.id,
+              sender_name: pushName,
+              type: "whatsapp"
+            });
+
+          // 5. Update Conversation
+          await supabaseClient
+            .from("conversations")
+            .update({ 
+              last_message_at: new Date().toISOString(),
+              unread_count: 1 // In a real app we'd increment this
+            })
+            .eq("id", conversation.id);
+        }
         
         result = { success: true };
         break;

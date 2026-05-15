@@ -23,38 +23,90 @@ serve(async (req) => {
       throw new Error("Content and phone are required");
     }
 
-    const WHATSAPP_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
-    const PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
+    // Get conversation and instance info
+    const { data: conversation, error: convError } = await supabase
+      .from("conversations")
+      .select(`
+        *,
+        instance:whatsapp_instances(*)
+      `)
+      .eq("id", conversationId)
+      .single();
 
-    if (!WHATSAPP_TOKEN || !PHONE_NUMBER_ID) {
-      throw new Error("WhatsApp API credentials not configured");
-    }
+    if (convError || !conversation) throw new Error("Conversation not found");
 
-    const response = await fetch(
-      `https://graph.facebook.com/v17.0/${PHONE_NUMBER_ID}/messages`,
-      {
+    const instance = conversation.instance;
+    let whatsappMessageId;
+
+    if (instance.evolution_instance_name) {
+      const EVOLUTION_API_URL = Deno.env.get("EVOLUTION_API_URL");
+      const EVOLUTION_API_KEY = Deno.env.get("EVOLUTION_API_KEY");
+
+      if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
+        throw new Error("Evolution API credentials not configured");
+      }
+
+      const evolutionUrl = EVOLUTION_API_URL.endsWith("/") 
+        ? EVOLUTION_API_URL.slice(0, -1) 
+        : EVOLUTION_API_URL;
+
+      const response = await fetch(`${evolutionUrl}/message/sendText/${instance.evolution_instance_name}`, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${WHATSAPP_TOKEN}`,
           "Content-Type": "application/json",
+          "apikey": EVOLUTION_API_KEY,
         },
         body: JSON.stringify({
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: phone,
-          type: "text",
-          text: { body: content },
+          number: phone,
+          options: {
+            delay: 1200,
+            presence: "composing",
+            linkPreview: false,
+          },
+          textMessage: {
+            text: content,
+          },
         }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to send message via Evolution API");
       }
-    );
+      whatsappMessageId = result.key?.id;
+    } else {
+      // Official WhatsApp API Fallback
+      const WHATSAPP_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
+      const PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
 
-    const result = await response.json();
+      if (!WHATSAPP_TOKEN || !PHONE_NUMBER_ID) {
+        throw new Error("WhatsApp API credentials not configured");
+      }
 
-    if (!response.ok) {
-      throw new Error(result.error?.message || "Failed to send message via WhatsApp");
+      const response = await fetch(
+        `https://graph.facebook.com/v17.0/${PHONE_NUMBER_ID}/messages`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${WHATSAPP_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: phone,
+            type: "text",
+            text: { body: content },
+          }),
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error?.message || "Failed to send message via WhatsApp");
+      }
+      whatsappMessageId = result.messages?.[0]?.id;
     }
-
-    const whatsappMessageId = result.messages?.[0]?.id;
 
     const { data: message, error: dbError } = await supabase
       .from("messages")
