@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { ChatSidebar } from "./ChatSidebar";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
-import { MessageSquare, User, Phone, Calendar, FileText } from "lucide-react";
+import { MessageSquare, User, Phone, Calendar, FileText, Info, HelpCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,6 +14,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -71,6 +79,47 @@ export function ChatInterface() {
     }
   };
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('schema-db-changes-chat-interface')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversations',
+          filter: `id=eq.${selectedConversationId}`
+        },
+        (payload) => {
+          if (payload.new && (payload.new as any).assigned_to === selectedConversation?.assigned_to) return;
+          refetch();
+          
+          // Show toast if conversation is assigned to current user
+          supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user && (payload.new as any).assigned_to === user.id) {
+              toast.info("Uma conversa foi atribuída a você!");
+            }
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversations'
+        },
+        () => {
+          toast.info("Nova conversa recebida!");
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedConversationId, selectedConversation?.assigned_to, refetch]);
+
   const handleUpdateContactNote = async () => {
     if (!selectedConversation?.contact?.id) return;
     const { error } = await supabase
@@ -107,6 +156,60 @@ export function ChatInterface() {
                     <h3 className="font-semibold">{selectedConversation?.contact?.name || "Contato"}</h3>
                     <p className="text-xs text-muted-foreground">{selectedConversation?.contact?.phone_number}</p>
                   </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="gap-2">
+                        <HelpCircle className="h-4 w-4" />
+                        <span className="hidden sm:inline">Guia Rápido</span>
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Guia de Atendimento AG SAC</DialogTitle>
+                        <DialogDescription>
+                          Aprenda a utilizar as principais ferramentas do sistema.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4 overflow-y-auto max-h-[60vh]">
+                        <section>
+                          <h4 className="font-bold mb-2">1. Como Responder</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Utilize o campo de texto na parte inferior para enviar mensagens de WhatsApp. 
+                            Você também pode enviar <strong>Notas Internas</strong> clicando no botão amarelo, 
+                            que são visíveis apenas para sua equipe.
+                          </p>
+                        </section>
+                        <section>
+                          <h4 className="font-bold mb-2">2. Filtros e Status</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Na barra lateral, você pode filtrar por:
+                          </p>
+                          <ul className="text-sm text-muted-foreground list-disc pl-5 mt-1">
+                            <li><strong>Minhas:</strong> Conversas atribuídas a você.</li>
+                            <li><strong>Não Atribuídas:</strong> Conversas aguardando um agente.</li>
+                            <li><strong>Todas:</strong> Visão geral de toda a inbox (apenas Admin/Supervisor).</li>
+                          </ul>
+                        </section>
+                        <section>
+                          <h4 className="font-bold mb-2">3. Atribuição</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Utilize o menu lateral direito para atribuir a conversa a si mesmo ou a outro agente. 
+                            Isso organiza a inbox e garante que cada cliente seja atendido.
+                          </p>
+                        </section>
+                        <section>
+                          <h4 className="font-bold mb-2">4. Respostas Rápidas</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Clique no ícone de raio (Zap) no campo de texto ou digite <code>/</code> para ver 
+                            seus modelos de resposta pronta.
+                          </p>
+                        </section>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </div>
               
