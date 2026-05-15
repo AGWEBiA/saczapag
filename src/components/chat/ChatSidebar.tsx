@@ -110,10 +110,33 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
   return (
     <div className="flex flex-col h-full border-r bg-card">
       <div className="p-4 border-b">
-        <h2 className="text-xl font-bold mb-4">Conversas</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold">Conversas</h2>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Filter className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Filtrar por</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuRadioGroup value={filter} onValueChange={setFilter}>
+                <DropdownMenuRadioItem value="all">Todas</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="mine">Minhas</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="unassigned">Não Atribuídas</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         <div className="relative">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar conversas..." className="pl-8" />
+          <Input 
+            placeholder="Buscar..." 
+            className="pl-8" 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
       </div>
       <ScrollArea className="flex-1">
