@@ -97,6 +97,27 @@ serve(async (req) => {
         result = await response.json();
         break;
       }
+      
+      case "webhook": {
+        // Handle Evolution API webhooks
+        const { event, data } = payload;
+        const instanceName = data?.instance;
+        
+        if (event === "connection.update") {
+          const status = data?.state === "open" ? "connected" : "disconnected";
+          await supabaseClient
+            .from("whatsapp_instances")
+            .update({ 
+              status, 
+              last_connected_at: status === "connected" ? new Date().toISOString() : null,
+              phone_number: data?.number || null
+            })
+            .eq("evolution_instance_name", instanceName);
+        }
+        
+        result = { success: true };
+        break;
+      }
 
       default:
         throw new Error(`Unknown action: ${action}`);
