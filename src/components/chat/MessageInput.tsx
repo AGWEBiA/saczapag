@@ -1,11 +1,24 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Send, Loader2, Zap } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 
 interface MessageInputProps {
   conversationId: string;
@@ -122,7 +135,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
                       className="cursor-pointer"
                     >
                       <div className="flex flex-col">
-                        <span className="font-bold text-xs">/{reply.shortcut}</span>
+                        <span className="font-bold text-xs text-primary">/{reply.shortcut}</span>
                         <span className="text-xs text-muted-foreground line-clamp-1">{reply.content}</span>
                       </div>
                     </CommandItem>
