@@ -84,6 +84,7 @@ export type Database = {
           created_at: string
           id: string
           instance_id: string
+          is_group: boolean | null
           last_message_at: string | null
           status: Database["public"]["Enums"]["conversation_status"]
           unread_count: number
@@ -95,6 +96,7 @@ export type Database = {
           created_at?: string
           id?: string
           instance_id: string
+          is_group?: boolean | null
           last_message_at?: string | null
           status?: Database["public"]["Enums"]["conversation_status"]
           unread_count?: number
@@ -106,6 +108,7 @@ export type Database = {
           created_at?: string
           id?: string
           instance_id?: string
+          is_group?: boolean | null
           last_message_at?: string | null
           status?: Database["public"]["Enums"]["conversation_status"]
           unread_count?: number
@@ -136,11 +139,14 @@ export type Database = {
           direction: Database["public"]["Enums"]["message_direction"]
           evolution_message_id: string | null
           id: string
+          is_internal: boolean | null
           is_read: boolean
           media_type: string | null
           media_url: string | null
           metadata: Json | null
+          sender_name: string | null
           sender_user_id: string | null
+          type: Database["public"]["Enums"]["message_type"] | null
         }
         Insert: {
           content?: string | null
@@ -149,11 +155,14 @@ export type Database = {
           direction: Database["public"]["Enums"]["message_direction"]
           evolution_message_id?: string | null
           id?: string
+          is_internal?: boolean | null
           is_read?: boolean
           media_type?: string | null
           media_url?: string | null
           metadata?: Json | null
+          sender_name?: string | null
           sender_user_id?: string | null
+          type?: Database["public"]["Enums"]["message_type"] | null
         }
         Update: {
           content?: string | null
@@ -162,11 +171,14 @@ export type Database = {
           direction?: Database["public"]["Enums"]["message_direction"]
           evolution_message_id?: string | null
           id?: string
+          is_internal?: boolean | null
           is_read?: boolean
           media_type?: string | null
           media_url?: string | null
           metadata?: Json | null
+          sender_name?: string | null
           sender_user_id?: string | null
+          type?: Database["public"]["Enums"]["message_type"] | null
         }
         Relationships: [
           {
@@ -293,6 +305,7 @@ export type Database = {
       conversation_status: "aberta" | "pendente" | "resolvida"
       instance_status: "connected" | "disconnected" | "connecting" | "error"
       message_direction: "inbound" | "outbound"
+      message_type: "whatsapp" | "internal"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -424,6 +437,7 @@ export const Constants = {
       conversation_status: ["aberta", "pendente", "resolvida"],
       instance_status: ["connected", "disconnected", "connecting", "error"],
       message_direction: ["inbound", "outbound"],
+      message_type: ["whatsapp", "internal"],
     },
   },
 } as const
