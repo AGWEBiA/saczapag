@@ -12,6 +12,7 @@ interface MessageListProps {
 }
 
 export function MessageList({ conversationId }: MessageListProps) {
+  const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: messages, isLoading } = useQuery({
