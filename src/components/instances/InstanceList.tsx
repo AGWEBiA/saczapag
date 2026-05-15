@@ -168,26 +168,70 @@ export function InstanceList() {
                   <TableCell className="font-medium">{instance.name}</TableCell>
                   <TableCell>{instance.evolution_instance_name}</TableCell>
                   <TableCell>
-                    <Badge variant={instance.status === "connected" ? "default" : "secondary"}>
-                      {instance.status}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {instance.status === "connected" ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      ) : instance.status === "error" ? (
+                        <XCircle className="h-4 w-4 text-destructive" />
+                      ) : (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
+                      <Badge variant={instance.status === "connected" ? "default" : "secondary"}>
+                        {instance.status === "connected" ? "Conectado" : 
+                         instance.status === "connecting" ? "Aguardando QR" : 
+                         instance.status === "disconnected" ? "Desconectado" : "Erro"}
+                      </Badge>
+                    </div>
                   </TableCell>
                   <TableCell>
                     {new Date(instance.created_at).toLocaleDateString("pt-BR")}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => {
-                        if (confirm("Tem certeza que deseja remover esta instância?")) {
-                          deleteMutation.mutate(instance.id);
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      {instance.status !== "connected" ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => getQrMutation.mutate(instance.evolution_instance_name)}
+                          disabled={getQrMutation.isPending}
+                        >
+                          <QrCode className="mr-2 h-4 w-4" />
+                          Conectar
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-orange-500 hover:text-orange-600 hover:bg-orange-50"
+                          onClick={() => {
+                            if (confirm("Deseja desconectar esta instância?")) {
+                              logoutMutation.mutate(instance.evolution_instance_name);
+                            }
+                          }}
+                          disabled={logoutMutation.isPending}
+                        >
+                          <LogOut className="mr-2 h-4 w-4" />
+                          Logout
+                        </Button>
+                      )}
+                      
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => {
+                          if (confirm("Tem certeza que deseja remover esta instância?")) {
+                            deleteMutation.mutate({ 
+                              id: instance.id, 
+                              evolutionName: instance.evolution_instance_name 
+                            });
+                          }
+                        }}
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -200,6 +244,42 @@ export function InstanceList() {
         open={isCreateDialogOpen} 
         onOpenChange={setIsCreateDialogOpen} 
       />
+
+      <Dialog open={isQrDialogOpen} onOpenChange={setIsQrDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Conectar WhatsApp</DialogTitle>
+            <DialogDescription>
+              Abra o WhatsApp no seu celular, vá em Aparelhos Conectados e escaneie o código abaixo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center p-6 space-y-4">
+            {qrCodeData?.base64 ? (
+              <div className="bg-white p-4 rounded-lg shadow-inner">
+                <img 
+                  src={qrCodeData.base64} 
+                  alt="WhatsApp QR Code" 
+                  className="w-64 h-64"
+                />
+              </div>
+            ) : (
+              <div className="w-64 h-64 flex items-center justify-center bg-muted rounded-lg">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+              </div>
+            )}
+            <p className="text-sm font-medium text-center">
+              Instância: <span className="text-primary">{qrCodeData?.name}</span>
+            </p>
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => setIsQrDialogOpen(false)}
+            >
+              Fechar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
