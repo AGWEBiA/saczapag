@@ -87,7 +87,10 @@ export function ChatInterface() {
                 </div>
               </div>
               
-              <MessageList conversationId={selectedConversationId} />
+              <MessageList 
+                conversationId={selectedConversationId} 
+                isGroup={selectedConversation?.is_group} 
+              />
               
               <MessageInput conversationId={selectedConversationId} />
             </div>

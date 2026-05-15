@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Search, Filter } from "lucide-react";
+import { User, Search, Filter, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -157,12 +157,15 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
               <Avatar className="h-12 w-12 flex-shrink-0">
                 <AvatarImage src={conv.contact?.avatar_url || ""} />
                 <AvatarFallback>
-                  <User className="h-6 w-6" />
+                  {conv.is_group ? <Users className="h-6 w-6" /> : <User className="h-6 w-6" />}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-baseline mb-1">
-                  <h3 className="font-semibold truncate">{conv.contact?.name || "Sem Nome"}</h3>
+                  <div className="flex items-center gap-1 min-w-0">
+                    {conv.is_group && <Users className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
+                    <h3 className="font-semibold truncate">{conv.contact?.name || "Sem Nome"}</h3>
+                  </div>
                   {conv.last_message_at && (
                     <span className="text-[10px] text-muted-foreground whitespace-nowrap ml-2">
                       {formatDistanceToNow(new Date(conv.last_message_at), { addSuffix: true, locale: ptBR })}

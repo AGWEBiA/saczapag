@@ -12,10 +12,30 @@ interface MessageInputProps {
 
 export function MessageInput({ conversationId }: MessageInputProps) {
   const [content, setContent] = useState("");
+  const [isInternal, setIsInternal] = useState(false);
   const queryClient = useQueryClient();
 
   const sendMutation = useMutation({
     mutationFn: async () => {
+      if (isInternal) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Usuário não autenticado");
+
+        const { error } = await supabase
+          .from("messages")
+          .insert({
+            conversation_id: conversationId,
+            direction: "outbound",
+            content: content.trim(),
+            is_internal: true,
+            sender_user_id: user.id,
+            type: 'internal'
+          });
+        
+        if (error) throw error;
+        return { success: true };
+      }
+
       // Fetch phone number for WhatsApp API
       const { data: convData } = await supabase
         .from("conversations")
@@ -43,7 +63,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },
     onError: (error) => {
-      toast.error("Erro ao enviar mensagem: " + error.message);
+      toast.error("Erro ao enviar: " + error.message);
     },
   });
 
@@ -54,23 +74,39 @@ export function MessageInput({ conversationId }: MessageInputProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 border-t bg-card">
-      <div className="flex gap-2">
+    <div className="p-4 border-t bg-card space-y-2">
+      <div className="flex gap-2 mb-2">
+        <Button 
+          type="button" 
+          variant={isInternal ? "secondary" : "ghost"} 
+          size="sm"
+          onClick={() => setIsInternal(!isInternal)}
+          className={cn("text-xs gap-1", isInternal && "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-200")}
+        >
+          {isInternal ? "Nota Interna Ativada" : "Enviar Nota Interna"}
+        </Button>
+      </div>
+      <form onSubmit={handleSubmit} className="flex gap-2">
         <Input
-          placeholder="Digite sua mensagem..."
+          placeholder={isInternal ? "Digite uma nota apenas para a equipe..." : "Digite sua mensagem..."}
           value={content}
           onChange={(e) => setContent(e.target.value)}
           disabled={sendMutation.isPending}
-          className="flex-1"
+          className={cn("flex-1", isInternal && "border-yellow-300 focus-visible:ring-yellow-400 bg-yellow-50/50")}
         />
-        <Button type="submit" size="icon" disabled={!content.trim() || sendMutation.isPending}>
+        <Button 
+          type="submit" 
+          size="icon" 
+          disabled={!content.trim() || sendMutation.isPending}
+          className={cn(isInternal && "bg-yellow-600 hover:bg-yellow-700")}
+        >
           {sendMutation.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Send className="h-4 w-4" />
           )}
         </Button>
-      </div>
-    </form>
+      </form>
+    </div>
   );
 }
