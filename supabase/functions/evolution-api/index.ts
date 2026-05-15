@@ -191,6 +191,7 @@ serve(async (req) => {
             .from("conversations")
             .update({ 
               last_message_at: new Date().toISOString(),
+              last_message_content: content,
               unread_count: 1 // In a real app we'd increment this
             })
             .eq("id", conversation.id);

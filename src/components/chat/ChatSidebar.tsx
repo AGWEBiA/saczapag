@@ -172,10 +172,16 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-1">
-                  <p className="text-sm text-muted-foreground truncate flex-1">
-                    {conv.contact?.phone_number}
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs text-muted-foreground truncate font-medium">
+                    {conv.last_message_content || conv.contact?.phone_number}
                   </p>
+                  {conv.last_message_content && (
+                    <p className="text-[10px] text-muted-foreground/60 truncate italic">
+                      {conv.contact?.phone_number}
+                    </p>
+                  )}
+                </div>
                   {conv.unread_count > 0 && (
                     <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                       {conv.unread_count}

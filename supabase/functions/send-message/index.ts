@@ -124,7 +124,10 @@ serve(async (req) => {
 
     await supabase
       .from("conversations")
-      .update({ last_message_at: new Date().toISOString() })
+      .update({ 
+        last_message_at: new Date().toISOString(),
+        last_message_content: content
+      })
       .eq("id", conversationId);
 
     return new Response(JSON.stringify(message), {
