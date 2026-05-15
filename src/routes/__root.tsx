@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
@@ -119,15 +119,14 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const auth = useAuth();
   const router = useRouter();
-  const qc = useQueryClient();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
       router.invalidate();
-      qc.invalidateQueries();
+      queryClient.invalidateQueries();
     });
     return () => subscription.unsubscribe();
-  }, [router, qc]);
+  }, [router, queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>
