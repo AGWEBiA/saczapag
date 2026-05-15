@@ -21,9 +21,7 @@ import {
   LogOut,
   CheckCircle2,
   XCircle,
-  Play,
-  ArrowRight,
-  ShieldCheck
+  Play
 } from "lucide-react";
 import { toast } from "sonner";
 import { CreateInstanceDialog } from "./CreateInstanceDialog";
@@ -33,6 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 
 export function InstanceList() {
@@ -52,21 +51,19 @@ export function InstanceList() {
       if (error) throw error;
       return data;
     },
-    refetchInterval: 10000, // Refresh every 10 seconds to catch status changes
+    refetchInterval: 10000,
   });
 
   const deleteMutation = useMutation({
     mutationFn: async ({ id, evolutionName }: { id: string; evolutionName: string }) => {
-      // 1. Delete from Evolution API
       try {
         await supabase.functions.invoke("evolution-api", {
           body: { action: "delete-instance", instanceName: evolutionName },
         });
       } catch (err) {
-        console.error("Failed to delete from Evolution API, proceeding anyway", err);
+        console.error("Failed to delete from Evolution API", err);
       }
 
-      // 2. Delete from Supabase
       const { error } = await supabase
         .from("whatsapp_instances")
         .delete()
@@ -133,115 +130,167 @@ export function InstanceList() {
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-        <CardTitle className="text-xl font-bold">Instâncias WhatsApp</CardTitle>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Atualizar
-          </Button>
-          <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nova Instância
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>Instância Evolution</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Criado em</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {instances?.length === 0 ? (
+    <div className="space-y-6">
+      <Card className="bg-primary/5 border-primary/20">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Play className="h-4 w-4 text-primary" />
+            Passo a Passo: Sua Primeira Conexão
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-start gap-3 p-3 bg-card rounded-md border">
+              <div className="bg-primary/10 text-primary h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</div>
+              <div>
+                <p className="text-xs font-bold mb-1">Criar Instância</p>
+                <p className="text-[10px] text-muted-foreground">Clique em "Nova Instância" e dê um nome amigável para identificar seu número.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-3 bg-card rounded-md border">
+              <div className="bg-primary/10 text-primary h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</div>
+              <div>
+                <p className="text-xs font-bold mb-1">Escaneie o QR Code</p>
+                <p className="text-[10px] text-muted-foreground">Clique em "Conectar", abra o WhatsApp no celular e escaneie o código gerado.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-3 bg-card rounded-md border">
+              <div className="bg-primary/10 text-primary h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</div>
+              <div>
+                <p className="text-xs font-bold mb-1">Valide a Conexão</p>
+                <p className="text-[10px] text-muted-foreground">O status mudará para "Conectado". Agora sua equipe já pode receber mensagens!</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardTitle className="text-xl font-bold">Configuração e Testes</CardTitle>
+          <div className="flex gap-2">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Play className="h-4 w-4" /> Testar Webhook
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Simulador de Webhook</DialogTitle>
+                  <DialogDescription>
+                    Envie uma mensagem de teste para verificar se sua inbox está recebendo dados corretamente.
+                  </DialogDescription>
+                </DialogHeader>
+                <WebhookTester />
+              </DialogContent>
+            </Dialog>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Atualizar
+            </Button>
+            <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova Instância
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                  Nenhuma instância encontrada. Clique em "Nova Instância" para começar.
-                </TableCell>
+                <TableHead>Nome</TableHead>
+                <TableHead>Instância Evolution</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Criado em</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
-            ) : (
-              instances?.map((instance) => (
-                <TableRow key={instance.id}>
-                  <TableCell className="font-medium">{instance.name}</TableCell>
-                  <TableCell>{instance.evolution_instance_name}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {instance.status === "connected" ? (
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                      ) : instance.status === "error" ? (
-                        <XCircle className="h-4 w-4 text-destructive" />
-                      ) : (
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      )}
-                      <Badge variant={instance.status === "connected" ? "default" : "secondary"}>
-                        {instance.status === "connected" ? "Conectado" : 
-                         instance.status === "connecting" ? "Aguardando QR" : 
-                         instance.status === "disconnected" ? "Desconectado" : "Erro"}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(instance.created_at).toLocaleDateString("pt-BR")}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      {instance.status !== "connected" ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => getQrMutation.mutate(instance.evolution_instance_name)}
-                          disabled={getQrMutation.isPending}
-                        >
-                          <QrCode className="mr-2 h-4 w-4" />
-                          Conectar
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-orange-500 hover:text-orange-600 hover:bg-orange-50"
-                          onClick={() => {
-                            if (confirm("Deseja desconectar esta instância?")) {
-                              logoutMutation.mutate(instance.evolution_instance_name);
-                            }
-                          }}
-                          disabled={logoutMutation.isPending}
-                        >
-                          <LogOut className="mr-2 h-4 w-4" />
-                          Logout
-                        </Button>
-                      )}
-                      
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => {
-                          if (confirm("Tem certeza que deseja remover esta instância?")) {
-                            deleteMutation.mutate({ 
-                              id: instance.id, 
-                              evolutionName: instance.evolution_instance_name 
-                            });
-                          }
-                        }}
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+            </TableHeader>
+            <TableBody>
+              {instances?.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    Nenhuma instância encontrada. Siga o guia acima para começar.
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
+              ) : (
+                instances?.map((instance) => (
+                  <TableRow key={instance.id}>
+                    <TableCell className="font-medium">{instance.name}</TableCell>
+                    <TableCell>{instance.evolution_instance_name}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {instance.status === "connected" ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        ) : instance.status === "error" ? (
+                          <XCircle className="h-4 w-4 text-destructive" />
+                        ) : (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                        <Badge variant={instance.status === "connected" ? "default" : "secondary"}>
+                          {instance.status === "connected" ? "Conectado" : 
+                           instance.status === "connecting" ? "Aguardando QR" : 
+                           instance.status === "disconnected" ? "Desconectado" : "Erro"}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {new Date(instance.created_at).toLocaleDateString("pt-BR")}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {instance.status !== "connected" ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => getQrMutation.mutate(instance.evolution_instance_name)}
+                            disabled={getQrMutation.isPending}
+                          >
+                            <QrCode className="mr-2 h-4 w-4" />
+                            Conectar
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-orange-500 hover:text-orange-600 hover:bg-orange-50"
+                            onClick={() => {
+                              if (confirm("Deseja desconectar esta instância?")) {
+                                logoutMutation.mutate(instance.evolution_instance_name);
+                              }
+                            }}
+                            disabled={logoutMutation.isPending}
+                          >
+                            <LogOut className="mr-2 h-4 w-4" />
+                            Logout
+                          </Button>
+                        )}
+                        
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => {
+                            if (confirm("Tem certeza que deseja remover esta instância?")) {
+                              deleteMutation.mutate({ 
+                                id: instance.id, 
+                                evolutionName: instance.evolution_instance_name 
+                              });
+                            }
+                          }}
+                          disabled={deleteMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       <CreateInstanceDialog 
         open={isCreateDialogOpen} 
