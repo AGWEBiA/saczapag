@@ -26,10 +26,27 @@ interface ChatSidebarProps {
 
 export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
   const queryClient = useQueryClient();
-  const { data: conversations, isLoading } = useQuery({
-    queryKey: ["conversations"],
+  const [filter, setFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
+
+  const { data: profile } = useQuery({
+    queryKey: ["current_profile"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+      return data;
+    }
+  });
+
+  const { data: conversations, isLoading } = useQuery({
+    queryKey: ["conversations", filter, search],
+    queryFn: async () => {
+      let query = supabase
         .from("conversations")
         .select(`
           *,
@@ -37,9 +54,25 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
         `)
         .order("last_message_at", { ascending: false });
 
+      if (filter === "mine" && profile?.id) {
+        query = query.eq("assigned_to", profile.id);
+      } else if (filter === "unassigned") {
+        query = query.is("assigned_to", null);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
+
+      if (search) {
+        return data.filter(c => 
+          c.contact?.name?.toLowerCase().includes(search.toLowerCase()) || 
+          c.contact?.phone_number?.includes(search)
+        );
+      }
+
       return data;
     },
+    enabled: !!profile || filter === "all" || filter === "unassigned",
   });
 
   useEffect(() => {
