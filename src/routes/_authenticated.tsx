@@ -20,20 +20,59 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthenticatedLayout() {
+  const router = useRouter();
+  const { user } = Route.useRouteContext();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.invalidate();
+  };
+
+  const navItems = [
+    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { to: "/instances", label: "Instâncias", icon: Smartphone },
+    { to: "/contacts", label: "Contatos", icon: Users },
+    { to: "/settings", label: "Configurações", icon: Settings },
+  ];
+
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Sidebar Placeholder */}
-      <aside className="w-64 border-r bg-muted/30 p-4">
-        <div className="mb-8 font-bold text-xl">AG SAC</div>
-        <nav className="space-y-2">
-          <Link to="/dashboard" className="block p-2 rounded hover:bg-accent transition-colors" activeProps={{ className: "bg-accent font-medium" }}>Dashboard</Link>
-          <Link to="/instances" className="block p-2 rounded hover:bg-accent transition-colors" activeProps={{ className: "bg-accent font-medium" }}>Instâncias</Link>
-          <Link to="/contacts" className="block p-2 rounded hover:bg-accent transition-colors" activeProps={{ className: "bg-accent font-medium" }}>Contatos</Link>
-          <Link to="/settings" className="block p-2 rounded hover:bg-accent transition-colors" activeProps={{ className: "bg-accent font-medium" }}>Configurações</Link>
+      <aside className="w-64 border-r bg-card flex flex-col">
+        <div className="p-6 border-b">
+          <div className="font-bold text-xl tracking-tight text-primary">AG SAC</div>
+          <div className="text-xs text-muted-foreground mt-1 truncate">{user?.email}</div>
+        </div>
+        
+        <nav className="flex-1 p-4 space-y-1">
+          {navItems.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className="flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors hover:bg-accent group"
+              activeProps={{ className: "bg-primary/10 text-primary font-medium" }}
+            >
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </Link>
+          ))}
         </nav>
+
+        <div className="p-4 border-t">
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            onClick={handleLogout}
+          >
+            <LogOut className="mr-3 h-4 w-4" />
+            Sair
+          </Button>
+        </div>
       </aside>
-      <main className="flex-1 overflow-auto p-8">
-        <Outlet />
+      
+      <main className="flex-1 overflow-auto bg-muted/10 p-8">
+        <div className="max-w-7xl mx-auto">
+          <Outlet />
+        </div>
       </main>
     </div>
   );
