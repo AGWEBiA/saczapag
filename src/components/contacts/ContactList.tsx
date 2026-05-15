@@ -106,7 +106,7 @@ export function ContactList() {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Phone className="h-3 w-3 text-muted-foreground" />
-                      {contact.phone}
+                      {contact.phone_number}
                     </div>
                   </TableCell>
                   <TableCell>
