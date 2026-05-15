@@ -14,16 +14,281 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      contacts: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          name: string | null
+          phone_number: string
+          tags: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          name?: string | null
+          phone_number: string
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          name?: string | null
+          phone_number?: string
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      conversations: {
+        Row: {
+          assigned_to: string | null
+          contact_id: string
+          created_at: string
+          id: string
+          instance_id: string
+          last_message_at: string | null
+          status: Database["public"]["Enums"]["conversation_status"]
+          unread_count: number
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          contact_id: string
+          created_at?: string
+          id?: string
+          instance_id: string
+          last_message_at?: string | null
+          status?: Database["public"]["Enums"]["conversation_status"]
+          unread_count?: number
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          contact_id?: string
+          created_at?: string
+          id?: string
+          instance_id?: string
+          last_message_at?: string | null
+          status?: Database["public"]["Enums"]["conversation_status"]
+          unread_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          content: string | null
+          conversation_id: string
+          created_at: string
+          direction: Database["public"]["Enums"]["message_direction"]
+          evolution_message_id: string | null
+          id: string
+          is_read: boolean
+          media_type: string | null
+          media_url: string | null
+          metadata: Json | null
+          sender_user_id: string | null
+        }
+        Insert: {
+          content?: string | null
+          conversation_id: string
+          created_at?: string
+          direction: Database["public"]["Enums"]["message_direction"]
+          evolution_message_id?: string | null
+          id?: string
+          is_read?: boolean
+          media_type?: string | null
+          media_url?: string | null
+          metadata?: Json | null
+          sender_user_id?: string | null
+        }
+        Update: {
+          content?: string | null
+          conversation_id?: string
+          created_at?: string
+          direction?: Database["public"]["Enums"]["message_direction"]
+          evolution_message_id?: string | null
+          id?: string
+          is_read?: boolean
+          media_type?: string | null
+          media_url?: string | null
+          metadata?: Json | null
+          sender_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_instances: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          evolution_instance_name: string
+          id: string
+          last_connected_at: string | null
+          name: string
+          phone_number: string | null
+          qr_code: string | null
+          status: Database["public"]["Enums"]["instance_status"]
+          updated_at: string
+          webhook_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          evolution_instance_name: string
+          id?: string
+          last_connected_at?: string | null
+          name: string
+          phone_number?: string | null
+          qr_code?: string | null
+          status?: Database["public"]["Enums"]["instance_status"]
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          evolution_instance_name?: string
+          id?: string
+          last_connected_at?: string | null
+          name?: string
+          phone_number?: string | null
+          qr_code?: string | null
+          status?: Database["public"]["Enums"]["instance_status"]
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "supervisor" | "atendente"
+      conversation_status: "aberta" | "pendente" | "resolvida"
+      instance_status: "connected" | "disconnected" | "connecting" | "error"
+      message_direction: "inbound" | "outbound"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +415,11 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "supervisor", "atendente"],
+      conversation_status: ["aberta", "pendente", "resolvida"],
+      instance_status: ["connected", "disconnected", "connecting", "error"],
+      message_direction: ["inbound", "outbound"],
+    },
   },
 } as const
