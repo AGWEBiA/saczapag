@@ -30,12 +30,26 @@ export function CreateInstanceDialog({ open, onOpenChange }: CreateInstanceDialo
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
+      const finalEvolutionName = evolutionName || name.toLowerCase().replace(/\s+/g, "_");
+
+      // 1. Create in Evolution API first
+      const { data: evoData, error: evoError } = await supabase.functions.invoke("evolution-api", {
+        body: {
+          action: "create-instance",
+          instanceName: finalEvolutionName,
+        },
+      });
+
+      if (evoError) throw new Error("Erro na Evolution API: " + evoError.message);
+      if (evoData?.error) throw new Error(evoData.error);
+
+      // 2. Save to Supabase
       const { data, error } = await supabase
         .from("whatsapp_instances")
         .insert([
           {
             name,
-            evolution_instance_name: evolutionName || name.toLowerCase().replace(/\s+/g, "_"),
+            evolution_instance_name: finalEvolutionName,
             status: "connecting",
             created_by: user.id,
           },
@@ -48,7 +62,7 @@ export function CreateInstanceDialog({ open, onOpenChange }: CreateInstanceDialo
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["whatsapp_instances"] });
-      toast.success("Instância criada com sucesso!");
+      toast.success("Instância criada e pronta para conexão!");
       onOpenChange(false);
       setName("");
       setEvolutionName("");
