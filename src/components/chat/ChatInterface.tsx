@@ -32,11 +32,17 @@ export function ChatInterface() {
         .select("*, contact:contacts(*)")
         .eq("id", selectedConversationId)
         .single();
-      if (data) setInternalNote(data.contact?.internal_note || "");
+      if (error) throw error;
       return data;
     },
     enabled: !!selectedConversationId,
   });
+
+  useEffect(() => {
+    if (selectedConversation) {
+      setInternalNote(selectedConversation.contact?.internal_note || "");
+    }
+  }, [selectedConversation]);
 
   const { data: agents } = useQuery({
     queryKey: ["agents"],
