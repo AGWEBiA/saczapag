@@ -21,6 +21,48 @@ import { toast } from "sonner";
 export function ChatInterface() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
 
+  const { data: selectedConversation, refetch } = useQuery({
+    queryKey: ["conversation", selectedConversationId],
+    queryFn: async () => {
+      if (!selectedConversationId) return null;
+      const { data, error } = await supabase
+        .from("conversations")
+        .select("*, contact:contacts(*)")
+        .eq("id", selectedConversationId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedConversationId,
+  });
+
+  const { data: agents } = useQuery({
+    queryKey: ["agents"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("role", "agent");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const handleAssign = async (agentId: string | null) => {
+    if (!selectedConversationId) return;
+    const { error } = await supabase
+      .from("conversations")
+      .update({ assigned_to: agentId })
+      .eq("id", selectedConversationId);
+    
+    if (error) {
+      toast.error("Erro ao atribuir: " + error.message);
+    } else {
+      toast.success("Conversa atribuída com sucesso");
+      refetch();
+    }
+  };
+
   return (
     <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-background">
       <div className="w-80 flex-shrink-0">
