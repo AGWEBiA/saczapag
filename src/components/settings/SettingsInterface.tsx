@@ -6,10 +6,45 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { User, Bell, Shield, Smartphone, Globe } from "lucide-react";
+import { User, Bell, Shield, Smartphone, Globe, UserPlus, Users, Wand2 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 
 export function SettingsInterface() {
   const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: agents, isLoading: loadingAgents } = useQuery({
+    queryKey: ["all_agents"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const { data: rules } = useQuery({
+    queryKey: ["assignment_rules"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("assignment_rules")
+        .select(`*, instance:whatsapp_instances(name)`);
+      if (error) throw error;
+      return data;
+    }
+  });
 
   const handleSave = () => {
     setLoading(true);
@@ -67,7 +102,82 @@ export function SettingsInterface() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="notifications" className="mt-6">
+        <TabsContent value="team" className="mt-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle>Gestão de Agentes</CardTitle>
+                <CardDescription>
+                  Visualize e gerencie os membros da sua equipe.
+                </CardDescription>
+              </div>
+              <Button size="sm" className="gap-2">
+                <UserPlus className="h-4 w-4" /> Adicionar Agente
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Papel</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loadingAgents ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-4">Carregando...</TableCell>
+                    </TableRow>
+                  ) : agents?.map((agent) => (
+                    <TableRow key={agent.id}>
+                      <TableCell className="font-medium">{agent.full_name || "Sem nome"}</TableCell>
+                      <TableCell>{agent.email}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="capitalize">{agent.role}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="default" className="bg-green-500">Ativo</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="assignment" className="mt-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle>Regras de Atribuição</CardTitle>
+                <CardDescription>
+                  Configure como novas conversas são distribuídas automaticamente.
+                </CardDescription>
+              </div>
+              <Button size="sm" variant="outline">Nova Regra</Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {rules?.length === 0 ? (
+                  <div className="text-center py-8 border-2 border-dashed rounded-lg">
+                    <p className="text-sm text-muted-foreground">Nenhuma regra ativa. Novos chats ficarão "Não Atribuídos".</p>
+                  </div>
+                ) : rules?.map((rule) => (
+                  <div key={rule.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h4 className="font-semibold">{rule.name}</h4>
+                      <p className="text-xs text-muted-foreground">Instância: {(rule as any).instance?.name}</p>
+                    </div>
+                    <Switch defaultChecked={rule.is_active} />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
           <Card>
             <CardHeader>
               <CardTitle>Preferências de Notificação</CardTitle>
