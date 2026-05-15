@@ -20,7 +20,10 @@ import {
   QrCode, 
   LogOut,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Play,
+  ArrowRight,
+  ShieldCheck
 } from "lucide-react";
 import { toast } from "sonner";
 import { CreateInstanceDialog } from "./CreateInstanceDialog";
@@ -280,6 +283,72 @@ export function InstanceList() {
           </div>
         </DialogContent>
       </Dialog>
-    </Card>
+    </div>
+  );
+}
+
+function WebhookTester() {
+  const [phone, setPhone] = useState("5511999999999");
+  const [content, setContent] = useState("Mensagem de teste!");
+  const [loading, setLoading] = useState(false);
+
+  const handleTest = async () => {
+    setLoading(true);
+    try {
+      const { data: instances } = await supabase
+        .from("whatsapp_instances")
+        .select("evolution_instance_name")
+        .limit(1);
+
+      if (!instances?.length) {
+        toast.error("Crie uma instância primeiro!");
+        return;
+      }
+
+      const { error } = await supabase.functions.invoke("evolution-api", {
+        body: { 
+          action: "webhook", 
+          data: {
+            instance: instances[0].evolution_instance_name,
+            event: "messages.upsert",
+            data: {
+              key: {
+                remoteJid: `${phone}@s.whatsapp.net`,
+                fromMe: false,
+                id: `TEST_${Date.now()}`
+              },
+              pushName: "Test User",
+              message: {
+                conversation: content
+              }
+            }
+          }
+        },
+      });
+
+      if (error) throw error;
+      toast.success("Evento de webhook simulado! Verifique o chat.");
+    } catch (err: any) {
+      toast.error("Falha no teste: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4 pt-4">
+      <div className="space-y-2">
+        <label className="text-xs font-bold uppercase">Telefone (sem @)</label>
+        <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="5511999999999" />
+      </div>
+      <div className="space-y-2">
+        <label className="text-xs font-bold uppercase">Conteúdo</label>
+        <Input value={content} onChange={e => setContent(e.target.value)} />
+      </div>
+      <Button className="w-full gap-2" onClick={handleTest} disabled={loading}>
+        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+        Disparar Evento
+      </Button>
+    </div>
   );
 }
