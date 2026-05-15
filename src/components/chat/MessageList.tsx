@@ -59,7 +59,7 @@ export function MessageList({ conversationId }: MessageListProps) {
               key={msg.id}
               className={cn(
                 "flex flex-col max-w-[80%] rounded-lg p-3",
-                msg.direction === "sent"
+                msg.direction === "outbound"
                   ? "bg-primary text-primary-foreground self-end rounded-tr-none"
                   : "bg-card self-start rounded-tl-none border"
               )}
@@ -67,7 +67,7 @@ export function MessageList({ conversationId }: MessageListProps) {
               <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
               <span className={cn(
                 "text-[10px] mt-1 self-end opacity-70",
-                msg.direction === "sent" ? "text-primary-foreground" : "text-muted-foreground"
+                msg.direction === "outbound" ? "text-primary-foreground" : "text-muted-foreground"
               )}>
                 {format(new Date(msg.created_at), "HH:mm", { locale: ptBR })}
               </span>
