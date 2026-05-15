@@ -16,19 +16,23 @@ export function MessageInput({ conversationId }: MessageInputProps) {
 
   const sendMutation = useMutation({
     mutationFn: async () => {
-      // For now, we just insert into Supabase
-      // In a real scenario, this would trigger Evolution API via Edge Function or server action
-      const { data, error } = await supabase
-        .from("messages")
-        .insert([
-          {
-            conversation_id: conversationId,
-            content: content.trim(),
-            direction: "outbound",
-          },
-        ])
-        .select()
+      // Fetch phone number for WhatsApp API
+      const { data: convData } = await supabase
+        .from("conversations")
+        .select("contact:contacts(phone_number)")
+        .eq("id", conversationId)
         .single();
+      
+      const phone = (convData as any)?.contact?.phone_number;
+      if (!phone) throw new Error("Telefone do contato não encontrado");
+
+      const { data, error } = await supabase.functions.invoke("send-message", {
+        body: { 
+          conversationId, 
+          content: content.trim(),
+          phone: phone 
+        },
+      });
 
       if (error) throw error;
       return data;
