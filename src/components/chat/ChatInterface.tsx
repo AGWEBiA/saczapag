@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChatSidebar } from "./ChatSidebar";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
-import { MessageSquare, User, Phone, Calendar } from "lucide-react";
+import { MessageSquare, User, Phone, Calendar, FileText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,12 +14,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 
 export function ChatInterface() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
+  const [internalNote, setInternalNote] = useState("");
 
   const { data: selectedConversation, refetch } = useQuery({
     queryKey: ["conversation", selectedConversationId],
@@ -35,6 +37,12 @@ export function ChatInterface() {
     },
     enabled: !!selectedConversationId,
   });
+
+  useEffect(() => {
+    if (selectedConversation) {
+      setInternalNote(selectedConversation.contact?.internal_note || "");
+    }
+  }, [selectedConversation]);
 
   const { data: agents } = useQuery({
     queryKey: ["agents"],
@@ -63,6 +71,21 @@ export function ChatInterface() {
     }
   };
 
+  const handleUpdateContactNote = async () => {
+    if (!selectedConversation?.contact?.id) return;
+    const { error } = await supabase
+      .from("contacts")
+      .update({ internal_note: internalNote })
+      .eq("id", selectedConversation.contact.id);
+    
+    if (error) {
+      toast.error("Erro ao salvar nota: " + error.message);
+    } else {
+      toast.success("Nota do contato salva");
+      refetch();
+    }
+  };
+
   return (
     <div className="flex h-full overflow-hidden bg-background">
       <div className="w-80 flex-shrink-0">
@@ -87,7 +110,10 @@ export function ChatInterface() {
                 </div>
               </div>
               
-              <MessageList conversationId={selectedConversationId} />
+              <MessageList 
+                conversationId={selectedConversationId} 
+                isGroup={!!selectedConversation?.is_group} 
+              />
               
               <MessageInput conversationId={selectedConversationId} />
             </div>
@@ -138,6 +164,28 @@ export function ChatInterface() {
                       <span className="text-muted-foreground">Criada em:</span>
                       <span>{selectedConversation?.created_at && format(new Date(selectedConversation.created_at), "dd/MM/yyyy", { locale: ptBR })}</span>
                     </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
+                    <FileText size={14} /> Nota sobre o Contato
+                  </h4>
+                  <div className="space-y-2">
+                    <Textarea 
+                      placeholder="Adicione informações fixas sobre este cliente..."
+                      className="text-xs min-h-[100px] bg-muted/50"
+                      value={internalNote}
+                      onChange={(e) => setInternalNote(e.target.value)}
+                    />
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full text-xs"
+                      onClick={handleUpdateContactNote}
+                    >
+                      Salvar Nota
+                    </Button>
                   </div>
                 </div>
               </div>

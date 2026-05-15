@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Search, Filter } from "lucide-react";
+import { User, Search, Filter, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -77,7 +77,7 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
 
   useEffect(() => {
     const channel = supabase
-      .channel('schema-db-changes')
+      .channel('schema-db-changes-sidebar')
       .on(
         'postgres_changes',
         {
@@ -150,35 +150,43 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
               key={conv.id}
               onClick={() => onSelect(conv.id)}
               className={cn(
-                "w-full flex items-center gap-3 p-4 hover:bg-accent transition-colors text-left border-b",
+                "w-full flex items-center gap-3 p-4 hover:bg-accent transition-colors text-left border-b relative",
                 selectedId === conv.id && "bg-accent"
               )}
             >
               <Avatar className="h-12 w-12 flex-shrink-0">
                 <AvatarImage src={conv.contact?.avatar_url || ""} />
                 <AvatarFallback>
-                  <User className="h-6 w-6" />
+                  {conv.is_group ? <Users className="h-6 w-6" /> : <User className="h-6 w-6" />}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-baseline mb-1">
-                  <h3 className="font-semibold truncate">{conv.contact?.name || "Sem Nome"}</h3>
+                  <div className="flex items-center gap-1 min-w-0">
+                    {conv.is_group && <Users className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
+                    <h3 className="font-semibold truncate">{conv.contact?.name || "Sem Nome"}</h3>
+                  </div>
                   {conv.last_message_at && (
                     <span className="text-[10px] text-muted-foreground whitespace-nowrap ml-2">
                       {formatDistanceToNow(new Date(conv.last_message_at), { addSuffix: true, locale: ptBR })}
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-1">
-                  <p className="text-sm text-muted-foreground truncate flex-1">
-                    {conv.contact?.phone_number}
+                <div className="flex flex-col gap-0.5">
+                  <p className="text-sm text-foreground/80 truncate font-medium">
+                    {conv.last_message_content || conv.contact?.phone_number}
                   </p>
-                  {conv.unread_count > 0 && (
-                    <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                      {conv.unread_count}
-                    </span>
+                  {conv.last_message_content && (
+                    <p className="text-[10px] text-muted-foreground/60 truncate italic">
+                      {conv.contact?.phone_number}
+                    </p>
                   )}
                 </div>
+                {conv.unread_count > 0 && (
+                  <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full absolute right-4 bottom-4">
+                    {conv.unread_count}
+                  </span>
+                )}
               </div>
             </button>
           ))
