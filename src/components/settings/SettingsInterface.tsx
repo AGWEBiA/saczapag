@@ -10,6 +10,22 @@ import { User, Bell, Shield, Smartphone, Globe, UserPlus, Users, Wand2 } from "l
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter
+} from "@/components/ui/dialog";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import { 
   Table, 
   TableBody, 
   TableCell, 
@@ -21,7 +37,10 @@ import { Badge } from "@/components/ui/badge";
 
 export function SettingsInterface() {
   const [loading, setLoading] = useState(false);
+  const [isAddAgentOpen, setIsAddAgentOpen] = useState(false);
+  const [isAddRuleOpen, setIsAddRuleOpen] = useState(false);
   const queryClient = useQueryClient();
+
 
   const { data: agents, isLoading: loadingAgents } = useQuery({
     queryKey: ["all_agents"],
@@ -115,10 +134,59 @@ export function SettingsInterface() {
                   Visualize e gerencie os membros da sua equipe.
                 </CardDescription>
               </div>
-              <Button size="sm" className="gap-2">
-                <UserPlus className="h-4 w-4" /> Adicionar Agente
-              </Button>
+              <Dialog open={isAddAgentOpen} onOpenChange={setIsAddAgentOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="gap-2">
+                    <UserPlus className="h-4 w-4" /> Gerenciar Papéis
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Gerenciar Equipe</DialogTitle>
+                  </DialogHeader>
+                  <div className="py-4 space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Para adicionar novos membros, peça para eles se cadastrarem no sistema. 
+                      Aqui você pode alterar o papel de usuários existentes.
+                    </p>
+                    <Table>
+                      <TableBody>
+                        {agents?.map(agent => (
+                          <TableRow key={agent.id}>
+                            <TableCell>{agent.email}</TableCell>
+                            <TableCell>
+                              <Select 
+                                defaultValue={agent.role || undefined} 
+                                onValueChange={async (newRole) => {
+                                  const { error } = await supabase
+                                    .from('profiles')
+                                    .update({ role: newRole })
+                                    .eq('id', agent.id);
+                                  if (error) toast.error(error.message);
+                                  else {
+                                    toast.success("Papel atualizado!");
+                                    queryClient.invalidateQueries({ queryKey: ["all_agents"] });
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="w-32">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="admin">Admin</SelectItem>
+                                  <SelectItem value="agent">Agente</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </CardHeader>
+
             <CardContent>
               <Table>
                 <TableHeader>
