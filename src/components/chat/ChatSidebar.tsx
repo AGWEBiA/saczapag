@@ -1,7 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,7 +27,6 @@ interface ChatSidebarProps {
 
 export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
   const queryClient = useQueryClient();
-
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
 
@@ -43,7 +41,8 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
         .eq("id", user.id)
         .single();
       return data;
-    }
+    },
+    staleTime: Infinity, // Profile doesn't change often
   });
 
   const { data: conversations, isLoading } = useQuery({
@@ -64,21 +63,18 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
       }
 
       if (search) {
-        // Search by contact name or phone number directly in DB
         query = query.or(`contact.name.ilike.%${search}%,contact.phone_number.ilike.%${search}%`);
       }
 
       const { data, error } = await query;
       if (error) throw error;
-
       return data;
     },
-
     enabled: !!profile || filter === "all" || filter === "unassigned",
+    staleTime: 1000 * 30, // 30 seconds
   });
 
   useEffect(() => {
-    // Single channel for all sidebar-related updates to reduce WebSocket connections
     const sidebarChannel = supabase
       .channel('sidebar-updates')
       .on(
@@ -102,13 +98,9 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
         },
         async (payload) => {
           const newMessage = payload.new as any;
-          
-          // Invalidate conversations list as last_message changed
           queryClient.invalidateQueries({ queryKey: ["conversations"] });
 
-          // Show toast if we are not in that conversation or page is hidden
           if (newMessage.conversation_id !== selectedId || document.visibilityState !== 'visible') {
-            // Optimization: Only fetch contact name if needed for toast
             const { data: conv } = await supabase
               .from('conversations')
               .select('contact:contacts(name)')
@@ -131,7 +123,6 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
       supabase.removeChannel(sidebarChannel);
     };
   }, [queryClient, selectedId, onSelect]);
-
 
   return (
     <div className="flex flex-col h-full border-r bg-card">
@@ -172,49 +163,12 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
           <div className="p-4 text-center text-sm text-muted-foreground">Nenhuma conversa encontrada.</div>
         ) : (
           conversations?.map((conv) => (
-            <button
-              key={conv.id}
-              onClick={() => onSelect(conv.id)}
-              className={cn(
-                "w-full flex items-center gap-3 p-4 hover:bg-accent transition-colors text-left border-b relative",
-                selectedId === conv.id && "bg-accent"
-              )}
-            >
-              <Avatar className="h-12 w-12 flex-shrink-0">
-                <AvatarImage src={conv.contact?.avatar_url || ""} />
-                <AvatarFallback>
-                  {conv.is_group ? <Users className="h-6 w-6" /> : <User className="h-6 w-6" />}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-baseline mb-1">
-                  <div className="flex items-center gap-1 min-w-0">
-                    {conv.is_group && <Users className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
-                    <h3 className="font-semibold truncate">{conv.contact?.name || "Sem Nome"}</h3>
-                  </div>
-                  {conv.last_message_at && (
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap ml-2">
-                      {formatDistanceToNow(new Date(conv.last_message_at), { addSuffix: true, locale: ptBR })}
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <p className="text-sm text-foreground/80 truncate font-medium">
-                    {conv.last_message_content || conv.contact?.phone_number}
-                  </p>
-                  {conv.last_message_content && (
-                    <p className="text-[10px] text-muted-foreground/60 truncate italic">
-                      {conv.contact?.phone_number}
-                    </p>
-                  )}
-                </div>
-                {conv.unread_count > 0 && (
-                  <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full absolute right-4 bottom-4">
-                    {conv.unread_count}
-                  </span>
-                )}
-              </div>
-            </button>
+            <ChatItem 
+              key={conv.id} 
+              conv={conv} 
+              selectedId={selectedId} 
+              onSelect={onSelect} 
+            />
           ))
         )}
       </ScrollArea>
@@ -272,4 +226,3 @@ const ChatItem = React.memo(({ conv, selectedId, onSelect }: { conv: any, select
 });
 
 ChatItem.displayName = "ChatItem";
-

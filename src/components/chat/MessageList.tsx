@@ -31,7 +31,6 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
     staleTime: 1000 * 60, // Consider messages fresh for 1 minute
   });
 
-
   useEffect(() => {
     const channel = supabase
       .channel(`chat-${conversationId}`)
@@ -80,10 +79,9 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
             Inicie a conversa enviando uma mensagem.
           </div>
         ) : (
-        {messages?.map((msg) => (
-          <MessageBubble key={msg.id} msg={msg} isGroup={isGroup} />
-        ))}
-
+          messages?.map((msg) => (
+            <MessageBubble key={msg.id} msg={msg} isGroup={isGroup} />
+          ))
         )}
       </div>
     </ScrollArea>
@@ -124,4 +122,3 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: any, isGroup?: boolea
 });
 
 MessageBubble.displayName = "MessageBubble";
-
