@@ -1,4 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -26,6 +28,7 @@ interface ChatSidebarProps {
 
 export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
   const queryClient = useQueryClient();
+
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
 
@@ -60,18 +63,17 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
         query = query.is("assigned_to", null);
       }
 
+      if (search) {
+        // Search by contact name or phone number directly in DB
+        query = query.or(`contact.name.ilike.%${search}%,contact.phone_number.ilike.%${search}%`);
+      }
+
       const { data, error } = await query;
       if (error) throw error;
 
-      if (search) {
-        return data.filter(c => 
-          c.contact?.name?.toLowerCase().includes(search.toLowerCase()) || 
-          c.contact?.phone_number?.includes(search)
-        );
-      }
-
       return data;
     },
+
     enabled: !!profile || filter === "all" || filter === "unassigned",
   });
 
@@ -102,9 +104,49 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
       )
       .subscribe();
 
+    // Listen for all messages to show global notifications
+    const globalChannel = supabase
+      .channel('global-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: 'direction=eq.inbound'
+        },
+        async (payload) => {
+          const newMessage = payload.new as any;
+          // Don't show toast if we are already in that conversation
+          if (newMessage.conversation_id === selectedId && document.visibilityState === 'visible') {
+            return;
+          }
+
+          // Fetch sender info for a better toast
+          const { data: conv } = await supabase
+            .from('conversations')
+            .select('contact:contacts(name)')
+            .eq('id', newMessage.conversation_id)
+            .single();
+
+          toast.info(`Nova mensagem de ${conv?.contact?.name || 'Cliente'}`, {
+            description: newMessage.content,
+            action: {
+              label: "Ver",
+              onClick: () => onSelect(newMessage.conversation_id)
+            }
+          });
+          
+          queryClient.invalidateQueries({ queryKey: ["conversations"] });
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(globalChannel);
     };
+
   }, [queryClient]);
 
   return (
