@@ -156,7 +156,7 @@ export function SettingsInterface() {
                             <TableCell>{agent.email}</TableCell>
                             <TableCell>
                               <Select 
-                                defaultValue={agent.role} 
+                                defaultValue={agent.role || undefined} 
                                 onValueChange={async (newRole) => {
                                   const { error } = await supabase
                                     .from('profiles')
