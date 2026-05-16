@@ -138,6 +138,46 @@ export function ChatInterface() {
     }
   };
 
+  const handleUpdateTags = async (tags: string[]) => {
+    if (!selectedConversation?.contact?.id) return;
+    const { error } = await supabase
+      .from("contacts")
+      .update({ tags })
+      .eq("id", selectedConversation.contact.id);
+    if (error) toast.error("Erro ao atualizar etiquetas");
+    else refetch();
+  };
+
+  const handleAddTag = () => {
+    const t = newTag.trim().toLowerCase();
+    if (!t) return;
+    const current = (selectedConversation?.contact?.tags as string[] | null) || [];
+    if (current.includes(t)) {
+      setNewTag("");
+      return;
+    }
+    handleUpdateTags([...current, t]);
+    setNewTag("");
+  };
+
+  const handleRemoveTag = (tag: string) => {
+    const current = (selectedConversation?.contact?.tags as string[] | null) || [];
+    handleUpdateTags(current.filter((x) => x !== tag));
+  };
+
+  const handleUpdateStatus = async (status: string) => {
+    if (!selectedConversationId) return;
+    const { error } = await supabase
+      .from("conversations")
+      .update({ status: status as any })
+      .eq("id", selectedConversationId);
+    if (error) toast.error("Erro ao atualizar status");
+    else {
+      toast.success("Status atualizado");
+      refetch();
+    }
+  };
+
   return (
     <div className="flex h-full overflow-hidden bg-background">
       <div className="w-80 flex-shrink-0">
