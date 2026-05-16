@@ -1,36 +1,28 @@
-# Plan: Integrate Evolution API for WhatsApp Management
+A transformação do sistema para um modelo similar ao DigiSac foca em três pilares: Centralização Omnichannel, Gestão de Funil (CRM) e Analytics Avançado.
 
-I will automate the WhatsApp instance creation and status management by integrating the Evolution API directly into the application flow. This involves creating a set of server-side actions (Edge Functions) to communicate with the Evolution API and updating the UI to reflect real-time status.
+### Alterações Propostas
 
-## Proposed Changes
+#### 1. Painel de Analytics (Dashboard)
+- Substituir o painel básico por um dashboard completo com indicadores de desempenho (KPIs).
+- **Gráficos:** Volume de mensagens por dia, tempo médio de resposta por agente e status dos atendimentos.
+- **Métricas:** Taxa de conversão (se aplicável), contatos novos vs. recorrentes.
 
-### 1. Database & Security
-- No migration needed for now as `whatsapp_instances` already exists.
-- I will verify and ensure Row Level Security (RLS) is correctly configured for the `whatsapp_instances` table to allow users to manage their own instances.
+#### 2. Interface de Chat "Unified Inbox"
+- **Indicadores de Canal:** Adicionar ícones visuais (WhatsApp, Instagram, etc.) nas conversas para reforçar o aspecto omnichannel.
+- **Gestão de Tags e Funil:** Permitir que agentes adicionem etiquetas (ex: "Lead Quente", "Suporte", "Venda") diretamente na barra lateral do chat.
+- **Notas Internas:** Melhorar a visibilidade das notas internas para colaboração entre equipe.
+- **Status de Atendimento:** Implementar estágios de funil (Aguardando, Em Atendimento, Finalizado).
 
-### 2. Edge Functions (Evolution API Integration)
-- Create a new Edge Function `evolution-api` to handle:
-    - `create-instance`: Call Evolution API to create a new instance.
-    - `get-qr-code`: Fetch the QR code for a specific instance.
-    - `get-status`: Check the connection status of an instance.
-    - `logout-instance`: Log out and disconnect an instance.
-    - `delete-instance`: Remove the instance from both Evolution API and Supabase.
+#### 3. Gestão de Contatos (CRM Lite)
+- Exibição de histórico completo e metadados do contato.
+- Possibilidade de filtrar a lista de conversas por Tags ou Agente Atribuído.
 
-### 3. Frontend Integration
-- **Instance Creation**: Update `CreateInstanceDialog` to trigger the Edge Function when a new instance is created in the database.
-- **Real-time Status**: Update `InstanceList` to:
-    - Show QR codes for instances that are "connecting".
-    - Periodically check for status updates.
-    - Provide "Connect" (show QR) and "Logout" actions.
-- **Error Handling**: Improve feedback for API failures.
+#### 4. Automação e Respostas Rápidas
+- Interface para gerenciar Respostas Rápidas com atalhos (ex: `/boasvindas`).
+- Preparação para fluxo de Chatbot básico (Auto-atendimento).
 
-### 4. Webhook Setup
-- Prepare a webhook handler in the Edge Function to receive events from Evolution API (e.g., status changes, incoming messages) and update the Supabase database automatically.
-
-## Technical Details
-- **Secrets**: Use `EVOLUTION_API_URL` and `EVOLUTION_API_KEY` (which the user is configuring in Lovable Cloud).
-- **Communication**: Frontend calls Supabase Edge Functions via `supabase.functions.invoke`. Edge Functions use `fetch` to talk to Evolution API.
-- **State Management**: Use React Query for caching and auto-refreshing instance statuses.
-
----
-I will start by setting up the Edge Function infrastructure.
+### Detalhes Técnicos
+- **Frontend:** Utilização de `recharts` para visualização de dados.
+- **Banco de Dados:** Atualização da tabela `contacts` para suportar estágios de funil se necessário (usaremos `tags` inicialmente).
+- **Real-time:** Otimização do Supabase Realtime para garantir que múltiplos agentes vejam as atualizações instantaneamente sem conflitos.
+- **UX/UI:** Ajuste de cores e layout para seguir o padrão de "Plataforma SaaS" profissional (mais limpo e focado em produtividade).
