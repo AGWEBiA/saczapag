@@ -28,6 +28,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
       if (error) throw error;
       return data;
     },
+    staleTime: 1000 * 60, // Consider messages fresh for 1 minute
   });
 
   useEffect(() => {
@@ -79,36 +80,45 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
           </div>
         ) : (
           messages?.map((msg) => (
-            <div
-              key={msg.id}
-              className={cn(
-                "flex flex-col max-w-[80%] rounded-lg p-3",
-                msg.is_internal 
-                  ? "bg-yellow-50 border-yellow-200 self-center max-w-[90%] w-full border text-yellow-900" 
-                  : msg.direction === "outbound"
-                    ? "bg-primary text-primary-foreground self-end rounded-tr-none"
-                    : "bg-card self-start rounded-tl-none border"
-              )}
-            >
-              {msg.is_internal && (
-                <span className="text-[10px] font-bold uppercase mb-1 text-yellow-700">Nota Interna</span>
-              )}
-              {isGroup && msg.direction === "inbound" && msg.sender_name && (
-                <span className="text-[10px] font-bold mb-1 text-primary">{msg.sender_name}</span>
-              )}
-              <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
-              <div className="flex items-center justify-between gap-2 mt-1">
-                <span className={cn(
-                  "text-[10px] opacity-70",
-                  msg.is_internal ? "text-yellow-600" : msg.direction === "outbound" ? "text-primary-foreground" : "text-muted-foreground"
-                )}>
-                  {format(new Date(msg.created_at), "HH:mm", { locale: ptBR })}
-                </span>
-              </div>
-            </div>
+            <MessageBubble key={msg.id} msg={msg} isGroup={isGroup} />
           ))
         )}
       </div>
     </ScrollArea>
   );
 }
+
+import * as React from "react";
+
+const MessageBubble = React.memo(({ msg, isGroup }: { msg: any, isGroup?: boolean }) => {
+  return (
+    <div
+      className={cn(
+        "flex flex-col max-w-[80%] rounded-lg p-3",
+        msg.is_internal 
+          ? "bg-yellow-50 border-yellow-200 self-center max-w-[90%] w-full border text-yellow-900" 
+          : msg.direction === "outbound"
+            ? "bg-primary text-primary-foreground self-end rounded-tr-none"
+            : "bg-card self-start rounded-tl-none border"
+      )}
+    >
+      {msg.is_internal && (
+        <span className="text-[10px] font-bold uppercase mb-1 text-yellow-700">Nota Interna</span>
+      )}
+      {isGroup && msg.direction === "inbound" && msg.sender_name && (
+        <span className="text-[10px] font-bold mb-1 text-primary">{msg.sender_name}</span>
+      )}
+      <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+      <div className="flex items-center justify-between gap-2 mt-1">
+        <span className={cn(
+          "text-[10px] opacity-70",
+          msg.is_internal ? "text-yellow-600" : msg.direction === "outbound" ? "text-primary-foreground" : "text-muted-foreground"
+        )}>
+          {format(new Date(msg.created_at), "HH:mm", { locale: ptBR })}
+        </span>
+      </div>
+    </div>
+  );
+});
+
+MessageBubble.displayName = "MessageBubble";
