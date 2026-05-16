@@ -299,19 +299,67 @@ export function ChatInterface() {
 
                 <div className="pt-4 border-t">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
-                    <Calendar size={14} /> Informações
+                    <Info size={14} /> Status do Atendimento
                   </h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Status:</span>
-                      <span className="capitalize">{selectedConversation?.status}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Criada em:</span>
-                      <span>{selectedConversation?.created_at && format(new Date(selectedConversation.created_at), "dd/MM/yyyy", { locale: ptBR })}</span>
-                    </div>
+                  <Select
+                    value={selectedConversation?.status || "aberta"}
+                    onValueChange={handleUpdateStatus}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="aberta">Aberta</SelectItem>
+                      <SelectItem value="pendente">Pendente</SelectItem>
+                      <SelectItem value="resolvida">Resolvida</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground mt-2 flex items-center gap-1">
+                    <Calendar size={10} />
+                    Criada em {selectedConversation?.created_at && format(new Date(selectedConversation.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
+                    <Tag size={14} /> Etiquetas
+                  </h4>
+                  <div className="flex flex-wrap gap-1.5 mb-2 min-h-[28px]">
+                    {((selectedConversation?.contact?.tags as string[] | null) || []).map((tag) => (
+                      <Badge key={tag} variant="secondary" className="text-[10px] pl-2 pr-1 py-0.5 gap-1">
+                        {tag}
+                        <button
+                          onClick={() => handleRemoveTag(tag)}
+                          className="hover:bg-muted-foreground/20 rounded-full p-0.5"
+                          aria-label={`Remover etiqueta ${tag}`}
+                        >
+                          <X size={10} />
+                        </button>
+                      </Badge>
+                    ))}
+                    {(!selectedConversation?.contact?.tags || (selectedConversation.contact.tags as string[]).length === 0) && (
+                      <span className="text-[10px] text-muted-foreground italic">Sem etiquetas</span>
+                    )}
+                  </div>
+                  <div className="flex gap-1">
+                    <Input
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddTag();
+                        }
+                      }}
+                      placeholder="lead, vip, suporte..."
+                      className="h-8 text-xs"
+                    />
+                    <Button size="icon" variant="outline" className="h-8 w-8 flex-shrink-0" onClick={handleAddTag}>
+                      <Plus size={14} />
+                    </Button>
                   </div>
                 </div>
+
 
                 <div className="pt-4 border-t">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
