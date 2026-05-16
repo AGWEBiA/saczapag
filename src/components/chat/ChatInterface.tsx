@@ -32,6 +32,7 @@ import { toast } from "sonner";
 export function ChatInterface() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
   const [internalNote, setInternalNote] = useState("");
+  const [newTag, setNewTag] = useState("");
 
   const { data: selectedConversation, refetch } = useQuery({
     queryKey: ["conversation", selectedConversationId],
