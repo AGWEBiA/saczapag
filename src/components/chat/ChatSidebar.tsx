@@ -78,8 +78,9 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
   });
 
   useEffect(() => {
-    const channel = supabase
-      .channel('schema-db-changes-sidebar')
+    // Single channel for all sidebar-related updates to reduce WebSocket connections
+    const sidebarChannel = supabase
+      .channel('sidebar-updates')
       .on(
         'postgres_changes',
         {
@@ -96,58 +97,41 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'messages'
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["conversations"] });
-        }
-      )
-      .subscribe();
-
-    // Listen for all messages to show global notifications
-    const globalChannel = supabase
-      .channel('global-messages')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
           table: 'messages',
           filter: 'direction=eq.inbound'
         },
         async (payload) => {
           const newMessage = payload.new as any;
-          // Don't show toast if we are already in that conversation
-          if (newMessage.conversation_id === selectedId && document.visibilityState === 'visible') {
-            return;
-          }
-
-          // Fetch sender info for a better toast
-          const { data: conv } = await supabase
-            .from('conversations')
-            .select('contact:contacts(name)')
-            .eq('id', newMessage.conversation_id)
-            .single();
-
-          toast.info(`Nova mensagem de ${conv?.contact?.name || 'Cliente'}`, {
-            description: newMessage.content,
-            action: {
-              label: "Ver",
-              onClick: () => onSelect(newMessage.conversation_id)
-            }
-          });
           
+          // Invalidate conversations list as last_message changed
           queryClient.invalidateQueries({ queryKey: ["conversations"] });
+
+          // Show toast if we are not in that conversation or page is hidden
+          if (newMessage.conversation_id !== selectedId || document.visibilityState !== 'visible') {
+            // Optimization: Only fetch contact name if needed for toast
+            const { data: conv } = await supabase
+              .from('conversations')
+              .select('contact:contacts(name)')
+              .eq('id', newMessage.conversation_id)
+              .single();
+
+            toast.info(`Nova mensagem de ${conv?.contact?.name || 'Cliente'}`, {
+              description: newMessage.content,
+              action: {
+                label: "Ver",
+                onClick: () => onSelect(newMessage.conversation_id)
+              }
+            });
+          }
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
-      supabase.removeChannel(globalChannel);
+      supabase.removeChannel(sidebarChannel);
     };
+  }, [queryClient, selectedId, onSelect]);
 
-  }, [queryClient]);
 
   return (
     <div className="flex flex-col h-full border-r bg-card">
@@ -237,3 +221,55 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
     </div>
   );
 }
+
+import * as React from "react";
+
+const ChatItem = React.memo(({ conv, selectedId, onSelect }: { conv: any, selectedId?: string, onSelect: (id: string) => void }) => {
+  return (
+    <button
+      onClick={() => onSelect(conv.id)}
+      className={cn(
+        "w-full flex items-center gap-3 p-4 hover:bg-accent transition-colors text-left border-b relative",
+        selectedId === conv.id && "bg-accent"
+      )}
+    >
+      <Avatar className="h-12 w-12 flex-shrink-0">
+        <AvatarImage src={conv.contact?.avatar_url || ""} />
+        <AvatarFallback>
+          {conv.is_group ? <Users className="h-6 w-6" /> : <User className="h-6 w-6" />}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex-1 min-w-0">
+        <div className="flex justify-between items-baseline mb-1">
+          <div className="flex items-center gap-1 min-w-0">
+            {conv.is_group && <Users className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
+            <h3 className="font-semibold truncate">{conv.contact?.name || "Sem Nome"}</h3>
+          </div>
+          {conv.last_message_at && (
+            <span className="text-[10px] text-muted-foreground whitespace-nowrap ml-2">
+              {formatDistanceToNow(new Date(conv.last_message_at), { addSuffix: true, locale: ptBR })}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <p className="text-sm text-foreground/80 truncate font-medium">
+            {conv.last_message_content || conv.contact?.phone_number}
+          </p>
+          {conv.last_message_content && (
+            <p className="text-[10px] text-muted-foreground/60 truncate italic">
+              {conv.contact?.phone_number}
+            </p>
+          )}
+        </div>
+        {conv.unread_count > 0 && (
+          <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full absolute right-4 bottom-4">
+            {conv.unread_count}
+          </span>
+        )}
+      </div>
+    </button>
+  );
+});
+
+ChatItem.displayName = "ChatItem";
+
