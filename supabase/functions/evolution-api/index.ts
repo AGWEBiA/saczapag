@@ -121,8 +121,9 @@ serve(async (req) => {
 
           const remoteJid = data.key.remoteJid;
           const isGroup = remoteJid.endsWith("@g.us");
-          const pushName = data.pushName || "Unknown";
-          const content = message.conversation || message.extendedTextMessage?.text || "Mensagem de mídia";
+          const pushName = data.pushName || "Contato";
+          const content = message.conversation || message.extendedTextMessage?.text || message.imageMessage?.caption || "Mensagem de mídia";
+
           
           // 1. Get Instance
           const { data: instance } = await supabaseClient
@@ -145,7 +146,7 @@ serve(async (req) => {
               .from("contacts")
               .insert({ 
                 phone_number: remoteJid, 
-                name: isGroup ? (data.groupName || remoteJid) : pushName 
+                name: isGroup ? (data.groupName || data.groupInfo?.subject || remoteJid) : pushName 
               })
               .select("id")
               .single();

@@ -29,7 +29,6 @@ interface ChatSidebarProps {
 export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
   const queryClient = useQueryClient();
 
-  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
 
