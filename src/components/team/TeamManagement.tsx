@@ -30,7 +30,8 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { UserPlus, Upload, Trash2, Mail, Phone, Briefcase, Lock, Download, Edit, Key, AlertCircle } from "lucide-react";
+import { UserPlus, Upload, Trash2, Mail, Phone, Briefcase, Lock, Download, Edit, Key, AlertCircle, FileSpreadsheet } from "lucide-react";
+import { CSVImportDialog } from "@/components/shared/CSVImportDialog";
 import { Badge } from "@/components/ui/badge";
 import { 
   AlertDialog,
@@ -170,88 +171,58 @@ export function TeamManagement() {
     document.body.removeChild(link);
   };
 
-  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImportMembers = async (data: any[]) => {
+    let successCount = 0;
+    const errors: string[] = [];
+    const existingEmails = teamMembers?.map(m => m.email?.toLowerCase()) || [];
 
-    setLoading(true);
-    setImportErrors([]);
-    const reader = new FileReader();
-    
-    reader.onload = async (event) => {
-      let text = event.target?.result as string;
-      // Remove BOM (UTF-8) comum em arquivos salvos pelo Excel
-      if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
-      const lines = text.split(/\r?\n/).filter(line => line.trim());
+    for (let i = 0; i < data.length; i++) {
+      const item = data[i];
+      const email = (item.email || "").toLowerCase().trim();
+      const fullName = item.fullName || "";
+      const password = item.password || "Mudar123!";
 
-      if (lines.length <= 1) {
-        toast.error("Arquivo CSV vazio ou inválido.");
-        setLoading(false);
-        return;
+      if (!email || !fullName) {
+        errors.push(`Linha ${i + 1}: E-mail e Nome são obrigatórios.`);
+        continue;
       }
 
-      // Detecta delimitador (Excel BR costuma usar ;)
-      const delimiter = (lines[0].match(/;/g)?.length || 0) > (lines[0].match(/,/g)?.length || 0) ? ";" : ",";
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-      let successCount = 0;
-      const errors: string[] = [];
-      const existingEmails = teamMembers?.map(m => m.email?.toLowerCase()) || [];
-
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(delimiter).map(v => v.trim().replace(/^"|"$/g, ""));
-        const email = (values[0] || "").toLowerCase();
-        const password = values[1];
-        const fullName = values[2];
-
-        if (!email || !fullName) {
-          errors.push(`Linha ${i + 1}: E-mail e Nome são obrigatórios.`);
-          continue;
-        }
-
-        if (!emailRegex.test(email)) {
-          errors.push(`Linha ${i + 1}: E-mail "${email}" tem formato inválido.`);
-          continue;
-        }
-
-        if (existingEmails.includes(email)) {
-          errors.push(`Linha ${i + 1}: E-mail ${email} já cadastrado.`);
-          continue;
-        }
-
-        const memberData = {
-          email,
-          password: password || "Mudar123!",
-          fullName,
-          // whatsapp,
-          // position,
-          role: "agent",
-        };
-
-        try {
-          const { data, error } = await supabase.functions.invoke("manage-team", { body: memberData });
-          if (error || data.error) throw new Error(error?.message || data.error);
-          successCount++;
-        } catch (err: any) {
-          errors.push(`Linha ${i + 1}: ${err.message}`);
-        }
+      if (!emailRegex.test(email)) {
+        errors.push(`Linha ${i + 1}: E-mail "${email}" tem formato inválido.`);
+        continue;
       }
 
-      setLoading(false);
-      setImportErrors(errors);
-      
-      if (successCount > 0) {
-        toast.success(`${successCount} membros importados com sucesso!`);
-        queryClient.invalidateQueries({ queryKey: ["team_members"] });
+      if (existingEmails.includes(email)) {
+        errors.push(`Linha ${i + 1}: E-mail ${email} já cadastrado.`);
+        continue;
       }
-      
-      if (errors.length > 0) {
-        toast.error(`${errors.length} linhas falharam na importação.`);
-      } else {
-        setIsImportModalOpen(false);
+
+      try {
+        const { data: response, error } = await supabase.functions.invoke("manage-team", {
+          body: { 
+            action: "create",
+            email,
+            fullName,
+            password,
+            role: "agent"
+          }
+        });
+
+        if (error || response.error) {
+          throw new Error(error?.message || response.error);
+        }
+        successCount++;
+      } catch (err: any) {
+        errors.push(`Linha ${i + 1} (${email}): ${err.message}`);
       }
-    };
-    reader.readAsText(file);
+    }
+
+    if (successCount > 0) {
+      queryClient.invalidateQueries({ queryKey: ["team_members"] });
+    }
+
+    return { success: successCount, errors };
   };
 
   return (
@@ -268,41 +239,23 @@ export function TeamManagement() {
             <Download className="h-4 w-4" /> Template CSV
           </Button>
           
-          <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <Upload className="h-4 w-4" /> Importar CSV
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Importar Equipe</DialogTitle>
-                <DialogDescription>
-                  Selecione um arquivo CSV para importar múltiplos membros.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="csv">Arquivo CSV</Label>
-                  <Input id="csv" type="file" accept=".csv" onChange={handleImportCSV} disabled={loading} />
-                </div>
-                
-                {importErrors.length > 0 && (
-                  <div className="bg-destructive/10 p-3 rounded-md border border-destructive/20 max-h-40 overflow-y-auto">
-                    <div className="flex items-center gap-2 text-destructive font-medium mb-1">
-                      <AlertCircle className="h-4 w-4" />
-                      <span className="text-sm">Erros na importação:</span>
-                    </div>
-                    <ul className="text-xs space-y-1 text-destructive/90">
-                      {importErrors.map((err, idx) => (
-                        <li key={idx}>{err}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button variant="outline" className="gap-2" onClick={() => setIsImportModalOpen(true)}>
+            <Upload className="h-4 w-4" /> Importar CSV
+          </Button>
+          
+          <CSVImportDialog
+            open={isImportModalOpen}
+            onOpenChange={setIsImportModalOpen}
+            title="Importar Membros da Equipe"
+            description="Selecione um arquivo CSV para importar múltiplos colaboradores."
+            fields={[
+              { key: "fullName", label: "Nome Completo", required: true, aliases: ["nome", "name", "nome completo", "full name", "full_name"] },
+              { key: "email", label: "E-mail", required: true, aliases: ["e-mail", "mail", "email"] },
+              { key: "password", label: "Senha Inicial", required: false, aliases: ["senha", "password", "pass"] },
+            ]}
+            onImport={handleImportMembers}
+            templateHeaders={["nome", "email", "senha"]}
+          />
 
           <Dialog open={isAddModalOpen} onOpenChange={(open) => {
             setIsAddModalOpen(open);
