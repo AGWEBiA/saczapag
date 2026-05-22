@@ -71,7 +71,7 @@ export function TeamManagement() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, email, full_name, role, position, whatsapp_number, status, created_at")
+        .select("id, email, full_name, role, whatsapp_number, status, created_at")
         .order("created_at", { ascending: false });
       
       if (error) throw error;
