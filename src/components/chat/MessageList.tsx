@@ -24,11 +24,11 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
         .from("messages")
         .select("id, content, created_at, direction, sender_name, is_internal")
         .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: false }) // Buscar as últimas primeiro
+        .order("created_at", { ascending: false })
         .limit(50);
 
       if (error) throw error;
-      return data?.reverse(); // Reverter para exibir na ordem correta
+      return data?.reverse() || [];
     },
   });
 

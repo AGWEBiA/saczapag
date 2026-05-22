@@ -53,7 +53,7 @@ export function InstanceList() {
       if (error) throw error;
       return data;
     },
-    refetchInterval: 30000, // Aumentado para 30s
+    refetchInterval: 60000, // Aumentado para 60s
   });
 
   const deleteMutation = useMutation({
