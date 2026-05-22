@@ -7,11 +7,13 @@ export const Route = createFileRoute("/login")({
   validateSearch: (search) => z.object({
     redirect: z.string().optional(),
   }).parse(search),
-  beforeLoad: async ({ context, search }) => {
-    // getSession is much faster as it uses the local cache
+  beforeLoad: async ({ search }) => {
+    // No servidor, pulamos a verificação para evitar falsos positivos
+    if (typeof window === "undefined") return;
+
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
-      throw redirect({ to: search.redirect || "/" });
+      throw redirect({ to: search.redirect || "/dashboard" });
     }
   },
   component: LoginComponent,

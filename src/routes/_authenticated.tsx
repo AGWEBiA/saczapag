@@ -2,10 +2,16 @@ import { createFileRoute, redirect, Outlet, Link, useRouter } from "@tanstack/re
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Users2 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
-    // Pegar sessão atualizada do Supabase
+    // No servidor, não redirecionamos pois não temos acesso ao localStorage/cookies do Supabase ainda
+    // O controle será feito no lado do cliente para evitar loops infinitos de redirect no SSR
+    if (typeof window === "undefined") {
+      return { user: null };
+    }
+
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session?.user) {
@@ -23,12 +29,31 @@ export const Route = createFileRoute("/_authenticated")({
 
 function AuthenticatedLayout() {
   const router = useRouter();
-  const { user } = Route.useRouteContext();
+  const { user: initialUser } = Route.useRouteContext();
+  const { user: authUser, isLoading, isAuthenticated } = useAuth();
+  
+  // Usamos o usuário do hook useAuth se disponível, caso contrário o do context inicial
+  const user = authUser || initialUser;
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.invalidate();
+    router.navigate({ to: "/login" });
   };
+
+  // Se estiver carregando no cliente, mostramos um loader
+  if (typeof window !== "undefined" && isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  // Se não estiver autenticado no cliente, redirecionamos (segunda camada de proteção)
+  if (typeof window !== "undefined" && !isLoading && !isAuthenticated) {
+    router.navigate({ to: "/login" });
+    return null;
+  }
 
   const navItems = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
