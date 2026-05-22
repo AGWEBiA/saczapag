@@ -43,15 +43,34 @@ serve(async (req) => {
         userId = authUser.user.id;
       }
 
+      // Upsert profile
       const { error: profileError } = await supabaseClient
         .from("profiles")
-        .update({
+        .upsert({
+          user_id: userId,
           full_name: fullName,
           role: role || "agent",
           email: email,
-        })
-        .eq("user_id", userId);
+        }, { onConflict: 'user_id' });
+      
       if (profileError) throw profileError;
+
+      // Sync user_roles
+      const roleMap: Record<string, string> = {
+        'admin': 'admin',
+        'supervisor': 'supervisor',
+        'agent': 'atendente',
+        'atendente': 'atendente'
+      };
+      
+      const dbRole = roleMap[role || "agent"] || "atendente";
+      
+      const { error: roleError } = await supabaseClient
+        .from("user_roles")
+        .upsert({
+          user_id: userId,
+          role: dbRole
+        }, { onConflict: 'user_id,role' });
 
       return new Response(JSON.stringify({ success: true, user_id: userId, existed }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -92,14 +111,29 @@ serve(async (req) => {
         .from("profiles")
         .update({
           full_name: fullName,
-          // whatsapp_number: whatsapp ?? null,
-          // position: position ?? null,
           role: role,
-          // status: status,
           email: email,
         })
         .eq("id", id);
       if (profileError) throw profileError;
+
+      // Sync user_roles on update
+      if (role) {
+        const roleMap: Record<string, string> = {
+          'admin': 'admin',
+          'supervisor': 'supervisor',
+          'agent': 'atendente',
+          'atendente': 'atendente'
+        };
+        const dbRole = roleMap[role] || "atendente";
+        
+        await supabaseClient
+          .from("user_roles")
+          .upsert({
+            user_id: userId,
+            role: dbRole
+          }, { onConflict: 'user_id,role' });
+      }
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -117,11 +151,14 @@ serve(async (req) => {
         .single();
       if (fetchErr) throw fetchErr;
 
+      // Skip updating status column as it may not exist
+      /*
       const { error: profileError } = await supabaseClient
         .from("profiles")
         .update({ status: "inactive" })
         .eq("id", id);
       if (profileError) throw profileError;
+      */
 
       if (profileRow?.user_id) {
         await supabaseClient.auth.admin.updateUserById(profileRow.user_id, {
