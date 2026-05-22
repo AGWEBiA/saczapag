@@ -1,7 +1,7 @@
 import { createFileRoute, redirect, Outlet, Link, useRouter } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare } from "lucide-react";
+import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Users2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
@@ -33,6 +33,7 @@ function AuthenticatedLayout() {
     { to: "/chat", label: "Chat", icon: MessageSquare },
     { to: "/instances", label: "Instâncias", icon: Smartphone },
     { to: "/contacts", label: "Contatos", icon: Users },
+    { to: "/team", label: "Equipe", icon: Users2 },
     { to: "/settings", label: "Configurações", icon: Settings },
   ];
 
