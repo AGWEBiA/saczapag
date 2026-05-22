@@ -5,10 +5,9 @@ import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Us
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
-    // getSession is much faster as it uses the local cache if available
-    const { data: { session }, error } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
     
-    if (error || !session?.user) {
+    if (!session?.user) {
       throw redirect({
         to: "/login",
         search: {
