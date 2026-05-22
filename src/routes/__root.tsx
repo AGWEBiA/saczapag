@@ -126,10 +126,12 @@ function RootComponent() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // Only invalidate on critical auth events to prevent reload loops
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+      if (event === 'SIGNED_OUT') {
         router.invalidate();
-        queryClient.invalidateQueries();
+        queryClient.clear();
+      }
+      if (event === 'SIGNED_IN') {
+        router.invalidate();
       }
     });
     return () => subscription.unsubscribe();
