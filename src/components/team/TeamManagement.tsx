@@ -68,6 +68,7 @@ export function TeamManagement() {
   const { data: teamMembers, isLoading } = useQuery({
     queryKey: ["team_members"],
     staleTime: 1000 * 60 * 60, // 1 hora
+    queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
         .select("id, email, full_name, role, position, whatsapp_number, status, created_at")
