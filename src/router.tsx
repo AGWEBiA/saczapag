@@ -21,8 +21,8 @@ export const getRouter = () => {
       auth: undefined!, // Injected at render time
     },
     scrollRestoration: true,
-    defaultPreload: 'intent',
-    defaultPreloadStaleTime: 60000, // 1 minute
+    defaultPreload: false,
+    defaultPreloadStaleTime: 0,
   });
 
   return router;

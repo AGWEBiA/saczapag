@@ -125,9 +125,12 @@ function RootComponent() {
   const isLoading = useRouterState({ select: (s) => s.status === 'pending' });
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      router.invalidate();
-      queryClient.invalidateQueries();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Only invalidate on critical auth events to prevent reload loops
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+        router.invalidate();
+        queryClient.invalidateQueries();
+      }
     });
     return () => subscription.unsubscribe();
   }, [router, queryClient]);
@@ -135,8 +138,10 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       {isLoading && (
-        <div className="fixed top-0 left-0 right-0 z-[9999]">
-          <div className="h-1 bg-primary animate-progress-bar w-full" />
+        <div className="fixed top-0 left-0 right-0 z-[9999] pointer-events-none">
+          <div className="h-0.5 bg-primary animate-in fade-in duration-200">
+            <div className="h-full bg-primary animate-progress-bar w-full origin-left" />
+          </div>
         </div>
       )}
       <Outlet />
