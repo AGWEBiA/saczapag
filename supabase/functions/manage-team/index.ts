@@ -116,6 +116,9 @@ serve(async (req) => {
         email: email,
       });
 
+      // If we want to actually send the email via Supabase:
+      // const { error: resetError } = await supabaseClient.auth.resetPasswordForEmail(email);
+
       if (resetError) throw resetError;
 
       return new Response(JSON.stringify({ success: true, message: "Link de recuperação gerado" }), {
