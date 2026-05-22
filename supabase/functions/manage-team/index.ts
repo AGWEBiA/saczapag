@@ -21,27 +21,26 @@ serve(async (req) => {
     const { action = "create", id, email, password, fullName, whatsapp, position, role, status } = body;
 
     if (action === "create") {
-      // 1. Create the user in Auth
       const { data: authUser, error: authError } = await supabaseClient.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
         user_metadata: { full_name: fullName }
       });
-
       if (authError) throw authError;
 
-      // 2. Update the profile
+      // O trigger handle_new_user já cria o profile com user_id = authUser.user.id
       const { error: profileError } = await supabaseClient
         .from("profiles")
         .update({
           full_name: fullName,
-          whatsapp_number: whatsapp,
-          position: position,
-          role: role || "agent"
+          whatsapp_number: whatsapp ?? null,
+          position: position ?? null,
+          role: role || "agent",
+          status: "active",
+          email: email,
         })
-        .eq("id", authUser.user.id);
-
+        .eq("user_id", authUser.user.id);
       if (profileError) throw profileError;
 
       return new Response(JSON.stringify({ success: true, user: authUser.user }), {
@@ -53,26 +52,43 @@ serve(async (req) => {
     if (action === "update") {
       if (!id) throw new Error("ID is required for update");
 
-      // Update Auth if email changed (optional, usually safer to keep email linked)
-      if (email) {
-        const { error: authUpdateError } = await supabaseClient.auth.admin.updateUserById(id, {
-          email: email,
-          user_metadata: { full_name: fullName }
-        });
-        if (authUpdateError) throw authUpdateError;
+      // 'id' do client é o profile.id — buscar o user_id correspondente
+      const { data: profileRow, error: fetchErr } = await supabaseClient
+        .from("profiles")
+        .select("user_id, email")
+        .eq("id", id)
+        .single();
+      if (fetchErr) throw fetchErr;
+      if (!profileRow?.user_id) throw new Error("Profile sem user_id vinculado");
+
+      const userId = profileRow.user_id;
+
+      // Atualiza auth somente se algo mudou
+      const authUpdate: Record<string, unknown> = {
+        user_metadata: { full_name: fullName },
+      };
+      if (email && email !== profileRow.email) {
+        authUpdate.email = email;
       }
+      if (status) {
+        // Bane o usuário se inativo, libera se ativo
+        authUpdate.ban_duration = status === "inactive" ? "876000h" : "none";
+      }
+
+      const { error: authUpdateError } = await supabaseClient.auth.admin.updateUserById(userId, authUpdate);
+      if (authUpdateError) throw authUpdateError;
 
       const { error: profileError } = await supabaseClient
         .from("profiles")
         .update({
           full_name: fullName,
-          whatsapp_number: whatsapp,
-          position: position,
+          whatsapp_number: whatsapp ?? null,
+          position: position ?? null,
           role: role,
-          status: status
+          status: status,
+          email: email,
         })
         .eq("id", id);
-
       if (profileError) throw profileError;
 
       return new Response(JSON.stringify({ success: true }), {
@@ -84,23 +100,24 @@ serve(async (req) => {
     if (action === "delete") {
       if (!id) throw new Error("ID is required for deletion");
 
-      // We usually deactivate instead of hard delete
+      const { data: profileRow, error: fetchErr } = await supabaseClient
+        .from("profiles")
+        .select("user_id")
+        .eq("id", id)
+        .single();
+      if (fetchErr) throw fetchErr;
+
       const { error: profileError } = await supabaseClient
         .from("profiles")
-        .update({ status: 'inactive' })
+        .update({ status: "inactive" })
         .eq("id", id);
-
       if (profileError) throw profileError;
 
-      // Also disable the user in Auth
-      const { error: authError } = await supabaseClient.auth.admin.updateUserById(id, {
-        ban_duration: 'none' // To re-enable
-      });
-      
-      // Better way to disable access:
-      await supabaseClient.auth.admin.updateUserById(id, {
-        app_metadata: { status: 'inactive' }
-      });
+      if (profileRow?.user_id) {
+        await supabaseClient.auth.admin.updateUserById(profileRow.user_id, {
+          ban_duration: "876000h",
+        });
+      }
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -110,15 +127,10 @@ serve(async (req) => {
 
     if (action === "reset-password") {
       if (!email) throw new Error("Email is required for password reset");
-
       const { error: resetError } = await supabaseClient.auth.admin.generateLink({
-        type: 'recovery',
+        type: "recovery",
         email: email,
       });
-
-      // If we want to actually send the email via Supabase:
-      // const { error: resetError } = await supabaseClient.auth.resetPasswordForEmail(email);
-
       if (resetError) throw resetError;
 
       return new Response(JSON.stringify({ success: true, message: "Link de recuperação gerado" }), {
@@ -129,7 +141,8 @@ serve(async (req) => {
 
     throw new Error("Invalid action");
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error("manage-team error:", error?.message, error);
+    return new Response(JSON.stringify({ error: error?.message || "Erro desconhecido" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,
     });
