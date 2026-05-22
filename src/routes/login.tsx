@@ -2,16 +2,19 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
   validateSearch: (search) => z.object({
     redirect: z.string().optional(),
   }).parse(search),
-  beforeLoad: async ({ context, search }) => {
-    // getSession is much faster as it uses the local cache
+  beforeLoad: async ({ search }) => {
+    // No servidor, pulamos a verificação para evitar falsos positivos
+    if (typeof window === "undefined") return;
+
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
-      throw redirect({ to: search.redirect || "/" });
+      throw redirect({ to: search.redirect || "/dashboard" });
     }
   },
   component: LoginComponent,
@@ -52,9 +55,14 @@ function LoginComponent() {
         });
         if (signInError) throw signInError;
         
-        // Pequeno delay para garantir que a sessão foi persistida
-        await new Promise(resolve => setTimeout(resolve, 500));
-        navigate({ to: search.redirect || "/dashboard" });
+        toast.success("Login realizado com sucesso! Redirecionando...");
+        
+        // Pequeno delay para garantir que a sessão foi persistida e o estado do cliente Supabase atualizado
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        const target = search.redirect || "/dashboard";
+        // Usamos replace: true para limpar o histórico e evitar que o usuário volte para a tela de login ao clicar em 'Voltar'
+        await navigate({ to: target, replace: true });
       }
     } catch (err: any) {
       setError(err.message || "Ocorreu um erro.");
