@@ -125,13 +125,11 @@ function RootComponent() {
   const isLoading = useRouterState({ select: (s) => s.status === 'pending' });
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      // Removemos o invalidate desnecessário que resetava o app inteiro
       if (event === 'SIGNED_OUT') {
-        router.invalidate();
         queryClient.clear();
-      }
-      if (event === 'SIGNED_IN') {
-        router.invalidate();
+        router.navigate({ to: '/login' });
       }
     });
     return () => subscription.unsubscribe();
