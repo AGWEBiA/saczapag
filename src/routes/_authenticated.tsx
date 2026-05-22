@@ -4,8 +4,13 @@ import { Button } from "@/components/ui/button";
 import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Users2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated")({
-  beforeLoad: async ({ location }) => {
-    // Usamos getSession de forma direta e síncrona se possível
+  beforeLoad: async ({ location, context }) => {
+    // Se já temos o user no context, não precisamos chamar o Supabase novamente
+    if (context.auth?.user) {
+      return { user: context.auth.user };
+    }
+
+    // Fallback apenas se o context ainda não estiver pronto
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session?.user) {
