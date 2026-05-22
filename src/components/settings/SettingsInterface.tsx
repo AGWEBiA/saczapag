@@ -38,8 +38,28 @@ import { Badge } from "@/components/ui/badge";
 export function SettingsInterface() {
   const [loading, setLoading] = useState(false);
   const [isAddAgentOpen, setIsAddAgentOpen] = useState(false);
-  const [isAddRuleOpen, setIsAddRuleOpen] = useState(false);
+  const [userName, setUserName] = useState("");
+  const [userRole, setUserRole] = useState("");
   const queryClient = useQueryClient();
+
+  const { data: profile } = useQuery({
+    queryKey: ["current_profile_settings"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+      
+      if (data) {
+        setUserName(data.full_name || "");
+        setUserRole(data.role || "");
+      }
+      return data;
+    },
+  });
 
 
   const { data: agents, isLoading: loadingAgents } = useQuery({
@@ -65,12 +85,34 @@ export function SettingsInterface() {
     }
   });
 
-  const handleSave = () => {
+  const handleSaveProfile = async () => {
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Não autenticado");
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ 
+          full_name: userName,
+          role: userRole
+        })
+        .eq("id", user.id);
+
+      if (error) throw error;
+      
+      toast.success("Perfil atualizado com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["current_profile_settings"] });
+      queryClient.invalidateQueries({ queryKey: ["current_profile"] });
+    } catch (error: any) {
+      toast.error("Erro ao salvar: " + error.message);
+    } finally {
       setLoading(false);
-      toast.success("Configurações salvas com sucesso!");
-    }, 1000);
+    }
+  };
+
+  const handleSave = () => {
+    toast.success("Configurações salvas!");
   };
 
   return (
@@ -111,14 +153,28 @@ export function SettingsInterface() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Nome Completo</Label>
-                  <Input id="name" placeholder="Nome do usuário" defaultValue="Usuário Admin" />
+                  <Input 
+                    id="name" 
+                    placeholder="Ex: José Silva" 
+                    value={userName} 
+                    onChange={(e) => setUserName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role">Função / Cargo</Label>
+                  <Input 
+                    id="role" 
+                    placeholder="Ex: Copywriter, Atendimento" 
+                    value={userRole}
+                    onChange={(e) => setUserRole(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" placeholder="email@exemplo.com" disabled />
+                  <Input id="email" type="email" value={profile?.email || ""} disabled />
                 </div>
               </div>
-              <Button onClick={handleSave} disabled={loading}>
+              <Button onClick={handleSaveProfile} disabled={loading}>
                 {loading ? "Salvando..." : "Salvar Alterações"}
               </Button>
             </CardContent>
