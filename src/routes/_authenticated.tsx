@@ -73,7 +73,7 @@ function AuthenticatedLayout() {
         </div>
       </aside>
       
-      <main className="flex-1 overflow-auto bg-muted/10 p-8">
+      <main className="flex-1 overflow-auto bg-muted/10 p-8 animate-in fade-in duration-300">
         <div className="max-w-7xl mx-auto">
           <Outlet />
         </div>
