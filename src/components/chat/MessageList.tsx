@@ -18,7 +18,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
 
   const { data: messages, isLoading } = useQuery({
     queryKey: ["messages", conversationId],
-    staleTime: 1000 * 60 * 10, // 10 minutos
+    staleTime: 1000 * 60 * 30, // 30 minutos (mensagens passadas não mudam)
     queryFn: async () => {
       const { data, error } = await supabase
         .from("messages")

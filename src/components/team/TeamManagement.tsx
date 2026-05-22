@@ -67,10 +67,10 @@ export function TeamManagement() {
 
   const { data: teamMembers, isLoading } = useQuery({
     queryKey: ["team_members"],
-    queryFn: async () => {
+    staleTime: 1000 * 60 * 60, // 1 hora
       const { data, error } = await supabase
         .from("profiles")
-        .select("*")
+        .select("id, email, full_name, role, position, whatsapp_number, status, created_at")
         .order("created_at", { ascending: false });
       
       if (error) throw error;
