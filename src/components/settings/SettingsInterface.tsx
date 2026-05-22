@@ -102,7 +102,7 @@ export function SettingsInterface() {
           role: userRole,
           whatsapp_number: userWhatsapp,
           position: userPosition
-        })
+        } as any)
         .eq("id", user.id);
 
       if (error) throw error;
