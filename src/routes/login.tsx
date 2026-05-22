@@ -8,9 +8,9 @@ export const Route = createFileRoute("/login")({
     redirect: z.string().optional(),
   }).parse(search),
   beforeLoad: async ({ context, search }) => {
-    // If already authenticated, redirect away
-    const { data } = await supabase.auth.getUser();
-    if (data.user) {
+    // getSession is much faster as it uses the local cache
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
       throw redirect({ to: search.redirect || "/" });
     }
   },
