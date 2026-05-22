@@ -190,14 +190,19 @@ export function CSVImportDialog({
                       {field.required && <span className="text-destructive ml-1">*</span>}
                     </Label>
                     <Select
-                      value={mapping[field.key] || ""}
-                      onValueChange={(val) => setMapping({ ...mapping, [field.key]: val })}
+                      value={mapping[field.key] || "__ignore__"}
+                      onValueChange={(val) => {
+                        const next = { ...mapping };
+                        if (val === "__ignore__") delete next[field.key];
+                        else next[field.key] = val;
+                        setMapping(next);
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Ignorar campo" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Ignorar campo</SelectItem>
+                        <SelectItem value="__ignore__">Ignorar campo</SelectItem>
                         {headers.map((h) => (
                           <SelectItem key={h} value={h}>{h}</SelectItem>
                         ))}
