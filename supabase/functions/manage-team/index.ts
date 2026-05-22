@@ -34,10 +34,10 @@ serve(async (req) => {
         .from("profiles")
         .update({
           full_name: fullName,
-          whatsapp_number: whatsapp ?? null,
-          position: position ?? null,
+          // whatsapp_number: whatsapp ?? null,
+          // position: position ?? null,
           role: role || "agent",
-          status: "active",
+          // status: "active",
           email: email,
         })
         .eq("user_id", authUser.user.id);
@@ -82,10 +82,10 @@ serve(async (req) => {
         .from("profiles")
         .update({
           full_name: fullName,
-          whatsapp_number: whatsapp ?? null,
-          position: position ?? null,
+          // whatsapp_number: whatsapp ?? null,
+          // position: position ?? null,
           role: role,
-          status: status,
+          // status: status,
           email: email,
         })
         .eq("id", id);
