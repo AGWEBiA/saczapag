@@ -2,6 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
   validateSearch: (search) => z.object({
@@ -53,6 +54,8 @@ function LoginComponent() {
           password,
         });
         if (signInError) throw signInError;
+        
+        toast.success("Login realizado com sucesso! Redirecionando...");
         
         // Pequeno delay para garantir que a sessão foi persistida e o estado do cliente Supabase atualizado
         await new Promise(resolve => setTimeout(resolve, 800));
