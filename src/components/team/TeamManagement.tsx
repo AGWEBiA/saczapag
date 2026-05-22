@@ -155,8 +155,8 @@ export function TeamManagement() {
   };
 
   const downloadCSVTemplte = () => {
-    const headers = ["email", "senha", "nome", "whatsapp", "cargo"];
-    const example = ["exemplo@empresa.com", "Senha123!", "João Silva", "5511999999999", "Atendimento"];
+    const headers = ["email", "senha", "nome"];
+    const example = ["exemplo@empresa.com", "Senha123!", "João Silva"];
     const csvContent = [headers.join(","), example.join(",")].join("\n");
     
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -197,8 +197,6 @@ export function TeamManagement() {
         const email = values[0];
         const password = values[1];
         const fullName = values[2];
-        const whatsapp = values[3];
-        const position = values[4];
 
         if (!email || !fullName) {
           errors.push(`Linha ${i + 1}: E-mail e Nome são obrigatórios.`);
@@ -214,8 +212,8 @@ export function TeamManagement() {
           email,
           password: password || "Mudar123!",
           fullName,
-          whatsapp,
-          position,
+          // whatsapp,
+          // position,
           role: "agent",
         };
 
@@ -348,23 +346,25 @@ export function TeamManagement() {
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="whatsapp">WhatsApp</Label>
+                      <Label htmlFor="whatsapp">WhatsApp (Opcional)</Label>
                       <Input
                         id="whatsapp"
                         placeholder="5511999999999"
                         value={formData.whatsapp}
                         onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                        disabled
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="position">Função / Cargo</Label>
+                      <Label htmlFor="position">Função / Cargo (Opcional)</Label>
                       <Input
                         id="position"
                         placeholder="Atendimento"
                         value={formData.position}
                         onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                        disabled
                       />
                     </div>
                     <div className="grid gap-2">
@@ -433,11 +433,12 @@ export function TeamManagement() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="edit-whatsapp">WhatsApp</Label>
+                  <Label htmlFor="edit-whatsapp">WhatsApp (Em breve)</Label>
                   <Input
                     id="edit-whatsapp"
                     value={formData.whatsapp}
                     onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                    disabled
                   />
                 </div>
                 <div className="grid gap-2">
@@ -458,11 +459,12 @@ export function TeamManagement() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="edit-position">Função / Cargo</Label>
+                  <Label htmlFor="edit-position">Função / Cargo (Em breve)</Label>
                   <Input
                     id="edit-position"
                     value={formData.position}
                     onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                    disabled
                   />
                 </div>
                 <div className="grid gap-2">
