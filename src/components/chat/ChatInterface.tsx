@@ -60,8 +60,7 @@ export function ChatInterface() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("*")
-        .eq("role", "agent");
+        .select("*");
       if (error) throw error;
       return data;
     },
