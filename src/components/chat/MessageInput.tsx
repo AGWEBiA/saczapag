@@ -23,9 +23,10 @@ import {
 
 interface MessageInputProps {
   conversationId: string;
+  isGroup?: boolean;
 }
 
-export function MessageInput({ conversationId }: MessageInputProps) {
+export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
   const [content, setContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
   const [openQuickReplies, setOpenQuickReplies] = useState(false);
@@ -63,9 +64,11 @@ export function MessageInput({ conversationId }: MessageInputProps) {
       if (!user) throw new Error("Usuário não autenticado");
 
       const senderName = profile?.full_name || user.email?.split('@')[0] || "Agente";
+      const jobTitle = profile?.role || "Atendimento";
+      const signature = `[${senderName} - ${jobTitle}]: `;
+      const finalContent = isGroup ? `${signature}${content.trim()}` : content.trim();
 
       if (isInternal) {
-
         const { error } = await supabase
           .from("messages")
           .insert({
@@ -95,7 +98,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
       const { data, error } = await supabase.functions.invoke("send-message", {
         body: { 
           conversationId, 
-          content: content.trim(),
+          content: finalContent,
           phone: phone,
           senderName: senderName
         },

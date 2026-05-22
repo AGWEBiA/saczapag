@@ -60,8 +60,7 @@ export function ChatInterface() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("*")
-        .eq("role", "agent");
+        .select("*");
       if (error) throw error;
       return data;
     },
@@ -261,7 +260,10 @@ export function ChatInterface() {
                 isGroup={!!selectedConversation?.is_group} 
               />
               
-              <MessageInput conversationId={selectedConversationId} />
+              <MessageInput 
+                conversationId={selectedConversationId} 
+                isGroup={!!selectedConversation?.is_group} 
+              />
             </div>
 
             {/* Right Sidebar: Contact Details & Assignment */}
