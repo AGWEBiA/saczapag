@@ -42,9 +42,9 @@ import { ptBR } from "date-fns/locale";
 export function Dashboard() {
   const { data: instances } = useQuery({
     queryKey: ["dash_instances"],
-    staleTime: 1000 * 60 * 30, // 30 min
+    staleTime: 1000 * 60 * 60, // 1h
     queryFn: async () => {
-      const { data, error } = await supabase.from("whatsapp_instances").select("*");
+      const { data, error } = await supabase.from("whatsapp_instances").select("id, status");
       if (error) throw error;
       return data;
     },
@@ -52,17 +52,20 @@ export function Dashboard() {
 
   const { data: contacts } = useQuery({
     queryKey: ["dash_contacts"],
-    staleTime: 1000 * 60 * 60, // 1h
+    staleTime: 1000 * 60 * 60 * 2, // 2h
     queryFn: async () => {
-      const { data, error } = await supabase.from("contacts").select("id", { count: 'estimated', head: true });
+      // Usando query otimizada apenas para contagem
+      const { count, error } = await supabase
+        .from("contacts")
+        .select("*", { count: 'estimated', head: true });
       if (error) throw error;
-      return data;
+      return { length: count || 0 };
     },
   });
 
   const { data: conversations } = useQuery({
     queryKey: ["dash_conversations"],
-    staleTime: 1000 * 60 * 10, // 10 min
+    staleTime: 1000 * 60 * 30, // 30 min
     queryFn: async () => {
       const { data, error } = await supabase.from("conversations").select("id, status, assigned_to");
       if (error) throw error;
@@ -72,15 +75,15 @@ export function Dashboard() {
 
   const { data: messages, isLoading: loadingMsgs } = useQuery({
     queryKey: ["dash_messages_7d"],
-    staleTime: 1000 * 60 * 15, // 15 min
+    staleTime: 1000 * 60 * 60, // 1h
     queryFn: async () => {
       const since = subDays(new Date(), 7).toISOString();
       const { data, error } = await supabase
         .from("messages")
         .select("id, direction, created_at")
         .gte("created_at", since)
-        .limit(500) // Reduzido para ser ainda mais rápido
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: true })
+        .limit(1000); 
       if (error) throw error;
       return data;
     },

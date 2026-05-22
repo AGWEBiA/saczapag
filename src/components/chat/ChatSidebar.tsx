@@ -47,7 +47,7 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
 
   const { data: conversations, isLoading } = useQuery({
     queryKey: ["conversations", filter, search],
-    staleTime: 1000 * 60 * 5, // 5 minutos de cache
+    staleTime: 1000 * 60 * 10, // 10 minutos de cache
     queryFn: async () => {
       let query = supabase
         .from("conversations")

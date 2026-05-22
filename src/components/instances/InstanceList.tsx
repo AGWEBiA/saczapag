@@ -43,7 +43,7 @@ export function InstanceList() {
 
   const { data: instances, isLoading, refetch } = useQuery({
     queryKey: ["whatsapp_instances"],
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 30, // 30 minutos
     queryFn: async () => {
       const { data, error } = await supabase
         .from("whatsapp_instances")
@@ -53,7 +53,7 @@ export function InstanceList() {
       if (error) throw error;
       return data;
     },
-    refetchInterval: 30000, // Aumentado para 30s
+    refetchInterval: 60000, // Aumentado para 60s
   });
 
   const deleteMutation = useMutation({

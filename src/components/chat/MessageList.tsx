@@ -18,17 +18,17 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
 
   const { data: messages, isLoading } = useQuery({
     queryKey: ["messages", conversationId],
-    staleTime: 1000 * 60 * 10, // 10 minutos
+    staleTime: 1000 * 60 * 30, // 30 minutos (mensagens passadas não mudam)
     queryFn: async () => {
       const { data, error } = await supabase
         .from("messages")
         .select("id, content, created_at, direction, sender_name, is_internal")
         .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: false }) // Buscar as últimas primeiro
+        .order("created_at", { ascending: false })
         .limit(50);
 
       if (error) throw error;
-      return data?.reverse(); // Reverter para exibir na ordem correta
+      return data?.reverse() || [];
     },
   });
 

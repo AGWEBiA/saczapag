@@ -126,7 +126,6 @@ function RootComponent() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      // Removemos o invalidate desnecessário que resetava o app inteiro
       if (event === 'SIGNED_OUT') {
         queryClient.clear();
         router.navigate({ to: '/login' });
@@ -134,6 +133,18 @@ function RootComponent() {
     });
     return () => subscription.unsubscribe();
   }, [router, queryClient]);
+
+  // Injetar o estado de auth no context do router globalmente
+  useEffect(() => {
+    if (!auth.isLoading) {
+      router.update({
+        context: {
+          ...router.options.context,
+          auth,
+        },
+      });
+    }
+  }, [auth, router]);
 
   return (
     <QueryClientProvider client={queryClient}>

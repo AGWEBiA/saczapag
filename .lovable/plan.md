@@ -1,28 +1,29 @@
-A transformação do sistema para um modelo similar ao DigiSac foca em três pilares: Centralização Omnichannel, Gestão de Funil (CRM) e Analytics Avançado.
+text
+O sistema apresenta uma lentidão severa causada principalmente por loops de re-renderização e invalidações excessivas de cache em cada navegação. Como o Supabase é externo, a latência de rede é amplificada por cada requisição redundante.
 
-### Alterações Propostas
+Vou implementar as seguintes otimizações estruturais:
 
-#### 1. Painel de Analytics (Dashboard)
-- Substituir o painel básico por um dashboard completo com indicadores de desempenho (KPIs).
-- **Gráficos:** Volume de mensagens por dia, tempo médio de resposta por agente e status dos atendimentos.
-- **Métricas:** Taxa de conversão (se aplicável), contatos novos vs. recorrentes.
+1. **Persistência de Cache (TanStack Query):**
+   - Aumentar `staleTime` para dados estáticos (perfil, instâncias, membros da equipe).
+   - Impedir que a troca de rotas invalide o cache desnecessariamente.
 
-#### 2. Interface de Chat "Unified Inbox"
-- **Indicadores de Canal:** Adicionar ícones visuais (WhatsApp, Instagram, etc.) nas conversas para reforçar o aspecto omnichannel.
-- **Gestão de Tags e Funil:** Permitir que agentes adicionem etiquetas (ex: "Lead Quente", "Suporte", "Venda") diretamente na barra lateral do chat.
-- **Notas Internas:** Melhorar a visibilidade das notas internas para colaboração entre equipe.
-- **Status de Atendimento:** Implementar estágios de funil (Aguardando, Em Atendimento, Finalizado).
+2. **Otimização do Layout Autenticado:**
+   - Remover chamadas de `supabase.auth.getSession()` no `beforeLoad` de cada rota.
+   - Centralizar a sessão no `context` do roteador para evitar centenas de requisições de autenticação ao navegar.
 
-#### 3. Gestão de Contatos (CRM Lite)
-- Exibição de histórico completo e metadados do contato.
-- Possibilidade de filtrar a lista de conversas por Tags ou Agente Atribuído.
+3. **Otimização do Chat e Dashboard:**
+   - No Chat, reduzir a frequência de atualizações globais da barra lateral.
+   - No Dashboard, otimizar as queries para buscar apenas o essencial (campos específicos e limites).
 
-#### 4. Automação e Respostas Rápidas
-- Interface para gerenciar Respostas Rápidas com atalhos (ex: `/boasvindas`).
-- Preparação para fluxo de Chatbot básico (Auto-atendimento).
+4. **Navegação Inteligente:**
+   - Desativar pré-carregamento agressivo que consome CPU e banda desnecessariamente.
+
+---
 
 ### Detalhes Técnicos
-- **Frontend:** Utilização de `recharts` para visualização de dados.
-- **Banco de Dados:** Atualização da tabela `contacts` para suportar estágios de funil se necessário (usaremos `tags` inicialmente).
-- **Real-time:** Otimização do Supabase Realtime para garantir que múltiplos agentes vejam as atualizações instantaneamente sem conflitos.
-- **UX/UI:** Ajuste de cores e layout para seguir o padrão de "Plataforma SaaS" profissional (mais limpo e focado em produtividade).
+
+- **`src/router.tsx`**: Configurar `defaultPreload: false` e ajustar o `QueryClient`.
+- **`src/routes/_authenticated.tsx`**: Otimizar o `beforeLoad` para usar a sessão já presente no contexto.
+- **`src/components/chat/ChatSidebar.tsx`**: Ajustar `staleTime` e `refetchOnWindowFocus`.
+- **`src/components/Dashboard.tsx`**: Limitar dados e aumentar cache.
+- **`src/hooks/use-auth.ts`**: Garantir que o hook não cause re-renders infinitos.
