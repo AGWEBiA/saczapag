@@ -240,7 +240,7 @@ export function TeamManagement() {
           </Button>
           
           <Button variant="outline" className="gap-2" onClick={() => setIsImportModalOpen(true)}>
-            <Upload className="h-4 w-4" /> Importar CSV
+            <FileSpreadsheet className="h-4 w-4" /> Importar CSV
           </Button>
           
           <CSVImportDialog
