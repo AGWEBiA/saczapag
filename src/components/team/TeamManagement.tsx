@@ -68,7 +68,7 @@ export function TeamManagement() {
 
   const { data: teamMembers, isLoading } = useQuery({
     queryKey: ["team_members"],
-    staleTime: 1000 * 60 * 60, // 1 hora
+    staleTime: 0, // Desativar cache para garantir que novos usuários apareçam imediatamente
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")

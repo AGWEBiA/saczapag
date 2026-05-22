@@ -62,13 +62,13 @@ export function ContactList() {
 
   const { data: contacts, isLoading, refetch } = useQuery({
     queryKey: ["contacts"],
-    staleTime: 1000 * 60 * 30, // 30 min
+    staleTime: 0, // Desativar cache para garantir que novos contatos apareçam imediatamente
     queryFn: async () => {
       const { data, error } = await supabase
         .from("contacts")
         .select("id, name, phone_number, avatar_url, created_at")
-        .order("name", { ascending: true })
-        .limit(100);
+        .order("created_at", { ascending: false })
+        .limit(1000);
 
       if (error) throw error;
       return data;
