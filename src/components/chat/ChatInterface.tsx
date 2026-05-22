@@ -261,7 +261,10 @@ export function ChatInterface() {
                 isGroup={!!selectedConversation?.is_group} 
               />
               
-              <MessageInput conversationId={selectedConversationId} />
+              <MessageInput 
+                conversationId={selectedConversationId} 
+                isGroup={!!selectedConversation?.is_group} 
+              />
             </div>
 
             {/* Right Sidebar: Contact Details & Assignment */}
