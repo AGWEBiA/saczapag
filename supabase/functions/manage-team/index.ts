@@ -20,6 +20,68 @@ serve(async (req) => {
     const body = await req.json();
     const { action = "create", id, email, password, fullName, whatsapp, position, role, status } = body;
 
+    if (action === "sync-roles") {
+      // Sincroniza user_roles a partir de profiles.role para todos os usuários existentes
+      const { data: profiles, error: pErr } = await supabaseClient
+        .from("profiles")
+        .select("user_id, role");
+      if (pErr) throw pErr;
+
+      const roleMap: Record<string, string> = {
+        admin: "admin",
+        supervisor: "supervisor",
+        agent: "atendente",
+        atendente: "atendente",
+      };
+
+      let synced = 0;
+      for (const p of profiles || []) {
+        if (!p.user_id) continue;
+        const dbRole = roleMap[p.role || "agent"] || "atendente";
+        const { error } = await supabaseClient
+          .from("user_roles")
+          .upsert({ user_id: p.user_id, role: dbRole }, { onConflict: "user_id,role" });
+        if (!error) synced++;
+      }
+
+      return new Response(JSON.stringify({ success: true, synced, total: profiles?.length || 0 }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
+    if (action === "backfill-profiles") {
+      // Cria profiles faltantes para usuários do auth que não têm profile
+      const { data: list } = await supabaseClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const { data: existingProfiles } = await supabaseClient
+        .from("profiles")
+        .select("user_id");
+      const existingIds = new Set((existingProfiles || []).map((p: any) => p.user_id));
+
+      let created = 0;
+      for (const u of list?.users || []) {
+        if (existingIds.has(u.id)) continue;
+        const { error } = await supabaseClient.from("profiles").upsert({
+          user_id: u.id,
+          email: u.email,
+          full_name: u.user_metadata?.full_name || u.email?.split("@")[0] || "Usuário",
+          role: "agent",
+        }, { onConflict: "user_id" });
+        if (!error) {
+          created++;
+          await supabaseClient.from("user_roles").upsert(
+            { user_id: u.id, role: "atendente" },
+            { onConflict: "user_id,role" }
+          );
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true, created, total: list?.users?.length || 0 }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
     if (action === "create") {
       // Idempotente: se já existir usuário com esse email, reaproveita
       let userId: string | null = null;
