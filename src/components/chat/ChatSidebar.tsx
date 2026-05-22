@@ -47,14 +47,22 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
 
   const { data: conversations, isLoading } = useQuery({
     queryKey: ["conversations", filter, search],
+    staleTime: 1000 * 60 * 5, // 5 minutos de cache
     queryFn: async () => {
       let query = supabase
         .from("conversations")
         .select(`
-          *,
-          contact:contacts(*)
+          id, 
+          status, 
+          assigned_to, 
+          last_message_at, 
+          last_message_content, 
+          unread_count, 
+          is_group,
+          contact:contacts(id, name, phone_number, avatar_url)
         `)
-        .order("last_message_at", { ascending: false });
+        .order("last_message_at", { ascending: false })
+        .limit(50); // Limite de conversas iniciais
 
       if (filter === "mine" && profile?.id) {
         query = query.eq("assigned_to", profile.id);
@@ -63,7 +71,8 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
       }
 
       if (search) {
-        query = query.or(`contact.name.ilike.%${search}%,contact.phone_number.ilike.%${search}%`);
+        // Busca otimizada
+        query = query.or(`last_message_content.ilike.%${search}%`);
       }
 
       const { data, error } = await query;
@@ -71,7 +80,6 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
       return data;
     },
     enabled: !!profile || filter === "all" || filter === "unassigned",
-    staleTime: 1000 * 30, // 30 seconds
   });
 
   useEffect(() => {
