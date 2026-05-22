@@ -66,16 +66,21 @@ export function TeamManagement() {
     status: "active"
   });
 
-  const { data: teamMembers, isLoading } = useQuery({
+  const { data: teamMembers, isLoading, error: queryError } = useQuery({
     queryKey: ["team_members"],
-    staleTime: 0, // Desativar cache para garantir que novos usuários apareçam imediatamente
+    staleTime: 0,
     queryFn: async () => {
+      console.log("Fetching team members...");
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .order("created_at", { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching team members:", error);
+        throw error;
+      }
+      console.log(`Fetched ${data?.length || 0} team members.`);
       return data;
     },
   });
@@ -509,10 +514,23 @@ export function TeamManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {queryError ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-destructive">
+                    <div className="flex flex-col items-center gap-2">
+                      <AlertCircle className="h-8 w-8" />
+                      <p>Erro ao carregar equipe: {(queryError as any).message}</p>
+                      <p className="text-xs text-muted-foreground">Verifique se você tem permissões de administrador no banco de dados.</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : isLoading ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8">
-                    Carregando membros da equipe...
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full" />
+                      <span>Carregando membros da equipe...</span>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : teamMembers?.length === 0 ? (
