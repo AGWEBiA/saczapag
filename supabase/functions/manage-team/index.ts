@@ -53,7 +53,7 @@ serve(async (req) => {
         .eq("user_id", userId);
       if (profileError) throw profileError;
 
-      return new Response(JSON.stringify({ success: true, user: authUser.user }), {
+      return new Response(JSON.stringify({ success: true, user_id: userId, existed }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
