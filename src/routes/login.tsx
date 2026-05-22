@@ -51,7 +51,10 @@ function LoginComponent() {
           password,
         });
         if (signInError) throw signInError;
-        navigate({ to: search.redirect || "/" });
+        
+        // Pequeno delay para garantir que a sessão foi persistida
+        await new Promise(resolve => setTimeout(resolve, 500));
+        navigate({ to: search.redirect || "/dashboard" });
       }
     } catch (err: any) {
       setError(err.message || "Ocorreu um erro.");
