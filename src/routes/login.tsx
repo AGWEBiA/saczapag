@@ -54,9 +54,12 @@ function LoginComponent() {
         });
         if (signInError) throw signInError;
         
-        // Pequeno delay para garantir que a sessão foi persistida
-        await new Promise(resolve => setTimeout(resolve, 500));
-        navigate({ to: search.redirect || "/dashboard" });
+        // Pequeno delay para garantir que a sessão foi persistida e o estado do cliente Supabase atualizado
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        const target = search.redirect || "/dashboard";
+        // Usamos replace: true para limpar o histórico e evitar que o usuário volte para a tela de login ao clicar em 'Voltar'
+        await navigate({ to: target, replace: true });
       }
     } catch (err: any) {
       setError(err.message || "Ocorreu um erro.");
