@@ -108,6 +108,9 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: any, isGroup?: boolea
       {isGroup && msg.direction === "inbound" && msg.sender_name && (
         <span className="text-[10px] font-bold mb-1 text-primary">{msg.sender_name}</span>
       )}
+      {msg.direction === "outbound" && msg.sender_name && (
+        <span className="text-[10px] font-bold mb-1 text-primary-foreground opacity-90">{msg.sender_name}</span>
+      )}
       <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
       <div className="flex items-center justify-between gap-2 mt-1">
         <span className={cn(

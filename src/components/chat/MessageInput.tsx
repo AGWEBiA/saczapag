@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, Loader2, Zap } from "lucide-react";
@@ -30,6 +31,20 @@ export function MessageInput({ conversationId }: MessageInputProps) {
   const [openQuickReplies, setOpenQuickReplies] = useState(false);
   const queryClient = useQueryClient();
 
+  const { data: profile } = useQuery({
+    queryKey: ["current_profile"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+      return data;
+    },
+  });
+
   const { data: quickReplies } = useQuery({
     queryKey: ["quick-replies"],
     queryFn: async () => {
@@ -44,9 +59,12 @@ export function MessageInput({ conversationId }: MessageInputProps) {
 
   const sendMutation = useMutation({
     mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const senderName = profile?.full_name || user.email?.split('@')[0] || "Agente";
+
       if (isInternal) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("Usuário não autenticado");
 
         const { error } = await supabase
           .from("messages")
@@ -56,6 +74,7 @@ export function MessageInput({ conversationId }: MessageInputProps) {
             content: content.trim(),
             is_internal: true,
             sender_user_id: user.id,
+            sender_name: senderName,
             type: 'internal'
           });
         
@@ -77,7 +96,8 @@ export function MessageInput({ conversationId }: MessageInputProps) {
         body: { 
           conversationId, 
           content: content.trim(),
-          phone: phone 
+          phone: phone,
+          senderName: senderName
         },
       });
 
