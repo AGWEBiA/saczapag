@@ -21,26 +21,36 @@ serve(async (req) => {
     const { action = "create", id, email, password, fullName, whatsapp, position, role, status } = body;
 
     if (action === "create") {
-      const { data: authUser, error: authError } = await supabaseClient.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { full_name: fullName }
-      });
-      if (authError) throw authError;
+      // Idempotente: se já existir usuário com esse email, reaproveita
+      let userId: string | null = null;
+      let existed = false;
+      const { data: existingList } = await supabaseClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const existing = existingList?.users?.find(
+        (u: any) => (u.email || "").toLowerCase() === String(email).toLowerCase()
+      );
 
-      // O trigger handle_new_user já cria o profile com user_id = authUser.user.id
+      if (existing) {
+        userId = existing.id;
+        existed = true;
+      } else {
+        const { data: authUser, error: authError } = await supabaseClient.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { full_name: fullName },
+        });
+        if (authError) throw authError;
+        userId = authUser.user.id;
+      }
+
       const { error: profileError } = await supabaseClient
         .from("profiles")
         .update({
           full_name: fullName,
-          // whatsapp_number: whatsapp ?? null,
-          // position: position ?? null,
           role: role || "agent",
-          // status: "active",
           email: email,
         })
-        .eq("user_id", authUser.user.id);
+        .eq("user_id", userId);
       if (profileError) throw profileError;
 
       return new Response(JSON.stringify({ success: true, user: authUser.user }), {
