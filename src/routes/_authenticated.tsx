@@ -5,6 +5,7 @@ import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Us
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
+    // Usamos getSession de forma direta e síncrona se possível
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session?.user) {

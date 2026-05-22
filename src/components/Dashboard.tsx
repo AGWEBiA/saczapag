@@ -42,7 +42,7 @@ import { ptBR } from "date-fns/locale";
 export function Dashboard() {
   const { data: instances } = useQuery({
     queryKey: ["dash_instances"],
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 30, // 30 min
     queryFn: async () => {
       const { data, error } = await supabase.from("whatsapp_instances").select("*");
       if (error) throw error;
@@ -52,9 +52,9 @@ export function Dashboard() {
 
   const { data: contacts } = useQuery({
     queryKey: ["dash_contacts"],
-    staleTime: 1000 * 60 * 10,
+    staleTime: 1000 * 60 * 60, // 1h
     queryFn: async () => {
-      const { data, error } = await supabase.from("contacts").select("id, created_at", { count: 'estimated' }).limit(1);
+      const { data, error } = await supabase.from("contacts").select("id", { count: 'estimated', head: true });
       if (error) throw error;
       return data;
     },
@@ -62,9 +62,9 @@ export function Dashboard() {
 
   const { data: conversations } = useQuery({
     queryKey: ["dash_conversations"],
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 60 * 10, // 10 min
     queryFn: async () => {
-      const { data, error } = await supabase.from("conversations").select("id, status, assigned_to, created_at");
+      const { data, error } = await supabase.from("conversations").select("id, status, assigned_to");
       if (error) throw error;
       return data;
     },
@@ -72,13 +72,14 @@ export function Dashboard() {
 
   const { data: messages, isLoading: loadingMsgs } = useQuery({
     queryKey: ["dash_messages_7d"],
+    staleTime: 1000 * 60 * 15, // 15 min
     queryFn: async () => {
       const since = subDays(new Date(), 7).toISOString();
       const { data, error } = await supabase
         .from("messages")
-        .select("id, direction, created_at", { count: 'estimated' })
+        .select("id, direction, created_at")
         .gte("created_at", since)
-        .limit(1000) // Limit total points for dashboard aggregation
+        .limit(500) // Reduzido para ser ainda mais rápido
         .order("created_at", { ascending: true });
       if (error) throw error;
       return data;
