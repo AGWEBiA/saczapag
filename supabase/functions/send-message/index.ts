@@ -17,7 +17,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { conversationId, content, phone } = await req.json();
+    const { conversationId, content, phone, senderName } = await req.json();
 
     if (!content || !phone) {
       throw new Error("Content and phone are required");
@@ -114,7 +114,8 @@ serve(async (req) => {
         conversation_id: conversationId,
         direction: "outbound",
         content: content,
-        whatsapp_message_id: whatsappMessageId,
+        sender_name: senderName,
+        evolution_message_id: whatsappMessageId,
         status: "sent"
       })
       .select()
