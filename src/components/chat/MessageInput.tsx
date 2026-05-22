@@ -23,6 +23,7 @@ import {
 
 interface MessageInputProps {
   conversationId: string;
+  isGroup?: boolean;
 }
 
 export function MessageInput({ conversationId }: MessageInputProps) {
