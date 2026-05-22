@@ -43,16 +43,17 @@ export function InstanceList() {
 
   const { data: instances, isLoading, refetch } = useQuery({
     queryKey: ["whatsapp_instances"],
+    staleTime: 1000 * 60 * 5,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("whatsapp_instances")
-        .select("*")
+        .select("id, name, evolution_instance_name, status, created_at")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data;
     },
-    refetchInterval: 10000,
+    refetchInterval: 30000, // Aumentado para 30s
   });
 
   const deleteMutation = useMutation({
