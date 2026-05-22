@@ -64,7 +64,7 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
       if (!user) throw new Error("Usuário não autenticado");
 
       const senderName = profile?.full_name || user.email?.split('@')[0] || "Agente";
-      const jobTitle = profile?.role || "Atendimento";
+      const jobTitle = (profile as any)?.position || profile?.role || "Atendimento";
       const signature = `[${senderName} - ${jobTitle}]: `;
       const finalContent = isGroup ? `${signature}${content.trim()}` : content.trim();
 

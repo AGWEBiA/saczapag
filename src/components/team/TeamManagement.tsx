@@ -30,22 +30,39 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { UserPlus, Upload, Trash2, Mail, Phone, Briefcase, Lock } from "lucide-react";
+import { UserPlus, Upload, Trash2, Mail, Phone, Briefcase, Lock, Download, Edit, Key, AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function TeamManagement() {
   const queryClient = useQueryClient();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
 
   // Form states
   const [formData, setFormData] = useState({
+    id: "",
     email: "",
     password: "",
     fullName: "",
     whatsapp: "",
     position: "",
     role: "agent",
+    status: "active"
   });
 
   const { data: teamMembers, isLoading } = useQuery({
@@ -61,77 +78,168 @@ export function TeamManagement() {
     },
   });
 
-  const createMemberMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
+  const manageMemberMutation = useMutation({
+    mutationFn: async ({ action, data }: { action: string; data: any }) => {
       const { data: response, error } = await supabase.functions.invoke("manage-team", {
-        body: data,
+        body: { ...data, action },
       });
       if (error) throw error;
       if (response.error) throw new Error(response.error);
       return response;
     },
-    onSuccess: () => {
-      toast.success("Membro da equipe cadastrado com sucesso!");
+    onSuccess: (_, variables) => {
+      const actionMsg = variables.action === "create" ? "cadastrado" : 
+                        variables.action === "update" ? "atualizado" : 
+                        variables.action === "delete" ? "removido" : "processado";
+      
+      toast.success(`Membro da equipe ${actionMsg} com sucesso!`);
       setIsAddModalOpen(false);
-      setFormData({
-        email: "",
-        password: "",
-        fullName: "",
-        whatsapp: "",
-        position: "",
-        role: "agent",
-      });
+      setIsEditModalOpen(false);
+      setIsDeleteAlertOpen(false);
+      resetForm();
       queryClient.invalidateQueries({ queryKey: ["team_members"] });
     },
     onError: (error: any) => {
-      toast.error("Erro ao cadastrar: " + error.message);
+      toast.error("Erro na operação: " + error.message);
     },
   });
 
+  const resetForm = () => {
+    setFormData({
+      id: "",
+      email: "",
+      password: "",
+      fullName: "",
+      whatsapp: "",
+      position: "",
+      role: "agent",
+      status: "active"
+    });
+    setSelectedMember(null);
+  };
+
   const handleAddMember = (e: React.FormEvent) => {
     e.preventDefault();
-    createMemberMutation.mutate(formData);
+    manageMemberMutation.mutate({ action: "create", data: formData });
+  };
+
+  const handleEditMember = (e: React.FormEvent) => {
+    e.preventDefault();
+    manageMemberMutation.mutate({ action: "update", data: formData });
+  };
+
+  const handleDeleteMember = () => {
+    if (selectedMember) {
+      manageMemberMutation.mutate({ action: "delete", data: { id: selectedMember.id } });
+    }
+  };
+
+  const handleResetPassword = (email: string) => {
+    manageMemberMutation.mutate({ action: "reset-password", data: { email } });
+  };
+
+  const openEditModal = (member: any) => {
+    setSelectedMember(member);
+    setFormData({
+      id: member.id,
+      email: member.email || "",
+      password: "", // Password not needed for update unless changing it
+      fullName: member.full_name || "",
+      whatsapp: member.whatsapp_number || "",
+      position: member.position || "",
+      role: member.role || "agent",
+      status: (member as any).status || "active"
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const downloadCSVTemplte = () => {
+    const headers = ["email", "senha", "nome", "whatsapp", "cargo"];
+    const example = ["exemplo@empresa.com", "Senha123!", "João Silva", "5511999999999", "Atendimento"];
+    const csvContent = [headers.join(","), example.join(",")].join("\n");
+    
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "template_equipe.csv");
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setLoading(true);
+    setImportErrors([]);
     const reader = new FileReader();
+    
     reader.onload = async (event) => {
       const text = event.target?.result as string;
-      const lines = text.split("\n");
-      const headers = lines[0].split(",");
+      const lines = text.split("\n").filter(line => line.trim());
       
-      // Basic CSV import logic
-      setLoading(true);
+      if (lines.length <= 1) {
+        toast.error("Arquivo CSV vazio ou inválido.");
+        setLoading(false);
+        return;
+      }
+
       let successCount = 0;
-      let errorCount = 0;
+      const errors: string[] = [];
+      const existingEmails = teamMembers?.map(m => m.email?.toLowerCase()) || [];
 
       for (let i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
-        const values = lines[i].split(",");
+        const values = lines[i].split(",").map(v => v.trim());
+        const email = values[0];
+        const password = values[1];
+        const fullName = values[2];
+        const whatsapp = values[3];
+        const position = values[4];
+
+        if (!email || !fullName) {
+          errors.push(`Linha ${i + 1}: E-mail e Nome são obrigatórios.`);
+          continue;
+        }
+
+        if (existingEmails.includes(email.toLowerCase())) {
+          errors.push(`Linha ${i + 1}: E-mail ${email} já cadastrado.`);
+          continue;
+        }
+
         const memberData = {
-          email: values[0]?.trim(),
-          password: values[1]?.trim() || "Mudar123!", // Default password if not provided
-          fullName: values[2]?.trim(),
-          whatsapp: values[3]?.trim(),
-          position: values[4]?.trim(),
+          email,
+          password: password || "Mudar123!",
+          fullName,
+          whatsapp,
+          position,
           role: "agent",
         };
 
         try {
-          await supabase.functions.invoke("manage-team", { body: memberData });
+          const { data, error } = await supabase.functions.invoke("manage-team", { body: memberData });
+          if (error || data.error) throw new Error(error?.message || data.error);
           successCount++;
-        } catch (err) {
-          errorCount++;
+        } catch (err: any) {
+          errors.push(`Linha ${i + 1}: ${err.message}`);
         }
       }
 
       setLoading(false);
-      toast.success(`${successCount} membros importados. ${errorCount} erros.`);
-      queryClient.invalidateQueries({ queryKey: ["team_members"] });
-      setIsImportModalOpen(false);
+      setImportErrors(errors);
+      
+      if (successCount > 0) {
+        toast.success(`${successCount} membros importados com sucesso!`);
+        queryClient.invalidateQueries({ queryKey: ["team_members"] });
+      }
+      
+      if (errors.length > 0) {
+        toast.error(`${errors.length} linhas falharam na importação.`);
+      } else {
+        setIsImportModalOpen(false);
+      }
     };
     reader.readAsText(file);
   };
@@ -145,18 +253,22 @@ export function TeamManagement() {
             Gerencie os membros do seu time e suas permissões de acesso.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" className="gap-2" onClick={downloadCSVTemplte}>
+            <Download className="h-4 w-4" /> Template CSV
+          </Button>
+          
           <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2">
                 <Upload className="h-4 w-4" /> Importar CSV
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Importar Equipe</DialogTitle>
                 <DialogDescription>
-                  Selecione um arquivo CSV com as colunas: email, senha, nome, whatsapp, cargo.
+                  Selecione um arquivo CSV para importar múltiplos membros.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
@@ -164,11 +276,28 @@ export function TeamManagement() {
                   <Label htmlFor="csv">Arquivo CSV</Label>
                   <Input id="csv" type="file" accept=".csv" onChange={handleImportCSV} disabled={loading} />
                 </div>
+                
+                {importErrors.length > 0 && (
+                  <div className="bg-destructive/10 p-3 rounded-md border border-destructive/20 max-h-40 overflow-y-auto">
+                    <div className="flex items-center gap-2 text-destructive font-medium mb-1">
+                      <AlertCircle className="h-4 w-4" />
+                      <span className="text-sm">Erros na importação:</span>
+                    </div>
+                    <ul className="text-xs space-y-1 text-destructive/90">
+                      {importErrors.map((err, idx) => (
+                        <li key={idx}>{err}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </DialogContent>
           </Dialog>
 
-          <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+          <Dialog open={isAddModalOpen} onOpenChange={(open) => {
+            setIsAddModalOpen(open);
+            if (!open) resetForm();
+          }}>
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <UserPlus className="h-4 w-4" /> Novo Membro
@@ -256,8 +385,8 @@ export function TeamManagement() {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button type="submit" disabled={createMemberMutation.isPending}>
-                    {createMemberMutation.isPending ? "Cadastrando..." : "Confirmar Cadastro"}
+                  <Button type="submit" disabled={manageMemberMutation.isPending}>
+                    {manageMemberMutation.isPending ? "Cadastrando..." : "Confirmar Cadastro"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -265,6 +394,132 @@ export function TeamManagement() {
           </Dialog>
         </div>
       </div>
+
+      {/* Edit Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={(open) => {
+        setIsEditModalOpen(open);
+        if (!open) resetForm();
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <form onSubmit={handleEditMember}>
+            <DialogHeader>
+              <DialogTitle>Editar Membro</DialogTitle>
+              <DialogDescription>
+                Atualize as informações do colaborador.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-fullName">Nome Completo</Label>
+                  <Input
+                    id="edit-fullName"
+                    required
+                    value={formData.fullName}
+                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-email">E-mail</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-whatsapp">WhatsApp</Label>
+                  <Input
+                    id="edit-whatsapp"
+                    value={formData.whatsapp}
+                    onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-status">Status</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value) => setFormData({ ...formData, status: value })}
+                  >
+                    <SelectTrigger id="edit-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Ativo</SelectItem>
+                      <SelectItem value="inactive">Inativo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-position">Função / Cargo</Label>
+                  <Input
+                    id="edit-position"
+                    value={formData.position}
+                    onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-role">Nível de Acesso</Label>
+                  <Select
+                    value={formData.role}
+                    onValueChange={(value) => setFormData({ ...formData, role: value })}
+                  >
+                    <SelectTrigger id="edit-role">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="agent">Agente</SelectItem>
+                      <SelectItem value="supervisor">Supervisor</SelectItem>
+                      <SelectItem value="admin">Administrador</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="gap-2"
+                onClick={() => handleResetPassword(formData.email)}
+                disabled={manageMemberMutation.isPending}
+              >
+                <Key className="h-4 w-4" /> Resetar Senha
+              </Button>
+              <Button type="submit" disabled={manageMemberMutation.isPending}>
+                {manageMemberMutation.isPending ? "Salvando..." : "Salvar Alterações"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Alert */}
+      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover Membro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação irá desativar o acesso do colaborador <strong>{selectedMember?.full_name}</strong> ao sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSelectedMember(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteMember}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Confirmar Remoção
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card>
         <CardHeader>
@@ -282,25 +537,26 @@ export function TeamManagement() {
                 <TableHead>WhatsApp</TableHead>
                 <TableHead>Cargo</TableHead>
                 <TableHead>Acesso</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
+                  <TableCell colSpan={7} className="text-center py-8">
                     Carregando membros da equipe...
                   </TableCell>
                 </TableRow>
               ) : teamMembers?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     Nenhum membro cadastrado.
                   </TableCell>
                 </TableRow>
               ) : (
                 teamMembers?.map((member) => (
-                  <TableRow key={member.id}>
+                  <TableRow key={member.id} className={(member as any).status === 'inactive' ? 'opacity-50' : ''}>
                     <TableCell className="font-medium">{member.full_name || "N/A"}</TableCell>
                     <TableCell>{member.email}</TableCell>
                     <TableCell>{(member as any).whatsapp_number || "N/A"}</TableCell>
@@ -310,10 +566,33 @@ export function TeamManagement() {
                         {member.role || "Agente"}
                       </span>
                     </TableCell>
+                    <TableCell>
+                      <Badge variant={(member as any).status === 'inactive' ? 'secondary' : 'default'} className={(member as any).status === 'inactive' ? '' : 'bg-green-500'}>
+                        {(member as any).status === 'inactive' ? 'Inativo' : 'Ativo'}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="text-muted-foreground hover:text-primary"
+                          onClick={() => openEditModal(member)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() => {
+                            setSelectedMember(member);
+                            setIsDeleteAlertOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
