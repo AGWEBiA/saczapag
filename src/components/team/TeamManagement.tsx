@@ -148,7 +148,7 @@ export function TeamManagement() {
       whatsapp: member.whatsapp_number || "",
       position: member.position || "",
       role: member.role || "agent",
-      status: member.status || "active"
+      status: (member as any).status || "active"
     });
     setIsEditModalOpen(true);
   };
@@ -556,7 +556,7 @@ export function TeamManagement() {
                 </TableRow>
               ) : (
                 teamMembers?.map((member) => (
-                  <TableRow key={member.id} className={member.status === 'inactive' ? 'opacity-50' : ''}>
+                  <TableRow key={member.id} className={(member as any).status === 'inactive' ? 'opacity-50' : ''}>
                     <TableCell className="font-medium">{member.full_name || "N/A"}</TableCell>
                     <TableCell>{member.email}</TableCell>
                     <TableCell>{(member as any).whatsapp_number || "N/A"}</TableCell>
@@ -567,8 +567,8 @@ export function TeamManagement() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={member.status === 'inactive' ? 'secondary' : 'default'} className={member.status === 'inactive' ? '' : 'bg-green-500'}>
-                        {member.status === 'inactive' ? 'Inativo' : 'Ativo'}
+                      <Badge variant={(member as any).status === 'inactive' ? 'secondary' : 'default'} className={(member as any).status === 'inactive' ? '' : 'bg-green-500'}>
+                        {(member as any).status === 'inactive' ? 'Inativo' : 'Ativo'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
