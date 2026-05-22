@@ -6,6 +6,7 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  useRouterState,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -121,6 +122,7 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const auth = useAuth();
   const router = useRouter();
+  const isLoading = useRouterState({ select: (s) => s.status === 'pending' });
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
@@ -132,9 +134,13 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      {isLoading && (
+        <div className="fixed top-0 left-0 right-0 z-[9999]">
+          <div className="h-1 bg-primary animate-progress-bar w-full" />
+        </div>
+      )}
       <Outlet />
       <Toaster position="top-right" richColors />
-
     </QueryClientProvider>
   );
 }

@@ -5,8 +5,10 @@ import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Us
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) {
+    // getSession is much faster as it uses the local cache if available
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error || !session?.user) {
       throw redirect({
         to: "/login",
         search: {
@@ -14,7 +16,7 @@ export const Route = createFileRoute("/_authenticated")({
         },
       });
     }
-    return { user: data.user };
+    return { user: session.user };
   },
   component: AuthenticatedLayout,
 });
@@ -71,7 +73,7 @@ function AuthenticatedLayout() {
         </div>
       </aside>
       
-      <main className="flex-1 overflow-auto bg-muted/10 p-8">
+      <main className="flex-1 overflow-auto bg-muted/10 p-8 animate-in fade-in duration-300">
         <div className="max-w-7xl mx-auto">
           <Outlet />
         </div>
