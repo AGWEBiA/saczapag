@@ -40,6 +40,8 @@ export function SettingsInterface() {
   const [isAddAgentOpen, setIsAddAgentOpen] = useState(false);
   const [userName, setUserName] = useState("");
   const [userRole, setUserRole] = useState("");
+  const [userWhatsapp, setUserWhatsapp] = useState("");
+  const [userPosition, setUserPosition] = useState("");
   const queryClient = useQueryClient();
 
   const { data: profile } = useQuery({
@@ -56,6 +58,8 @@ export function SettingsInterface() {
       if (data) {
         setUserName(data.full_name || "");
         setUserRole(data.role || "");
+        setUserWhatsapp((data as any).whatsapp_number || "");
+        setUserPosition((data as any).position || "");
       }
       return data;
     },
@@ -95,7 +99,9 @@ export function SettingsInterface() {
         .from("profiles")
         .update({ 
           full_name: userName,
-          role: userRole
+          role: userRole,
+          whatsapp_number: userWhatsapp,
+          position: userPosition
         })
         .eq("id", user.id);
 
@@ -172,6 +178,24 @@ export function SettingsInterface() {
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input id="email" type="email" value={profile?.email || ""} disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="whatsapp">WhatsApp</Label>
+                  <Input 
+                    id="whatsapp" 
+                    placeholder="Ex: 5511999999999" 
+                    value={userWhatsapp}
+                    onChange={(e) => setUserWhatsapp(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="position">Cargo</Label>
+                  <Input 
+                    id="position" 
+                    placeholder="Ex: Copywriter" 
+                    value={userPosition}
+                    onChange={(e) => setUserPosition(e.target.value)}
+                  />
                 </div>
               </div>
               <Button onClick={handleSaveProfile} disabled={loading}>
