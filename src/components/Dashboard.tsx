@@ -42,6 +42,7 @@ import { ptBR } from "date-fns/locale";
 export function Dashboard() {
   const { data: instances } = useQuery({
     queryKey: ["dash_instances"],
+    staleTime: 1000 * 60 * 5,
     queryFn: async () => {
       const { data, error } = await supabase.from("whatsapp_instances").select("*");
       if (error) throw error;
@@ -51,8 +52,9 @@ export function Dashboard() {
 
   const { data: contacts } = useQuery({
     queryKey: ["dash_contacts"],
+    staleTime: 1000 * 60 * 10,
     queryFn: async () => {
-      const { data, error } = await supabase.from("contacts").select("id, created_at");
+      const { data, error } = await supabase.from("contacts").select("id, created_at", { count: 'estimated' }).limit(1);
       if (error) throw error;
       return data;
     },
@@ -60,6 +62,7 @@ export function Dashboard() {
 
   const { data: conversations } = useQuery({
     queryKey: ["dash_conversations"],
+    staleTime: 1000 * 60 * 2,
     queryFn: async () => {
       const { data, error } = await supabase.from("conversations").select("id, status, assigned_to, created_at");
       if (error) throw error;
@@ -73,8 +76,9 @@ export function Dashboard() {
       const since = subDays(new Date(), 7).toISOString();
       const { data, error } = await supabase
         .from("messages")
-        .select("id, direction, created_at")
+        .select("id, direction, created_at", { count: 'estimated' })
         .gte("created_at", since)
+        .limit(1000) // Limit total points for dashboard aggregation
         .order("created_at", { ascending: true });
       if (error) throw error;
       return data;
