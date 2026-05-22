@@ -179,22 +179,28 @@ export function TeamManagement() {
     const reader = new FileReader();
     
     reader.onload = async (event) => {
-      const text = event.target?.result as string;
-      const lines = text.split("\n").filter(line => line.trim());
-      
+      let text = event.target?.result as string;
+      // Remove BOM (UTF-8) comum em arquivos salvos pelo Excel
+      if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+      const lines = text.split(/\r?\n/).filter(line => line.trim());
+
       if (lines.length <= 1) {
         toast.error("Arquivo CSV vazio ou inválido.");
         setLoading(false);
         return;
       }
 
+      // Detecta delimitador (Excel BR costuma usar ;)
+      const delimiter = (lines[0].match(/;/g)?.length || 0) > (lines[0].match(/,/g)?.length || 0) ? ";" : ",";
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
       let successCount = 0;
       const errors: string[] = [];
       const existingEmails = teamMembers?.map(m => m.email?.toLowerCase()) || [];
 
       for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(",").map(v => v.trim());
-        const email = values[0];
+        const values = lines[i].split(delimiter).map(v => v.trim().replace(/^"|"$/g, ""));
+        const email = (values[0] || "").toLowerCase();
         const password = values[1];
         const fullName = values[2];
 
@@ -203,7 +209,12 @@ export function TeamManagement() {
           continue;
         }
 
-        if (existingEmails.includes(email.toLowerCase())) {
+        if (!emailRegex.test(email)) {
+          errors.push(`Linha ${i + 1}: E-mail "${email}" tem formato inválido.`);
+          continue;
+        }
+
+        if (existingEmails.includes(email)) {
           errors.push(`Linha ${i + 1}: E-mail ${email} já cadastrado.`);
           continue;
         }
