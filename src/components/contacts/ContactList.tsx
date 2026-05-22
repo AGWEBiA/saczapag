@@ -11,14 +11,54 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Plus, RefreshCw, Trash2, User, Phone } from "lucide-react";
+import { Loader2, Plus, RefreshCw, Trash2, User, Phone, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { CreateContactDialog } from "./CreateContactDialog";
+import { CSVImportDialog } from "@/components/shared/CSVImportDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export function ContactList() {
   const queryClient = useQueryClient();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+
+  const handleImportContacts = async (data: any[]) => {
+    let successCount = 0;
+    const errors: string[] = [];
+
+    for (let i = 0; i < data.length; i++) {
+      const item = data[i];
+      const name = item.name || "";
+      const phone_number = item.phone_number || "";
+
+      if (!name || !phone_number) {
+        errors.push(`Linha ${i + 1}: Nome e Telefone são obrigatórios.`);
+        continue;
+      }
+
+      try {
+        const { error } = await supabase
+          .from("contacts")
+          .upsert({ 
+            name, 
+            phone_number 
+          }, { 
+            onConflict: "phone_number" 
+          });
+
+        if (error) throw error;
+        successCount++;
+      } catch (err: any) {
+        errors.push(`Linha ${i + 1} (${phone_number}): ${err.message}`);
+      }
+    }
+
+    if (successCount > 0) {
+      queryClient.invalidateQueries({ queryKey: ["contacts"] });
+    }
+
+    return { success: successCount, errors };
+  };
 
   const { data: contacts, isLoading, refetch } = useQuery({
     queryKey: ["contacts"],
@@ -68,6 +108,10 @@ export function ContactList() {
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Atualizar
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setIsImportDialogOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Importar CSV
           </Button>
           <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -138,6 +182,19 @@ export function ContactList() {
       <CreateContactDialog 
         open={isCreateDialogOpen} 
         onOpenChange={setIsCreateDialogOpen} 
+      />
+
+      <CSVImportDialog
+        open={isImportDialogOpen}
+        onOpenChange={setIsImportDialogOpen}
+        title="Importar Contatos"
+        description="Selecione um arquivo CSV para importar múltiplos contatos."
+        fields={[
+          { key: "name", label: "Nome", required: true, aliases: ["nome", "name", "contato", "display name"] },
+          { key: "phone_number", label: "Telefone", required: true, aliases: ["telefone", "phone", "whatsapp", "celular", "phone_number"] },
+        ]}
+        onImport={handleImportContacts}
+        templateHeaders={["nome", "telefone"]}
       />
     </Card>
   );
