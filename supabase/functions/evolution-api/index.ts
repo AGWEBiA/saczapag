@@ -94,6 +94,7 @@ serve(async (req) => {
             instanceName: instanceName,
             token: payload?.token || "",
             qrcode: true,
+            integration: payload?.integration || "WHATSAPP-BAILEYS",
           }),
         });
 
