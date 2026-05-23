@@ -64,7 +64,7 @@ export function InstanceList() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["whatsapp_instances"] });
+      queryClient.invalidateQueries({ queryKey: instancesQueryOptions.queryKey });
       toast.success("Instância removida com sucesso");
     },
     onError: (error) => {
@@ -81,7 +81,7 @@ export function InstanceList() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["whatsapp_instances"] });
+      queryClient.invalidateQueries({ queryKey: instancesQueryOptions.queryKey });
       toast.success("Logout realizado com sucesso");
     },
     onError: (error) => {
@@ -104,7 +104,7 @@ export function InstanceList() {
         setIsQrDialogOpen(true);
       } else if (data?.instance?.state === "open") {
         toast.success("Instância já está conectada!");
-        queryClient.invalidateQueries({ queryKey: ["whatsapp_instances"] });
+        queryClient.invalidateQueries({ queryKey: instancesQueryOptions.queryKey });
       } else {
         toast.error("Não foi possível gerar o QR code no momento.");
       }
