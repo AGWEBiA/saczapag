@@ -34,6 +34,7 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { EvolutionConfigsTab } from "./EvolutionConfigsTab";
 
 export function SettingsInterface() {
   const [loading, setLoading] = useState(false);
