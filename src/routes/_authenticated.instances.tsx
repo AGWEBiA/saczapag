@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { InstanceList } from "@/components/instances/InstanceList";
+import { instancesQueryOptions } from "@/lib/queries/instances";
 
 export const Route = createFileRoute("/_authenticated/instances")({
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(instancesQueryOptions),
   component: () => (
     <div className="p-8 max-w-7xl mx-auto">
       <div className="mb-8">
@@ -14,4 +17,3 @@ export const Route = createFileRoute("/_authenticated/instances")({
     </div>
   ),
 });
-

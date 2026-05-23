@@ -34,6 +34,7 @@ import {
   DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { instancesQueryOptions } from "@/lib/queries/instances";
 
 export function InstanceList() {
   const queryClient = useQueryClient();
@@ -42,18 +43,8 @@ export function InstanceList() {
   const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
 
   const { data: instances, isLoading, refetch } = useQuery({
-    queryKey: ["whatsapp_instances"],
-    staleTime: 1000 * 60 * 30, // 30 minutos
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("whatsapp_instances")
-        .select("id, name, evolution_instance_name, status, created_at")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      return data;
-    },
-    refetchInterval: 60000, // Aumentado para 60s
+    ...instancesQueryOptions,
+    refetchInterval: 60000,
   });
 
   const deleteMutation = useMutation({
@@ -73,7 +64,7 @@ export function InstanceList() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["whatsapp_instances"] });
+      queryClient.invalidateQueries({ queryKey: instancesQueryOptions.queryKey });
       toast.success("Instância removida com sucesso");
     },
     onError: (error) => {
@@ -90,7 +81,7 @@ export function InstanceList() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["whatsapp_instances"] });
+      queryClient.invalidateQueries({ queryKey: instancesQueryOptions.queryKey });
       toast.success("Logout realizado com sucesso");
     },
     onError: (error) => {
@@ -113,7 +104,7 @@ export function InstanceList() {
         setIsQrDialogOpen(true);
       } else if (data?.instance?.state === "open") {
         toast.success("Instância já está conectada!");
-        queryClient.invalidateQueries({ queryKey: ["whatsapp_instances"] });
+        queryClient.invalidateQueries({ queryKey: instancesQueryOptions.queryKey });
       } else {
         toast.error("Não foi possível gerar o QR code no momento.");
       }

@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -12,40 +11,87 @@ interface MessageListProps {
   isGroup?: boolean;
 }
 
+const PAGE_SIZE = 30;
+
+type Msg = {
+  id: string;
+  content: string | null;
+  created_at: string;
+  direction: string;
+  sender_name: string | null;
+  is_internal: boolean | null;
+};
+
 export function MessageList({ conversationId, isGroup }: MessageListProps) {
   const queryClient = useQueryClient();
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const topSentinelRef = useRef<HTMLDivElement>(null);
+  const lastScrollHeightRef = useRef<number>(0);
+  const initialScrollDone = useRef(false);
 
-  const { data: messages, isLoading } = useQuery({
-    queryKey: ["messages", conversationId],
-    staleTime: 1000 * 60 * 30, // 30 minutos (mensagens passadas não mudam)
-    queryFn: async () => {
-      const { data, error } = await supabase
+  const queryKey = ["messages", conversationId];
+
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey,
+    initialPageParam: null as string | null,
+    staleTime: 1000 * 60 * 30,
+    queryFn: async ({ pageParam }) => {
+      let q = supabase
         .from("messages")
         .select("id, content, created_at, direction, sender_name, is_internal")
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(PAGE_SIZE);
 
+      if (pageParam) {
+        q = q.lt("created_at", pageParam);
+      }
+
+      const { data, error } = await q;
       if (error) throw error;
-      return data?.reverse() || [];
+      return (data ?? []) as Msg[];
+    },
+    getNextPageParam: (lastPage) => {
+      if (!lastPage || lastPage.length < PAGE_SIZE) return undefined;
+      return lastPage[lastPage.length - 1].created_at;
     },
   });
 
+  // Mensagens em ordem cronológica
+  const messages: Msg[] = data
+    ? data.pages.flat().slice().reverse()
+    : [];
+
+  // Realtime: anexa novas mensagens à primeira "página" sem refetch completo
   useEffect(() => {
     const channel = supabase
       .channel(`chat-${conversationId}`)
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation_id=eq.${conversationId}`
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${conversationId}`,
         },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
-        }
+        (payload) => {
+          const newMsg = payload.new as Msg;
+          queryClient.setQueryData<any>(queryKey, (old: any) => {
+            if (!old) return old;
+            const pages = [...old.pages];
+            const first = pages[0] ?? [];
+            // first page é DESC: prepend
+            if (first.some((m: Msg) => m.id === newMsg.id)) return old;
+            pages[0] = [newMsg, ...first];
+            return { ...old, pages };
+          });
+        },
       )
       .subscribe();
 
@@ -54,15 +100,63 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
     };
   }, [conversationId, queryClient]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // IntersectionObserver no topo: dispara fetchNextPage
   useEffect(() => {
-    if (scrollRef.current) {
-      const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight;
-      }
+    const sentinel = topSentinelRef.current;
+    const container = scrollContainerRef.current;
+    if (!sentinel || !container) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (
+          entries[0].isIntersecting &&
+          hasNextPage &&
+          !isFetchingNextPage &&
+          initialScrollDone.current
+        ) {
+          lastScrollHeightRef.current = container.scrollHeight;
+          fetchNextPage();
+        }
+      },
+      { root: container, rootMargin: "100px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  // Mantém scroll position ao prepender mensagens antigas
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    if (lastScrollHeightRef.current > 0) {
+      const diff = container.scrollHeight - lastScrollHeightRef.current;
+      container.scrollTop = diff;
+      lastScrollHeightRef.current = 0;
     }
-  }, [messages]);
+  }, [data?.pages.length]);
+
+  // Scroll inicial e ao receber nova mensagem
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || messages.length === 0) return;
+    if (!initialScrollDone.current) {
+      container.scrollTop = container.scrollHeight;
+      initialScrollDone.current = true;
+      return;
+    }
+    // Se está perto do fim, faz auto-scroll
+    const nearBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+    if (nearBottom) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [messages.length]);
+
+  // Reset ao trocar de conversa
+  useEffect(() => {
+    initialScrollDone.current = false;
+    lastScrollHeightRef.current = 0;
+  }, [conversationId]);
 
   if (isLoading) {
     return (
@@ -73,34 +167,43 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
   }
 
   return (
-    <ScrollArea ref={scrollRef} className="flex-1 p-4 bg-muted/30">
+    <div
+      ref={scrollContainerRef}
+      className="flex-1 overflow-y-auto p-4 bg-muted/30"
+    >
+      <div ref={topSentinelRef} />
+      {isFetchingNextPage && (
+        <div className="flex justify-center py-2">
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        </div>
+      )}
       <div className="flex flex-col gap-4">
-        {messages?.length === 0 ? (
+        {messages.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             Inicie a conversa enviando uma mensagem.
           </div>
         ) : (
-          messages?.map((msg) => (
+          messages.map((msg) => (
             <MessageBubble key={msg.id} msg={msg} isGroup={isGroup} />
           ))
         )}
       </div>
-    </ScrollArea>
+    </div>
   );
 }
 
 import * as React from "react";
 
-const MessageBubble = React.memo(({ msg, isGroup }: { msg: any, isGroup?: boolean }) => {
+const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolean }) => {
   return (
     <div
       className={cn(
         "flex flex-col max-w-[80%] rounded-lg p-3",
-        msg.is_internal 
-          ? "bg-yellow-50 border-yellow-200 self-center max-w-[90%] w-full border text-yellow-900" 
+        msg.is_internal
+          ? "bg-yellow-50 border-yellow-200 self-center max-w-[90%] w-full border text-yellow-900"
           : msg.direction === "outbound"
             ? "bg-primary text-primary-foreground self-end rounded-tr-none"
-            : "bg-card self-start rounded-tl-none border"
+            : "bg-card self-start rounded-tl-none border",
       )}
     >
       {msg.is_internal && (
@@ -114,10 +217,16 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: any, isGroup?: boolea
       )}
       <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
       <div className="flex items-center justify-between gap-2 mt-1">
-        <span className={cn(
-          "text-[10px] opacity-70",
-          msg.is_internal ? "text-yellow-600" : msg.direction === "outbound" ? "text-primary-foreground" : "text-muted-foreground"
-        )}>
+        <span
+          className={cn(
+            "text-[10px] opacity-70",
+            msg.is_internal
+              ? "text-yellow-600"
+              : msg.direction === "outbound"
+                ? "text-primary-foreground"
+                : "text-muted-foreground",
+          )}
+        >
           {format(new Date(msg.created_at), "HH:mm", { locale: ptBR })}
         </span>
       </div>

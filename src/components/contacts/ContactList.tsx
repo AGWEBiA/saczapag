@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { CreateContactDialog } from "./CreateContactDialog";
 import { CSVImportDialog } from "@/components/shared/CSVImportDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { contactsQueryOptions } from "@/lib/queries/contacts";
 
 export function ContactList() {
   const queryClient = useQueryClient();
@@ -54,26 +55,14 @@ export function ContactList() {
     }
 
     if (successCount > 0) {
-      queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      queryClient.invalidateQueries({ queryKey: contactsQueryOptions.queryKey });
     }
 
     return { success: successCount, errors };
   };
 
-  const { data: contacts, isLoading, refetch } = useQuery({
-    queryKey: ["contacts"],
-    staleTime: 0, // Desativar cache para garantir que novos contatos apareçam imediatamente
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("contacts")
-        .select("id, name, phone_number, avatar_url, created_at")
-        .order("created_at", { ascending: false })
-        .limit(1000);
+  const { data: contacts, isLoading, refetch } = useQuery(contactsQueryOptions);
 
-      if (error) throw error;
-      return data;
-    },
-  });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -84,7 +73,7 @@ export function ContactList() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      queryClient.invalidateQueries({ queryKey: contactsQueryOptions.queryKey });
       toast.success("Contato removido com sucesso");
     },
     onError: (error) => {
