@@ -34,6 +34,7 @@ import {
   DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { instancesQueryOptions } from "@/lib/queries/instances";
 
 export function InstanceList() {
   const queryClient = useQueryClient();
@@ -42,18 +43,8 @@ export function InstanceList() {
   const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
 
   const { data: instances, isLoading, refetch } = useQuery({
-    queryKey: ["whatsapp_instances"],
-    staleTime: 1000 * 60 * 30, // 30 minutos
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("whatsapp_instances")
-        .select("id, name, evolution_instance_name, status, created_at")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      return data;
-    },
-    refetchInterval: 60000, // Aumentado para 60s
+    ...instancesQueryOptions,
+    refetchInterval: 60000,
   });
 
   const deleteMutation = useMutation({
