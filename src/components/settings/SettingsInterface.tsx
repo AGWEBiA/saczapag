@@ -34,6 +34,7 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { EvolutionConfigsTab } from "./EvolutionConfigsTab";
 
 export function SettingsInterface() {
   const [loading, setLoading] = useState(false);
@@ -359,28 +360,9 @@ export function SettingsInterface() {
         </TabsContent>
 
         <TabsContent value="api" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Evolution API</CardTitle>
-              <CardDescription>
-                Configurações globais de integração com a API de WhatsApp.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="api-url">URL Global da API</Label>
-                <Input id="api-url" placeholder="https://api.seuserver.com" defaultValue="https://api.evolution.com" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="global-key">Global ApiKey</Label>
-                <Input id="global-key" type="password" placeholder="Chave mestra da API" />
-              </div>
-              <Button onClick={handleSave} disabled={loading}>
-                Salvar Configurações da API
-              </Button>
-            </CardContent>
-          </Card>
+          <EvolutionConfigsTab />
         </TabsContent>
+
       </Tabs>
     </div>
   );

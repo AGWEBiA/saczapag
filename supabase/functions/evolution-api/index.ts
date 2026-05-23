@@ -17,21 +17,72 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { action, instanceName, data: payload } = await req.json();
-    const EVOLUTION_API_URL = Deno.env.get("EVOLUTION_API_URL");
-    const EVOLUTION_API_KEY = Deno.env.get("EVOLUTION_API_KEY");
+    const { action, instanceName, data: payload, configId } = await req.json();
 
-    if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
-      throw new Error("Evolution API credentials not configured");
+    // 1) Try to load Evolution config from DB (multi-instance / redundancy).
+    //    Priority: explicit configId > is_primary > lowest priority among active.
+    let EVOLUTION_API_URL: string | null = null;
+    let EVOLUTION_API_KEY: string | null = null;
+
+    const { data: configs } = await supabaseClient
+      .from("evolution_configs")
+      .select("id, api_url, api_key, is_primary, priority, is_active")
+      .eq("is_active", true)
+      .order("is_primary", { ascending: false })
+      .order("priority", { ascending: true });
+
+    const list = (configs ?? []) as Array<{
+      id: string;
+      api_url: string;
+      api_key: string;
+      is_primary: boolean;
+      priority: number;
+    }>;
+
+    const chosen = configId
+      ? list.find((c) => c.id === configId)
+      : list[0];
+
+    if (chosen) {
+      EVOLUTION_API_URL = chosen.api_url;
+      EVOLUTION_API_KEY = chosen.api_key;
+    } else {
+      // 2) Fallback to legacy env secrets
+      EVOLUTION_API_URL = Deno.env.get("EVOLUTION_API_URL") ?? null;
+      EVOLUTION_API_KEY = Deno.env.get("EVOLUTION_API_KEY") ?? null;
     }
 
-    const evolutionUrl = EVOLUTION_API_URL.endsWith("/") 
-      ? EVOLUTION_API_URL.slice(0, -1) 
+    if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
+      throw new Error("Nenhuma configuração Evolution API encontrada. Cadastre em Configurações > API.");
+    }
+
+    const evolutionUrl = EVOLUTION_API_URL.endsWith("/")
+      ? EVOLUTION_API_URL.slice(0, -1)
       : EVOLUTION_API_URL;
+
 
     let result;
 
     switch (action) {
+      case "test-config": {
+        // Testa conexão com a config escolhida (timeout 8s)
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 8000);
+        try {
+          const response = await fetch(`${evolutionUrl}/instance/fetchInstances`, {
+            method: "GET",
+            headers: { "apikey": EVOLUTION_API_KEY },
+            signal: ctrl.signal,
+          });
+          clearTimeout(t);
+          result = { ok: response.ok, status: response.status };
+        } catch (e: any) {
+          clearTimeout(t);
+          result = { ok: false, error: e?.message || "connection error" };
+        }
+        break;
+      }
+
       case "create-instance": {
         const response = await fetch(`${evolutionUrl}/instance/create`, {
           method: "POST",
