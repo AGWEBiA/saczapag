@@ -3,8 +3,10 @@ import { InstanceList } from "@/components/instances/InstanceList";
 import { instancesQueryOptions } from "@/lib/queries/instances";
 
 export const Route = createFileRoute("/_authenticated/instances")({
-  loader: ({ context }) =>
-    context.queryClient.ensureQueryData(instancesQueryOptions),
+  loader: ({ context }) => {
+    if (typeof window === "undefined") return;
+    return context.queryClient.ensureQueryData(instancesQueryOptions);
+  },
   component: () => (
     <div className="p-8 max-w-7xl mx-auto">
       <div className="mb-8">
