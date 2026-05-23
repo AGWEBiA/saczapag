@@ -1,25 +1,22 @@
 import { createFileRoute, redirect, Outlet, Link, useRouter } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Users2 } from "lucide-react";
+import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Users2, Activity } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
-    // No servidor, não redirecionamos pois não temos acesso ao localStorage/cookies do Supabase ainda
-    // O controle será feito no lado do cliente para evitar loops infinitos de redirect no SSR
     if (typeof window === "undefined") {
       return { user: null };
     }
 
     const { data: { session } } = await supabase.auth.getSession();
-    
+
     if (!session?.user) {
       throw redirect({
         to: "/login",
-        search: {
-          redirect: location.href,
-        },
+        search: { redirect: location.href },
       });
     }
     return { user: session.user };
@@ -30,30 +27,21 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthenticatedLayout() {
   const router = useRouter();
   const { user: initialUser } = Route.useRouteContext();
-  const { user: authUser, isLoading, isAuthenticated } = useAuth();
-  
-  // Usamos o usuário do hook useAuth se disponível, caso contrário o do context inicial
+  const { user: authUser, isAuthenticated, isLoading } = useAuth();
+
   const user = authUser || initialUser;
+
+  // Segunda camada de proteção em efeito (sem early-return para não quebrar hidratação)
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.navigate({ to: "/login" });
+    }
+  }, [isLoading, isAuthenticated, router]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.navigate({ to: "/login" });
   };
-
-  // Se estiver carregando no cliente, mostramos um loader
-  if (typeof window !== "undefined" && isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
-  // Se não estiver autenticado no cliente, redirecionamos (segunda camada de proteção)
-  if (typeof window !== "undefined" && !isLoading && !isAuthenticated) {
-    router.navigate({ to: "/login" });
-    return null;
-  }
 
   const navItems = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -61,6 +49,7 @@ function AuthenticatedLayout() {
     { to: "/instances", label: "Instâncias", icon: Smartphone },
     { to: "/contacts", label: "Contatos", icon: Users },
     { to: "/team", label: "Equipe", icon: Users2 },
+    { to: "/diagnostics", label: "Diagnóstico", icon: Activity },
     { to: "/settings", label: "Configurações", icon: Settings },
   ];
 
@@ -71,12 +60,13 @@ function AuthenticatedLayout() {
           <div className="font-bold text-xl tracking-tight text-primary">AG SAC</div>
           <div className="text-xs text-muted-foreground mt-1 truncate">{user?.email}</div>
         </div>
-        
+
         <nav className="flex-1 p-4 space-y-1">
           {navItems.map((item) => (
             <Link
               key={item.to}
               to={item.to}
+              preload="intent"
               className="flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors hover:bg-accent group"
               activeProps={{ className: "bg-primary/10 text-primary font-medium" }}
             >
@@ -97,7 +87,7 @@ function AuthenticatedLayout() {
           </Button>
         </div>
       </aside>
-      
+
       <main className="flex-1 overflow-auto bg-muted/10 p-8 animate-in fade-in duration-300">
         <div className="max-w-7xl mx-auto">
           <Outlet />

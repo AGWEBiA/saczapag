@@ -23,7 +23,8 @@ export const getRouter = () => {
       auth: undefined!, // Injected at render time
     },
     scrollRestoration: true,
-    defaultPreload: false,
+    defaultPreload: "intent",
+    defaultPreloadDelay: 50,
     defaultPreloadStaleTime: 0,
   });
 

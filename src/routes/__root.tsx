@@ -129,8 +129,10 @@ function RootComponent() {
   const isLoading = useRouterState({ select: (s) => s.status === 'pending' });
 
   useEffect(() => {
+    // Instala o profiler de queries (somente no cliente)
+    import("@/lib/query-profiler").then((m) => m.installQueryProfiler());
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      // Removemos o invalidate desnecessário que resetava o app inteiro
       if (event === 'SIGNED_OUT') {
         queryClient.clear();
         router.navigate({ to: '/login' });
