@@ -64,6 +64,25 @@ serve(async (req) => {
     let result;
 
     switch (action) {
+      case "test-config": {
+        // Testa conexão com a config escolhida (timeout 8s)
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 8000);
+        try {
+          const response = await fetch(`${evolutionUrl}/instance/fetchInstances`, {
+            method: "GET",
+            headers: { "apikey": EVOLUTION_API_KEY },
+            signal: ctrl.signal,
+          });
+          clearTimeout(t);
+          result = { ok: response.ok, status: response.status };
+        } catch (e: any) {
+          clearTimeout(t);
+          result = { ok: false, error: e?.message || "connection error" };
+        }
+        break;
+      }
+
       case "create-instance": {
         const response = await fetch(`${evolutionUrl}/instance/create`, {
           method: "POST",
