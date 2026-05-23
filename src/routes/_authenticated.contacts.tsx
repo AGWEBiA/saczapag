@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ContactList } from "@/components/contacts/ContactList";
+import { contactsQueryOptions } from "@/lib/queries/contacts";
 
 export const Route = createFileRoute("/_authenticated/contacts")({
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(contactsQueryOptions),
   component: () => (
     <div className="p-8 max-w-7xl mx-auto">
       <div className="mb-8">
@@ -14,4 +17,3 @@ export const Route = createFileRoute("/_authenticated/contacts")({
     </div>
   ),
 });
-
