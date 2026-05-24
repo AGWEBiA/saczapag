@@ -31,6 +31,17 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms = 15000) {
   }
 }
 
+function evolutionErrorMessage(prefix: string, response: Response, body: unknown) {
+  const raw = typeof body === "string" ? body : JSON.stringify(body);
+  const parsed = typeof body === "object" && body ? body as any : {};
+  return parsed?.response?.message?.join?.("; ") ||
+    parsed?.response?.message ||
+    parsed?.message?.join?.("; ") ||
+    parsed?.message ||
+    parsed?.error ||
+    `${prefix} retornou ${response.status}${raw && raw !== "{}" ? `: ${raw}` : ""}`;
+}
+
 async function resolveEvolutionConfig(
   supabase: SupabaseClientLike,
 ) {
@@ -117,8 +128,9 @@ async function sendViaEvolution(params: {
     );
   }
 
+  const sendUrl = `${apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
   const response = await fetchWithTimeout(
-    `${apiUrl}/message/sendText/${instanceName}`,
+    sendUrl,
     {
       method: "POST",
       headers: {
@@ -128,43 +140,17 @@ async function sendViaEvolution(params: {
       body: JSON.stringify({
         number: cleanPhone,
         text: content,
-        delay: 300,
-        linkPreview: false,
       }),
     },
-    20000,
+    10000,
   );
 
   const result = await response.json().catch(() => ({}));
-  if (response.ok) return result?.key?.id as string | undefined;
-
-  const fallbackResponse = await fetchWithTimeout(
-    `${apiUrl}/message/sendText/${instanceName}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: apiKey,
-      },
-      body: JSON.stringify({
-        number: cleanPhone,
-        options: { delay: 300, presence: "composing", linkPreview: false },
-        textMessage: { text: content },
-      }),
-    },
-    20000,
-  );
-
-
-  const fallbackResult = await fallbackResponse.json().catch(() => ({}));
-  if (!fallbackResponse.ok) {
-    throw new Error(
-      fallbackResult?.message || result?.message ||
-        `Evolution retornou ${fallbackResponse.status}`,
-    );
+  if (!response.ok) {
+    throw new Error(evolutionErrorMessage("Evolution", response, result));
   }
 
-  return fallbackResult?.key?.id as string | undefined;
+  return (result?.key?.id || result?.message?.key?.id || result?.id) as string | undefined;
 }
 
 async function sendToWhatsApp(params: {
