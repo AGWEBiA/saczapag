@@ -50,6 +50,60 @@ export function InstanceList() {
     refetchInterval: 60000,
   });
 
+  // Sincronização automática: enquanto houver instância não conectada,
+  // consulta o estado real na Evolution e atualiza o banco.
+  useEffect(() => {
+    if (!instances?.length) return;
+    const pending = instances.filter((i) => i.status !== "connected");
+    if (!pending.length) return;
+
+    let cancelled = false;
+
+    const syncOnce = async () => {
+      await Promise.all(
+        pending.map(async (inst) => {
+          try {
+            const { data } = await supabase.functions.invoke("evolution-api", {
+              body: { action: "get-status", instanceName: inst.evolution_instance_name },
+            });
+            const state = data?.instance?.state || data?.state;
+            if (!state) return;
+            const newStatus =
+              state === "open" ? "connected" :
+              state === "connecting" ? "connecting" :
+              "disconnected";
+            if (newStatus !== inst.status) {
+              await supabase
+                .from("whatsapp_instances")
+                .update({
+                  status: newStatus,
+                  last_connected_at: newStatus === "connected" ? new Date().toISOString() : null,
+                })
+                .eq("id", inst.id);
+              if (newStatus === "connected") {
+                toast.success(`Instância "${inst.name}" conectada!`);
+                setIsQrDialogOpen(false);
+              }
+            }
+          } catch (err) {
+            console.warn("sync status falhou para", inst.evolution_instance_name, err);
+          }
+        })
+      );
+      if (!cancelled) {
+        queryClient.invalidateQueries({ queryKey: instancesQueryOptions.queryKey });
+      }
+    };
+
+    syncOnce();
+    const interval = setInterval(syncOnce, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instances?.map((i) => `${i.id}:${i.status}`).join(",")]);
+
   const deleteMutation = useMutation({
     mutationFn: async ({ id, evolutionName }: { id: string; evolutionName: string }) => {
       try {
