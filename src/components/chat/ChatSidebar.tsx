@@ -46,26 +46,50 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
     staleTime: Infinity, // Profile doesn't change often
   });
 
+  // Debounce da busca para não disparar query a cada tecla
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => clearTimeout(t);
+  }, [search]);
+
   const { data: conversations, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ["conversations", filter, search],
-    staleTime: 0,
-    refetchInterval: 5000, // auto-refresh a cada 5s
-    refetchOnWindowFocus: true,
+    queryKey: ["conversations", filter, debouncedSearch],
+    staleTime: 1000 * 30, // 30s — realtime invalida quando necessário
+    refetchOnWindowFocus: false,
     queryFn: async () => {
+      // Quando há busca, primeiro descobre IDs de contatos por nome/telefone
+      // aproveitando os índices GIN trigram. Depois busca conversas que
+      // batam por contato OU por conteúdo da última mensagem.
+      let contactIds: string[] = [];
+      if (debouncedSearch) {
+        const digits = debouncedSearch.replace(/\D/g, "");
+        const { data: contacts } = await supabase
+          .from("contacts")
+          .select("id")
+          .or(
+            digits
+              ? `name.ilike.%${debouncedSearch}%,phone_number.ilike.%${digits}%`
+              : `name.ilike.%${debouncedSearch}%`,
+          )
+          .limit(100);
+        contactIds = (contacts ?? []).map((c) => c.id);
+      }
+
       let query = supabase
         .from("conversations")
         .select(`
-          id, 
-          status, 
-          assigned_to, 
-          last_message_at, 
-          last_message_content, 
-          unread_count, 
+          id,
+          status,
+          assigned_to,
+          last_message_at,
+          last_message_content,
+          unread_count,
           is_group,
           contact:contacts(id, name, phone_number, avatar_url)
         `)
         .order("last_message_at", { ascending: false })
-        .limit(50); // Limite de conversas iniciais
+        .limit(50);
 
       if (filter === "mine" && profile?.id) {
         query = query.eq("assigned_to", profile.id);
@@ -73,9 +97,12 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
         query = query.is("assigned_to", null);
       }
 
-      if (search) {
-        // Busca otimizada
-        query = query.or(`last_message_content.ilike.%${search}%`);
+      if (debouncedSearch) {
+        const ors: string[] = [`last_message_content.ilike.%${debouncedSearch}%`];
+        if (contactIds.length) {
+          ors.push(`contact_id.in.(${contactIds.join(",")})`);
+        }
+        query = query.or(ors.join(","));
       }
 
       const { data, error } = await query;
