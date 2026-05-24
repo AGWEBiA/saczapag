@@ -75,6 +75,18 @@ serve(async (req) => {
 
       const cleanPhone = String(phone).replace(/\D/g, "");
 
+      const stateResponse = await fetchWithTimeout(
+        `${evolutionUrl}/instance/connectionState/${instance.evolution_instance_name}`,
+        { method: "GET", headers: { apikey: EVOLUTION_API_KEY } },
+        8000
+      );
+      const stateResult = await stateResponse.json().catch(() => ({}));
+      const instanceState = stateResult?.instance?.state ?? stateResult?.state;
+
+      if (stateResponse.ok && instanceState && instanceState !== "open") {
+        throw new Error(`A instância ${instance.evolution_instance_name} não está conectada ao WhatsApp (estado atual: ${instanceState}). Reconecte a instância antes de enviar mensagens.`);
+      }
+
       let response: Response;
       try {
         // Try Evolution v2 payload first
@@ -93,11 +105,11 @@ serve(async (req) => {
               linkPreview: false,
             }),
           },
-          15000
+          45000
         );
       } catch (e: any) {
         const msg = e?.name === "AbortError"
-          ? "Tempo esgotado ao conectar com o servidor Evolution. Verifique se o servidor está acessível pela internet."
+          ? "Tempo esgotado ao enviar pela Evolution. A API está acessível, mas a instância pode estar desconectada ou demorando para processar o envio."
           : `Falha de conexão com Evolution: ${e?.message || e}`;
         throw new Error(msg);
       }
@@ -122,7 +134,7 @@ serve(async (req) => {
                 textMessage: { text: content },
               }),
             },
-            15000
+            45000
           );
           const r2json = await r2.json().catch(() => ({}));
           if (!r2.ok) {
@@ -177,7 +189,6 @@ serve(async (req) => {
         content: content,
         sender_name: senderName,
         evolution_message_id: whatsappMessageId,
-        status: "sent",
       })
       .select()
       .single();
