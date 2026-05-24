@@ -3,7 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 function jsonResponse(body: unknown, status = 200) {
@@ -28,7 +29,9 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms = 15000) {
   }
 }
 
-async function resolveEvolutionConfig(supabase: ReturnType<typeof createClient>) {
+async function resolveEvolutionConfig(
+  supabase: ReturnType<typeof createClient>,
+) {
   const { data: configs } = await supabase
     .from("evolution_configs")
     .select("id, api_url, api_key, is_primary, priority, is_active")
@@ -41,7 +44,9 @@ async function resolveEvolutionConfig(supabase: ReturnType<typeof createClient>)
   const apiKey = chosen?.api_key ?? Deno.env.get("EVOLUTION_API_KEY") ?? null;
 
   if (!apiUrl || !apiKey) {
-    throw new Error("Nenhuma configuração Evolution API encontrada. Cadastre em Configurações > API.");
+    throw new Error(
+      "Nenhuma configuração Evolution API encontrada. Cadastre em Configurações > API.",
+    );
   }
 
   return {
@@ -59,7 +64,9 @@ async function markMessage(
   await supabase
     .from("messages")
     .update({
-      ...(evolutionMessageId ? { evolution_message_id: evolutionMessageId } : {}),
+      ...(evolutionMessageId
+        ? { evolution_message_id: evolutionMessageId }
+        : {}),
       metadata,
     })
     .eq("id", messageId);
@@ -119,7 +126,10 @@ async function sendViaEvolution(params: {
 
   const fallbackResult = await fallbackResponse.json().catch(() => ({}));
   if (!fallbackResponse.ok) {
-    throw new Error(fallbackResult?.message || result?.message || `Evolution retornou ${fallbackResponse.status}`);
+    throw new Error(
+      fallbackResult?.message || result?.message ||
+        `Evolution retornou ${fallbackResponse.status}`,
+    );
   }
 
   return fallbackResult?.key?.id as string | undefined;
@@ -169,7 +179,11 @@ async function sendToWhatsApp(params: {
   );
 
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result.error?.message || "Failed to send message via WhatsApp");
+  if (!response.ok) {
+    throw new Error(
+      result.error?.message || "Failed to send message via WhatsApp",
+    );
+  }
   return result.messages?.[0]?.id as string | undefined;
 }
 
@@ -181,7 +195,7 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
     const { conversationId, content, phone, senderName } = await req.json();
@@ -241,7 +255,11 @@ serve(async (req) => {
         sent_at: new Date().toISOString(),
       }, whatsappMessageId);
 
-      return jsonResponse({ ...message, metadata: { delivery_status: "sent" }, evolution_message_id: whatsappMessageId }, 200);
+      return jsonResponse({
+        ...message,
+        metadata: { delivery_status: "sent" },
+        evolution_message_id: whatsappMessageId,
+      }, 200);
     } catch (sendError: any) {
       const errorMessage = sendError?.message || String(sendError);
       console.error("[send-message] send failed:", errorMessage);
