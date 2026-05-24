@@ -257,6 +257,20 @@ serve(async (req) => {
         break;
       }
 
+      case "fetch-groups": {
+        if (!instanceName) throw new Error("instanceName é obrigatório");
+        const response = await fetch(`${evolutionUrl}/chat/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=false`, {
+          method: "GET",
+          headers: { "apikey": EVOLUTION_API_KEY },
+        });
+        const groups = await response.json().catch(() => []);
+        if (!response.ok) {
+          throw new Error(groups?.message || groups?.error || `Evolution API retornou ${response.status}`);
+        }
+        result = Array.isArray(groups) ? groups : [];
+        break;
+      }
+
       case "set-webhook": {
         const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-webhook`;
         const events = [
