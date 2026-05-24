@@ -134,31 +134,32 @@ async function sendViaEvolution(params: {
   let lastError = "";
 
   for (const recipient of recipientCandidates) {
-  const response = await fetchWithTimeout(
-    sendUrl,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: apiKey,
-      },
-      body: JSON.stringify({
-        number: recipient,
-        text: content,
-      }),
-    },
-    15000,
-  );
+    try {
+      const response = await fetchWithTimeout(
+        sendUrl,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: apiKey,
+          },
+          body: JSON.stringify({
+            number: recipient,
+            text: content,
+          }),
+        },
+        15000,
+      );
 
-  const result = await response.json().catch(() => ({}));
-  if (response.ok) {
-    return (result?.key?.id || result?.message?.key?.id || result?.id) as string | undefined;
-  }
+      const result = await response.json().catch(() => ({}));
+      if (response.ok) {
+        return (result?.key?.id || result?.message?.key?.id || result?.id) as string | undefined;
+      }
 
-  if (response.status !== 400) {
-    throw new Error(evolutionErrorMessage("Evolution", response, result));
-  }
-  lastError = evolutionErrorMessage("Evolution", response, result);
+      lastError = evolutionErrorMessage("Evolution", response, result);
+    } catch (error: any) {
+      lastError = error?.message || String(error);
+    }
   }
 
   const fallbackResponse = await fetchWithTimeout(
