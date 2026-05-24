@@ -102,6 +102,64 @@ serve(async (req) => {
         break;
       }
 
+      case "diagnose-send": {
+        // Diagnóstico: tenta múltiplos formatos de payload em /message/sendText
+        // e retorna status/tempo/resposta de cada um para identificar qual o Evolution aceita.
+        const number = String(payload?.number || "").replace(/\D/g, "");
+        const text = String(payload?.text || "Teste diagnóstico");
+        if (!instanceName || !number) {
+          throw new Error("instanceName e data.number são obrigatórios");
+        }
+
+        const sendUrl = `${evolutionUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
+        const variants: Array<{ name: string; body: Record<string, unknown> }> = [
+          { name: "v2-flat", body: { number, text } },
+          { name: "v2-options", body: { number, text, options: { delay: 0, presence: "composing" } } },
+          { name: "v1-textMessage", body: { number, textMessage: { text } } },
+          { name: "v1-options", body: { number, options: { delay: 0 }, textMessage: { text } } },
+        ];
+
+        const attempts = [];
+        for (const v of variants) {
+          const started = Date.now();
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 15000);
+          try {
+            const r = await fetch(sendUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", apikey: EVOLUTION_API_KEY },
+              body: JSON.stringify(v.body),
+              signal: ctrl.signal,
+            });
+            const txt = await r.text();
+            let parsed: unknown = txt;
+            try { parsed = JSON.parse(txt); } catch { /* keep text */ }
+            attempts.push({
+              variant: v.name,
+              status: r.status,
+              ok: r.ok,
+              ms: Date.now() - started,
+              response: parsed,
+            });
+            if (r.ok) {
+              clearTimeout(timer);
+              break;
+            }
+          } catch (e: any) {
+            attempts.push({
+              variant: v.name,
+              ms: Date.now() - started,
+              error: e?.name === "AbortError" ? "timeout(15s)" : (e?.message || String(e)),
+            });
+          } finally {
+            clearTimeout(timer);
+          }
+        }
+
+        result = { sendUrl, instanceName, number, attempts };
+        break;
+      }
+
       case "create-instance": {
         const response = await fetch(`${evolutionUrl}/instance/create`, {
           method: "POST",
