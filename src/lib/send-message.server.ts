@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { Json } from "@/integrations/supabase/types";
 
 type SendMessageInput = {
   conversationId: string;
@@ -131,7 +132,7 @@ async function sendText(config: EvolutionConfig, instanceName: string, number: s
   return ((body as any)?.key?.id || (body as any)?.message?.key?.id || (body as any)?.id) as string | undefined;
 }
 
-async function updateMessage(messageId: string, metadata: Record<string, unknown>, evolutionMessageId?: string) {
+async function updateMessage(messageId: string, metadata: Json, evolutionMessageId?: string) {
   const { data, error } = await supabaseAdmin
     .from("messages")
     .update({
