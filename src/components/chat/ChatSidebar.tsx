@@ -167,8 +167,8 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
     <div className="flex flex-col h-full bg-card/40 overflow-hidden">
       <div className="p-3 lg:p-4 border-b space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold tracking-tight hidden lg:block">Inbox</h2>
-          <div className="flex items-center gap-1 w-full lg:w-auto justify-center lg:justify-end">
+          <h2 className="text-xl font-bold tracking-tight">Inbox</h2>
+          <div className="flex items-center gap-1 justify-end">
             <NewConversationDialog onCreated={(id) => onSelect(id)} />
             <GroupImportDialog />
             <Button
@@ -201,7 +201,7 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
             </DropdownMenu>
           </div>
         </div>
-        <div className="relative hidden lg:block">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 transition-colors group-focus-within:text-primary" />
           <Input 
             placeholder="Pesquisar mensagens..." 
@@ -256,7 +256,7 @@ const ChatItem = React.memo(({ conv, selectedId, onSelect }: { conv: any, select
           <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-background rounded-full shadow-sm" />
         )}
       </div>
-      <div className="flex-1 min-w-0 hidden lg:block">
+      <div className="flex-1 min-w-0">
         <div className="flex justify-between items-baseline mb-0.5">
           <div className="flex items-center gap-1.5 min-w-0">
             {conv.is_group && <Users className="h-3 w-3 text-primary flex-shrink-0" />}
