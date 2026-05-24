@@ -9,15 +9,6 @@ const corsHeaders = {
 
 type SupabaseClientLike = any;
 
-function runInBackground(promise: Promise<unknown>) {
-  const edgeRuntime = (globalThis as any).EdgeRuntime;
-  if (edgeRuntime?.waitUntil) {
-    edgeRuntime.waitUntil(promise);
-    return;
-  }
-  promise.catch((error) => console.error("[send-message] background send failed:", error));
-}
-
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -328,23 +319,19 @@ serve(async (req) => {
       })
       .eq("id", conversationId);
 
-    const sendPromise = processWhatsAppSend({
-        supabase,
-        messageId: message.id,
-        instance: conversation.instance,
-        phone,
-        content,
-      });
-
-    runInBackground(sendPromise);
+    const sendResult = await processWhatsAppSend({
+      supabase,
+      messageId: message.id,
+      instance: conversation.instance,
+      phone,
+      content,
+    });
 
     return jsonResponse({
       ...message,
-      metadata: {
-        delivery_status: "queued",
-        queued_at: message.metadata?.queued_at ?? new Date().toISOString(),
-      },
-    }, 202);
+      evolution_message_id: sendResult.evolutionMessageId ?? message.evolution_message_id,
+      metadata: sendResult.metadata,
+    });
   } catch (error: any) {
     return jsonResponse({ error: error?.message || String(error) }, 400);
   }
