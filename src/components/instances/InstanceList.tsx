@@ -41,6 +41,8 @@ export function InstanceList() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [qrCodeData, setQrCodeData] = useState<{ name: string; base64: string } | null>(null);
   const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
+  const [pairingPhone, setPairingPhone] = useState("");
+  const [pairingCode, setPairingCode] = useState<{ name: string; code: string } | null>(null);
 
   const { data: instances, isLoading, refetch } = useQuery({
     ...instancesQueryOptions,
@@ -111,6 +113,35 @@ export function InstanceList() {
     },
     onError: (error) => {
       toast.error("Erro ao buscar QR code: " + error.message);
+    },
+  });
+
+  const getPairingMutation = useMutation({
+    mutationFn: async (evolutionName: string) => {
+      const phone = pairingPhone.replace(/\D/g, "");
+      if (phone.length < 12) throw new Error("Informe o número com DDI e DDD. Ex: 5511999999999");
+
+      const { data, error } = await supabase.functions.invoke("evolution-api", {
+        body: { action: "get-qr-code", instanceName: evolutionName, data: { number: phone } },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data, variables) => {
+      const code = data?.pairingCode || data?.pairing_code;
+      if (code) {
+        setPairingCode({ name: variables, code });
+        toast.success("Código de pareamento gerado.");
+      } else if (data?.base64) {
+        setQrCodeData({ name: variables, base64: data.base64 });
+        setIsQrDialogOpen(true);
+      } else {
+        toast.error("Não foi possível gerar o código. Remova a instância e crie novamente se ela ficou presa em conexão.");
+      }
+    },
+    onError: (error) => {
+      toast.error("Erro ao gerar código: " + error.message);
     },
   });
 
