@@ -19,7 +19,6 @@ serve(async (req) => {
 
     const { action, instanceName, data: payload, configId } = await req.json();
 
-    // 1) Try to load Evolution config from DB (multi-instance / redundancy).
     let EVOLUTION_API_URL: string | null = null;
     let EVOLUTION_API_KEY: string | null = null;
 
@@ -107,6 +106,106 @@ serve(async (req) => {
         break;
       }
 
+      case "create-instance": {
+        const response = await fetch(`${evolutionUrl}/instance/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "apikey": EVOLUTION_API_KEY },
+          body: JSON.stringify({
+            instanceName: instanceName,
+            token: payload?.token || "",
+            qrcode: payload?.qrcode ?? false,
+            integration: payload?.integration || "WHATSAPP-BAILEYS",
+          }),
+        });
+        result = await response.json();
+        break;
+      }
+
+      case "get-qr-code": {
+        const connectUrl = new URL(`${evolutionUrl}/instance/connect/${instanceName}`);
+        const phoneNumber = String(payload?.number || "").replace(/\D/g, "");
+        if (phoneNumber) connectUrl.searchParams.set("number", phoneNumber);
+        const response = await fetch(connectUrl.toString(), {
+          method: "GET",
+          headers: { "apikey": EVOLUTION_API_KEY },
+        });
+        result = await response.json();
+        if (!response.ok) throw new Error(result?.message || result?.error || `Evolution API retornou ${response.status}`);
+        break;
+      }
+
+      case "get-status": {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 8000);
+        try {
+          const response = await fetch(`${evolutionUrl}/instance/connectionState/${instanceName}`, {
+            method: "GET",
+            headers: { "apikey": EVOLUTION_API_KEY },
+            signal: ctrl.signal,
+          });
+          if (response.status === 404) {
+             result = { state: "disconnected", error: "Instance not found on Evolution" };
+          } else {
+             result = await response.json().catch(() => ({}));
+          }
+        } catch (e: any) {
+          result = { error: e?.name === "AbortError" ? "timeout(8s)" : (e?.message || String(e)), state: "unknown" };
+        } finally {
+          clearTimeout(t);
+        }
+        break;
+      }
+
+      case "logout-instance": {
+        const response = await fetch(`${evolutionUrl}/instance/logout/${instanceName}`, {
+          method: "DELETE",
+          headers: { "apikey": EVOLUTION_API_KEY },
+        });
+        result = await response.json();
+        break;
+      }
+
+      case "restart-instance": {
+        const response = await fetch(`${evolutionUrl}/instance/restart/${instanceName}`, {
+          method: "POST",
+          headers: { "apikey": EVOLUTION_API_KEY },
+        });
+        result = await response.json();
+        break;
+      }
+
+      case "delete-instance": {
+        const response = await fetch(`${evolutionUrl}/instance/delete/${instanceName}`, {
+          method: "DELETE",
+          headers: { "apikey": EVOLUTION_API_KEY },
+        });
+        result = await response.json();
+        break;
+      }
+
+      case "set-webhook": {
+        const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-webhook`;
+        const events = ["MESSAGES_UPSERT", "CONNECTION_UPDATE", "QRCODE_UPDATED"];
+        const response = await fetch(`${evolutionUrl}/webhook/set/${instanceName}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: EVOLUTION_API_KEY },
+          body: JSON.stringify({
+            webhook: { enabled: true, url: webhookUrl, byEvents: false, base64: false, events },
+          }),
+        });
+        result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const r2 = await fetch(`${evolutionUrl}/webhook/set/${instanceName}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", apikey: EVOLUTION_API_KEY },
+            body: JSON.stringify({ url: webhookUrl, enabled: true, events }),
+          });
+          result = await r2.json().catch(() => ({}));
+        }
+        result.webhookUrl = webhookUrl;
+        break;
+      }
+
       case "webhook": {
         const { event, data } = payload;
         const iName = data?.instance;
@@ -168,7 +267,6 @@ serve(async (req) => {
             .maybeSingle();
 
           if (!conversation) {
-            // Se for grupo, ignora se não estiver "escolhido" (não houver conversa prévia)
             if (isGroup) {
               console.log(`Grupo ignorado (não gerenciado): ${remoteJid}`);
               break;
@@ -215,8 +313,7 @@ serve(async (req) => {
       }
 
       default:
-        result = { message: "Action not processed in full rewrite, but edge function is working." };
-        break;
+        throw new Error(`Unknown action: ${action}`);
     }
 
     return new Response(JSON.stringify(result), {
