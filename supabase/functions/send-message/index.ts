@@ -7,6 +7,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+type SupabaseClientLike = any;
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -30,7 +32,7 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms = 15000) {
 }
 
 async function resolveEvolutionConfig(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClientLike,
 ) {
   const { data: configs } = await supabase
     .from("evolution_configs")
@@ -56,7 +58,7 @@ async function resolveEvolutionConfig(
 }
 
 async function markMessage(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClientLike,
   messageId: string,
   metadata: Record<string, unknown>,
   evolutionMessageId?: string,
@@ -73,7 +75,7 @@ async function markMessage(
 }
 
 async function sendViaEvolution(params: {
-  supabase: ReturnType<typeof createClient>;
+  supabase: SupabaseClientLike;
   instanceName: string;
   phone: string;
   content: string;
@@ -136,7 +138,7 @@ async function sendViaEvolution(params: {
 }
 
 async function sendToWhatsApp(params: {
-  supabase: ReturnType<typeof createClient>;
+  supabase: SupabaseClientLike;
   instance: any;
   phone: string;
   content: string;
