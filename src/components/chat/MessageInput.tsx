@@ -136,19 +136,21 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
   };
 
   return (
-    <div className="p-4 border-t bg-card space-y-2">
-      <div className="flex gap-2 mb-2 items-center">
+    <div className="p-3 lg:p-6 border-t bg-card/50 backdrop-blur-xl space-y-3">
+      <div className="flex flex-wrap gap-2 items-center">
         <Button
           type="button"
-          variant={isInternal ? "secondary" : "ghost"}
+          variant={isInternal ? "secondary" : "outline"}
           size="sm"
           onClick={() => setIsInternal(!isInternal)}
           className={cn(
-            "text-xs gap-1",
-            isInternal && "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-200",
+            "text-[10px] lg:text-xs font-bold uppercase tracking-widest px-4 h-8 rounded-full transition-all duration-300",
+            isInternal 
+              ? "bg-yellow-400 text-yellow-950 hover:bg-yellow-500 border-none shadow-lg shadow-yellow-500/20 ring-2 ring-yellow-400/50" 
+              : "hover:bg-primary/5 hover:text-primary hover:border-primary/20",
           )}
         >
-          {isInternal ? "Nota Interna Ativada" : "Nota Interna"}
+          {isInternal ? "Modo: Nota Interna" : "Nota Interna"}
         </Button>
 
         <Popover open={openQuickReplies} onOpenChange={setOpenQuickReplies}>
@@ -186,29 +188,36 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
           </PopoverContent>
         </Popover>
       </div>
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <Input
-          placeholder={
-            isInternal ? "Digite uma nota apenas para a equipe..." : "Digite sua mensagem..."
-          }
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          disabled={sendMutation.isPending}
-          className={cn(
-            "flex-1",
-            isInternal && "border-yellow-300 focus-visible:ring-yellow-400 bg-yellow-50/50",
-          )}
-        />
+      <form onSubmit={handleSubmit} className="flex gap-2 items-end">
+        <div className="flex-1 relative group">
+          <Input
+            placeholder={
+              isInternal ? "Digite uma nota apenas para a equipe..." : "Escreva sua mensagem aqui..."
+            }
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            disabled={sendMutation.isPending}
+            className={cn(
+              "flex-1 min-h-[44px] py-3 lg:h-12 lg:px-6 bg-muted/50 border-transparent focus-visible:bg-background focus-visible:ring-primary/20 transition-all rounded-2xl lg:rounded-3xl shadow-inner",
+              isInternal && "border-yellow-300 focus-visible:ring-yellow-400 bg-yellow-50/50",
+            )}
+          />
+        </div>
         <Button
           type="submit"
           size="icon"
           disabled={!content.trim() || sendMutation.isPending}
-          className={cn(isInternal && "bg-yellow-600 hover:bg-yellow-700")}
+          className={cn(
+            "h-11 w-11 lg:h-12 lg:w-12 rounded-2xl lg:rounded-full shrink-0 shadow-lg transition-all duration-300 active:scale-95",
+            isInternal 
+              ? "bg-yellow-500 hover:bg-yellow-600 text-yellow-950 shadow-yellow-500/20" 
+              : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/20 hover:shadow-primary/30"
+          )}
         >
           {sendMutation.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-5 w-5 animate-spin" />
           ) : (
-            <Send className="h-4 w-4" />
+            <Send className="h-5 w-5" />
           )}
         </Button>
       </form>

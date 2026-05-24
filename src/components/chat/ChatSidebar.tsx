@@ -164,11 +164,11 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
   }, [queryClient, selectedId, onSelect]);
 
   return (
-    <div className="flex flex-col h-full border-r bg-card">
-      <div className="p-4 border-b">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold">Conversas</h2>
-          <div className="flex items-center gap-1">
+    <div className="flex flex-col h-full bg-card/40 overflow-hidden">
+      <div className="p-3 lg:p-4 border-b space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold tracking-tight hidden lg:block">Inbox</h2>
+          <div className="flex items-center gap-1 w-full lg:w-auto justify-center lg:justify-end">
             <NewConversationDialog onCreated={(id) => onSelect(id)} />
             <GroupImportDialog />
             <Button
@@ -201,21 +201,24 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
             </DropdownMenu>
           </div>
         </div>
-        <div className="relative">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+        <div className="relative hidden lg:block">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 transition-colors group-focus-within:text-primary" />
           <Input 
-            placeholder="Buscar..." 
-            className="pl-8" 
+            placeholder="Pesquisar mensagens..." 
+            className="pl-9 h-10 bg-muted/50 border-transparent focus-visible:bg-background transition-all rounded-xl" 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
       </div>
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 px-2">
         {isLoading ? (
-          <div className="p-4 text-center text-sm text-muted-foreground">Carregando...</div>
+          <div className="p-8 text-center">
+            <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground mx-auto mb-2 opacity-20" />
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Sincronizando...</div>
+          </div>
         ) : conversations?.length === 0 ? (
-          <div className="p-4 text-center text-sm text-muted-foreground">Nenhuma conversa encontrada.</div>
+          <div className="p-8 text-center text-muted-foreground/60 italic text-sm">Nenhuma conversa</div>
         ) : (
           conversations?.map((conv) => (
             <ChatItem 
@@ -238,40 +241,42 @@ const ChatItem = React.memo(({ conv, selectedId, onSelect }: { conv: any, select
     <button
       onClick={() => onSelect(conv.id)}
       className={cn(
-        "w-full flex items-center gap-3 p-4 hover:bg-accent transition-colors text-left border-b relative",
-        selectedId === conv.id && "bg-accent"
+        "w-full flex items-center gap-3 p-3 my-1 rounded-xl transition-all duration-300 text-left relative group border-2 border-transparent",
+        selectedId === conv.id ? "bg-primary/10 border-primary/20 shadow-sm" : "hover:bg-accent"
       )}
     >
-      <Avatar className="h-12 w-12 flex-shrink-0">
-        <AvatarImage src={conv.contact?.avatar_url || ""} />
-        <AvatarFallback>
-          {conv.is_group ? <Users className="h-6 w-6" /> : <User className="h-6 w-6" />}
-        </AvatarFallback>
-      </Avatar>
-      <div className="flex-1 min-w-0">
-        <div className="flex justify-between items-baseline mb-1">
-          <div className="flex items-center gap-1 min-w-0">
-            {conv.is_group && <Users className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
-            <h3 className="font-semibold truncate">{conv.contact?.name || "Sem Nome"}</h3>
+      <div className="relative shrink-0">
+        <Avatar className="h-10 w-10 lg:h-12 lg:w-12 border-2 border-background shadow-sm transition-transform duration-300 group-hover:scale-105">
+          <AvatarImage src={conv.contact?.avatar_url || ""} />
+          <AvatarFallback className="bg-primary/5 text-primary">
+            {conv.is_group ? <Users className="h-5 w-5 lg:h-6 lg:w-6" /> : <User className="h-5 w-5 lg:h-6 lg:w-6" />}
+          </AvatarFallback>
+        </Avatar>
+        {conv.status === 'aberta' && (
+          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-background rounded-full shadow-sm" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0 hidden lg:block">
+        <div className="flex justify-between items-baseline mb-0.5">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {conv.is_group && <Users className="h-3 w-3 text-primary flex-shrink-0" />}
+            <h3 className={cn("font-bold truncate text-sm tracking-tight", conv.unread_count > 0 ? "text-foreground" : "text-foreground/80")}>
+              {conv.contact?.name || "Sem Nome"}
+            </h3>
           </div>
           {conv.last_message_at && (
-            <span className="text-[10px] text-muted-foreground whitespace-nowrap ml-2">
-              {formatDistanceToNow(new Date(conv.last_message_at), { addSuffix: true, locale: ptBR })}
+            <span className="text-[10px] text-muted-foreground/60 whitespace-nowrap ml-2 font-medium">
+              {formatDistanceToNow(new Date(conv.last_message_at), { addSuffix: false, locale: ptBR })}
             </span>
           )}
         </div>
         <div className="flex flex-col gap-0.5">
-          <p className="text-sm text-foreground/80 truncate font-medium">
+          <p className={cn("text-xs truncate transition-colors", conv.unread_count > 0 ? "text-foreground font-semibold" : "text-muted-foreground")}>
             {conv.last_message_content || conv.contact?.phone_number}
           </p>
-          {conv.last_message_content && (
-            <p className="text-[10px] text-muted-foreground/60 truncate italic">
-              {conv.contact?.phone_number}
-            </p>
-          )}
         </div>
         {conv.unread_count > 0 && (
-          <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full absolute right-4 bottom-4">
+          <span className="bg-primary text-primary-foreground text-[10px] font-black px-1.5 py-0.5 rounded-full absolute top-3 right-3 shadow-md shadow-primary/30 animate-in zoom-in">
             {conv.unread_count}
           </span>
         )}
