@@ -45,9 +45,11 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
     staleTime: Infinity, // Profile doesn't change often
   });
 
-  const { data: conversations, isLoading } = useQuery({
+  const { data: conversations, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["conversations", filter, search],
-    staleTime: 1000 * 60 * 10, // 10 minutos de cache
+    staleTime: 0,
+    refetchInterval: 5000, // auto-refresh a cada 5s
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       let query = supabase
         .from("conversations")
