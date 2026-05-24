@@ -1,0 +1,21 @@
+{
+  "name": "AG SAC",
+  "short_name": "AG SAC",
+  "description": "Sistema de Atendimento AG SAC",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/39db5246-149c-4ede-bb30-a0440ca05766/id-preview-9f2ba60e--1dcd918c-35e8-4d0e-ac9e-3024ebd69060.lovable.app-1779048751573.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/39db5246-149c-4ede-bb30-a0440ca05766/id-preview-9f2ba60e--1dcd918c-35e8-4d0e-ac9e-3024ebd69060.lovable.app-1779048751573.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

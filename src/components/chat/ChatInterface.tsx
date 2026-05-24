@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
+import { cn } from "@/lib/utils";
 import { ChatSidebar } from "./ChatSidebar";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
-import { MessageSquare, User, Phone, Calendar, FileText, Info, HelpCircle, Tag, X, Plus } from "lucide-react";
+import { MessageSquare, User, Phone, Calendar, FileText, Info, HelpCircle, Tag, X, Plus, ChevronLeft, Menu } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
@@ -33,6 +34,7 @@ export function ChatInterface() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
   const [internalNote, setInternalNote] = useState("");
   const [newTag, setNewTag] = useState("");
+  const [mobileView, setMobileView] = useState<"list" | "chat">("list");
 
   const { data: selectedConversation, refetch } = useQuery({
     queryKey: ["conversation", selectedConversationId],
@@ -52,6 +54,7 @@ export function ChatInterface() {
   useEffect(() => {
     if (selectedConversation) {
       setInternalNote(selectedConversation.contact?.internal_note || "");
+      setMobileView("chat");
     }
   }, [selectedConversation]);
 
@@ -178,19 +181,33 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="flex h-full overflow-hidden bg-background shadow-2xl rounded-2xl border m-2 lg:m-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="w-20 lg:w-80 flex-shrink-0 border-r bg-card/50 backdrop-blur-xl">
+    <div className="flex h-[100dvh] lg:h-full overflow-hidden bg-background lg:shadow-2xl lg:rounded-2xl lg:border lg:m-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className={cn(
+        "w-full lg:w-80 flex-shrink-0 border-r bg-card/50 backdrop-blur-xl transition-all duration-300",
+        mobileView === "chat" && "hidden lg:flex"
+      )}>
         <ChatSidebar 
           selectedId={selectedConversationId} 
           onSelect={setSelectedConversationId} 
         />
       </div>
-      <div className="flex-1 flex flex-col min-w-0 relative bg-muted/5">
+      <div className={cn(
+        "flex-1 flex flex-col min-w-0 relative bg-muted/5 transition-all duration-300",
+        mobileView === "list" && "hidden lg:flex"
+      )}>
         {selectedConversationId ? (
           <div className="flex-1 flex min-w-0 min-h-0">
             <div className="flex-1 flex flex-col h-full min-h-0 border-r">
               <div className="p-3 lg:p-4 border-b bg-card/50 backdrop-blur-md flex items-center justify-between sticky top-0 z-10">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 lg:gap-3">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="lg:hidden" 
+                    onClick={() => setMobileView("list")}
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </Button>
                   <div className="relative">
                     <Avatar className="h-10 w-10 border-2 border-primary/10">
                       <AvatarFallback className="bg-primary/5 text-primary"><User /></AvatarFallback>
