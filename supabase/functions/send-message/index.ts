@@ -144,7 +144,9 @@ async function sendViaEvolution(params: {
 }) {
   const { supabase, instanceName, phone, content } = params;
   const { apiUrl, apiKey } = await resolveEvolutionConfig(supabase);
-  const cleanPhone = String(phone).replace(/@.+$/, "").replace(/\D/g, "");
+  const rawPhone = String(phone).trim();
+  const cleanPhone = rawPhone.replace(/@.+$/, "").replace(/\D/g, "");
+  const evolutionRecipient = rawPhone.includes("@") ? rawPhone : cleanPhone;
 
   if (cleanPhone.length < 10) {
     throw new Error(`Telefone inválido para envio: ${phone}`);
@@ -162,11 +164,11 @@ async function sendViaEvolution(params: {
 
   const sendUrl = `${apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
   const v1Payload = {
-    number: cleanPhone,
+    number: evolutionRecipient,
     textMessage: { text: content },
   };
   const v2Payload = {
-    number: cleanPhone,
+    number: evolutionRecipient,
     text: content,
   };
   const result = await postEvolutionText(sendUrl, apiKey, v1Payload).catch(async (error) => {
