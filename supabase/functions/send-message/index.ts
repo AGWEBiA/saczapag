@@ -9,6 +9,15 @@ const corsHeaders = {
 
 type SupabaseClientLike = any;
 
+function runInBackground(promise: Promise<unknown>) {
+  const edgeRuntime = (globalThis as any).EdgeRuntime;
+  if (edgeRuntime?.waitUntil) {
+    edgeRuntime.waitUntil(promise);
+    return;
+  }
+  promise.catch((error) => console.error("[send-message] background send failed:", error));
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -23,12 +32,18 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms = 15000) {
     return await fetch(url, { ...init, signal: ctrl.signal });
   } catch (error: any) {
     if (error?.name === "AbortError") {
-      throw new Error(`Tempo esgotado chamando ${url}`);
+      const timeoutError = new Error(`Tempo esgotado chamando ${url}`);
+      timeoutError.name = "TimeoutError";
+      throw timeoutError;
     }
     throw error;
   } finally {
     clearTimeout(t);
   }
+}
+
+function isSendTextTimeout(error: any) {
+  return error?.name === "TimeoutError" && String(error?.message || "").includes("/message/sendText/");
 }
 
 function evolutionErrorMessage(prefix: string, response: Response, body: unknown) {
@@ -205,6 +220,54 @@ async function sendToWhatsApp(params: {
   return result.messages?.[0]?.id as string | undefined;
 }
 
+async function processWhatsAppSend(params: {
+  supabase: SupabaseClientLike;
+  messageId: string;
+  instance: any;
+  phone: string;
+  content: string;
+}) {
+  const { supabase, messageId, instance, phone, content } = params;
+
+  await markMessage(supabase, messageId, {
+    delivery_status: "sending",
+    sending_at: new Date().toISOString(),
+  });
+
+  try {
+    const whatsappMessageId = await sendToWhatsApp({
+      supabase,
+      instance,
+      phone,
+      content,
+    });
+
+    await markMessage(supabase, messageId, {
+      delivery_status: "sent",
+      sent_at: new Date().toISOString(),
+    }, whatsappMessageId);
+  } catch (sendError: any) {
+    const errorMessage = sendError?.message || String(sendError);
+    if (isSendTextTimeout(sendError)) {
+      console.warn("[send-message] Evolution accepted request but did not answer in time:", errorMessage);
+      await markMessage(supabase, messageId, {
+        delivery_status: "sent",
+        sent_at: new Date().toISOString(),
+        gateway_status: "sent_without_evolution_response",
+        warning: errorMessage,
+      });
+      return;
+    }
+
+    console.error("[send-message] send failed:", errorMessage);
+    await markMessage(supabase, messageId, {
+      delivery_status: "failed",
+      failed_at: new Date().toISOString(),
+      error: errorMessage,
+    });
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -255,39 +318,23 @@ serve(async (req) => {
       })
       .eq("id", conversationId);
 
-    await markMessage(supabase, message.id, {
-      delivery_status: "sending",
-      sending_at: new Date().toISOString(),
-    });
-
-    try {
-      const whatsappMessageId = await sendToWhatsApp({
+    const sendPromise = processWhatsAppSend({
         supabase,
+        messageId: message.id,
         instance: conversation.instance,
         phone,
         content,
       });
 
-      await markMessage(supabase, message.id, {
-        delivery_status: "sent",
-        sent_at: new Date().toISOString(),
-      }, whatsappMessageId);
+    runInBackground(sendPromise);
 
-      return jsonResponse({
-        ...message,
-        metadata: { delivery_status: "sent" },
-        evolution_message_id: whatsappMessageId,
-      }, 200);
-    } catch (sendError: any) {
-      const errorMessage = sendError?.message || String(sendError);
-      console.error("[send-message] send failed:", errorMessage);
-      await markMessage(supabase, message.id, {
-        delivery_status: "failed",
-        failed_at: new Date().toISOString(),
-        error: errorMessage,
-      });
-      throw new Error(errorMessage);
-    }
+    return jsonResponse({
+      ...message,
+      metadata: {
+        delivery_status: "queued",
+        queued_at: message.metadata?.queued_at ?? new Date().toISOString(),
+      },
+    }, 202);
   } catch (error: any) {
     return jsonResponse({ error: error?.message || String(error) }, 400);
   }
