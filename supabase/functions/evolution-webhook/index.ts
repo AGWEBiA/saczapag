@@ -78,7 +78,7 @@ serve(async (req) => {
       if (!contact) {
         const { data: nc } = await supabase
           .from("contacts")
-          .insert({ phone_number: remoteJid, name: isGroup ? remoteJid : pushName })
+          .insert({ phone_number: remoteJid, name: isGroup ? (data.groupName || data.groupInfo?.subject || remoteJid) : pushName })
           .select("id").single();
         contact = nc;
       }
