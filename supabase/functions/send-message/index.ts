@@ -128,11 +128,11 @@ async function sendViaEvolution(params: {
       },
       body: JSON.stringify({
         number: cleanPhone,
-        options: { delay: 300, presence: "composing", linkPreview: false },
+        options: { delay: 300, linkPreview: false },
         textMessage: { text: content },
       }),
     },
-    30000,
+    12000,
   );
 
   const result = await response.json().catch(() => ({}));
@@ -150,12 +150,12 @@ async function sendViaEvolution(params: {
       },
       body: JSON.stringify({
         number: cleanPhone,
-        text: content,
         delay: 300,
         linkPreview: false,
+        textMessage: { text: content },
       }),
     },
-    30000,
+    12000,
   );
 
 
