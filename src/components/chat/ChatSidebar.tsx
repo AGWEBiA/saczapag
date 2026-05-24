@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { NewConversationDialog } from "./NewConversationDialog";
+import { GroupImportDialog } from "./GroupImportDialog";
 
 interface ChatSidebarProps {
   selectedId?: string;
@@ -169,6 +170,7 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
           <h2 className="text-xl font-bold">Conversas</h2>
           <div className="flex items-center gap-1">
             <NewConversationDialog onCreated={(id) => onSelect(id)} />
+            <GroupImportDialog />
             <Button
               variant="ghost"
               size="icon"
