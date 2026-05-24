@@ -22,7 +22,8 @@ import {
   LogOut,
   CheckCircle2,
   XCircle,
-  Play
+  Play,
+  RotateCw
 } from "lucide-react";
 import { toast } from "sonner";
 import { CreateInstanceDialog } from "./CreateInstanceDialog";
