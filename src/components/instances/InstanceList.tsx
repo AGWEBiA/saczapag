@@ -102,6 +102,7 @@ export function InstanceList() {
     },
     onSuccess: (data, variables) => {
       if (data?.base64) {
+        setPairingCode(null);
         setQrCodeData({ name: variables, base64: data.base64 });
         setIsQrDialogOpen(true);
       } else if (data?.instance?.state === "open") {
