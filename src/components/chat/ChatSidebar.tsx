@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Search, Filter, Users } from "lucide-react";
+import { User, Search, Filter, Users, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,9 +45,11 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
     staleTime: Infinity, // Profile doesn't change often
   });
 
-  const { data: conversations, isLoading } = useQuery({
+  const { data: conversations, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["conversations", filter, search],
-    staleTime: 1000 * 60 * 10, // 10 minutos de cache
+    staleTime: 0,
+    refetchInterval: 5000, // auto-refresh a cada 5s
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       let query = supabase
         .from("conversations")
@@ -137,22 +139,33 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold">Conversas</h2>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Filter className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>Filtrar por</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuRadioGroup value={filter} onValueChange={setFilter}>
-                <DropdownMenuRadioItem value="all">Todas</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="mine">Minhas</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="unassigned">Não Atribuídas</DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Atualizar conversas"
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Filter className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Filtrar por</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuRadioGroup value={filter} onValueChange={setFilter}>
+                  <DropdownMenuRadioItem value="all">Todas</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="mine">Minhas</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="unassigned">Não Atribuídas</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
         <div className="relative">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
