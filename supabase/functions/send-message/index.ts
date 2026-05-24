@@ -223,7 +223,7 @@ async function sendViaEvolution(params: {
     number: evolutionRecipient,
     text: content,
   };
-  const result = await postEvolutionText(sendUrl, apiKey, v2Payload);
+  const result = await postEvolutionText(sendUrl, apiKey, v2Payload) as any;
 
   return (result?.key?.id || result?.message?.key?.id || result?.id) as string | undefined;
 }
