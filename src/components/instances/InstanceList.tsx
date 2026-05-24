@@ -436,13 +436,28 @@ export function InstanceList() {
                 </div>
               ) : null}
             </div>
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={() => setIsQrDialogOpen(false)}
-            >
-              Fechar
-            </Button>
+            <div className="flex w-full gap-2">
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => qrCodeData?.name && regenerateQrMutation.mutate(qrCodeData.name)}
+                disabled={regenerateQrMutation.isPending}
+              >
+                {regenerateQrMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RotateCw className="mr-2 h-4 w-4" />
+                )}
+                Recriar QR
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setIsQrDialogOpen(false)}
+              >
+                Fechar
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
