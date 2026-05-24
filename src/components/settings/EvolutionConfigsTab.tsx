@@ -150,10 +150,10 @@ export function EvolutionConfigsTab() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <div>
-          <CardTitle>Evolution API — Instâncias</CardTitle>
+          <CardTitle>Evolution API — Configurações</CardTitle>
           <CardDescription>
-            Cadastre múltiplas instâncias para redundância. A marcada como <b>primária</b> é usada por padrão; as demais
-            ficam disponíveis como fallback (ordenadas por prioridade).
+            Cadastre URLs e chaves dos servidores Evolution. <b>API habilitada</b> só indica que a configuração pode ser usada;
+            a conexão real do WhatsApp aparece em <b>Instâncias</b>.
           </CardDescription>
         </div>
         <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}>
@@ -195,7 +195,7 @@ export function EvolutionConfigsTab() {
                 </div>
                 <div className="space-y-3 pt-1">
                   <div className="flex items-center justify-between">
-                    <Label>Ativa</Label>
+                    <Label>API habilitada</Label>
                     <Switch checked={form.is_active}
                       onCheckedChange={(v) => setForm({ ...form, is_active: v })} />
                   </div>
@@ -238,7 +238,7 @@ export function EvolutionConfigsTab() {
                 <TableHead>Nome</TableHead>
                 <TableHead>URL</TableHead>
                 <TableHead>Prioridade</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Uso</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -255,8 +255,8 @@ export function EvolutionConfigsTab() {
                   <TableCell>{c.priority}</TableCell>
                   <TableCell>
                     {c.is_active
-                      ? <Badge className="bg-green-500 hover:bg-green-500">ativa</Badge>
-                      : <Badge variant="secondary">inativa</Badge>}
+                      ? <Badge variant="secondary">API habilitada</Badge>
+                      : <Badge variant="outline">API desabilitada</Badge>}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
