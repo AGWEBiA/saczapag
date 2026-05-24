@@ -83,6 +83,15 @@ export function InstanceList() {
               if (newStatus === "connected") {
                 toast.success(`Instância "${inst.name}" conectada!`);
                 setIsQrDialogOpen(false);
+                // Auto-configura o webhook para receber mensagens
+                try {
+                  await supabase.functions.invoke("evolution-api", {
+                    body: { action: "set-webhook", instanceName: inst.evolution_instance_name },
+                  });
+                  toast.success("Webhook configurado automaticamente.");
+                } catch (e) {
+                  console.warn("Falha ao auto-configurar webhook:", e);
+                }
               }
             }
           } catch (err) {
