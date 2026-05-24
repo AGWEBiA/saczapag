@@ -113,7 +113,6 @@ async function sendViaEvolution(params: {
   const { supabase, instanceName, phone, content } = params;
   const { apiUrl, apiKey } = await resolveEvolutionConfig(supabase);
   const cleanPhone = String(phone).replace(/@.+$/, "").replace(/\D/g, "");
-  const jidPhone = String(phone).trim();
 
   if (cleanPhone.length < 10) {
     throw new Error(`Telefone inválido para envio: ${phone}`);
@@ -130,39 +129,7 @@ async function sendViaEvolution(params: {
   }
 
   const sendUrl = `${apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
-  const recipientCandidates = Array.from(new Set([jidPhone, cleanPhone].filter(Boolean)));
-  let lastError = "";
-
-  for (const recipient of recipientCandidates) {
-    try {
-      const response = await fetchWithTimeout(
-        sendUrl,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: apiKey,
-          },
-          body: JSON.stringify({
-            number: recipient,
-            text: content,
-          }),
-        },
-        15000,
-      );
-
-      const result = await response.json().catch(() => ({}));
-      if (response.ok) {
-        return (result?.key?.id || result?.message?.key?.id || result?.id) as string | undefined;
-      }
-
-      lastError = evolutionErrorMessage("Evolution", response, result);
-    } catch (error: any) {
-      lastError = error?.message || String(error);
-    }
-  }
-
-  const fallbackResponse = await fetchWithTimeout(
+  const response = await fetchWithTimeout(
     sendUrl,
     {
       method: "POST",
@@ -172,20 +139,18 @@ async function sendViaEvolution(params: {
       },
       body: JSON.stringify({
         number: cleanPhone,
-        textMessage: { text: content },
-        options: { delay: 300, linkPreview: false },
+        text: content,
       }),
     },
-    15000,
+    10000,
   );
 
-
-  const fallbackResult = await fallbackResponse.json().catch(() => ({}));
-  if (!fallbackResponse.ok) {
-    throw new Error(lastError || evolutionErrorMessage("Evolution", fallbackResponse, fallbackResult));
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(evolutionErrorMessage("Evolution", response, result));
   }
 
-  return (fallbackResult?.key?.id || fallbackResult?.message?.key?.id || fallbackResult?.id) as string | undefined;
+  return (result?.key?.id || result?.message?.key?.id || result?.id) as string | undefined;
 }
 
 async function sendToWhatsApp(params: {
