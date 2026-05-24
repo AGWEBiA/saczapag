@@ -35,20 +35,16 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
 
   const queryKey = useMemo(() => ["messages", conversationId] as const, [conversationId]);
 
-  const {
-    data,
-    isLoading,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useInfiniteQuery({
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey,
     initialPageParam: null as string | null,
     staleTime: 1000 * 60 * 30,
     queryFn: async ({ pageParam }) => {
       let q = supabase
         .from("messages")
-        .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata")
+        .select(
+          "id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata",
+        )
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE);
@@ -68,9 +64,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
   });
 
   // Mensagens em ordem cronológica
-  const messages: Msg[] = data
-    ? data.pages.flat().slice().reverse()
-    : [];
+  const messages: Msg[] = data ? data.pages.flat().slice().reverse() : [];
 
   // Realtime: anexa novas mensagens à primeira "página" sem refetch completo
   useEffect(() => {
@@ -110,7 +104,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
           queryClient.setQueryData<MessagesInfiniteData>(queryKey, (old) => {
             if (!old) return old;
             const pages = old.pages.map((page: Msg[]) =>
-              page.map((msg) => msg.id === updatedMsg.id ? updatedMsg : msg)
+              page.map((msg) => (msg.id === updatedMsg.id ? updatedMsg : msg)),
             );
             return { ...old, pages };
           });
@@ -168,8 +162,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
       return;
     }
     // Se está perto do fim, faz auto-scroll
-    const nearBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+    const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
     if (nearBottom) {
       container.scrollTop = container.scrollHeight;
     }
@@ -190,10 +183,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
   }
 
   return (
-    <div
-      ref={scrollContainerRef}
-      className="flex-1 overflow-y-auto p-4 bg-muted/30"
-    >
+    <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 bg-muted/30">
       <div ref={topSentinelRef} />
       {isFetchingNextPage && (
         <div className="flex justify-center py-2">
@@ -206,9 +196,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
             Inicie a conversa enviando uma mensagem.
           </div>
         ) : (
-          messages.map((msg) => (
-            <MessageBubble key={msg.id} msg={msg} isGroup={isGroup} />
-          ))
+          messages.map((msg) => <MessageBubble key={msg.id} msg={msg} isGroup={isGroup} />)
         )}
       </div>
     </div>
@@ -243,7 +231,9 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
         <span className="text-[10px] font-bold mb-1 text-primary">{msg.sender_name}</span>
       )}
       {msg.direction === "outbound" && msg.sender_name && (
-        <span className="text-[10px] font-bold mb-1 text-primary-foreground opacity-90">{msg.sender_name}</span>
+        <span className="text-[10px] font-bold mb-1 text-primary-foreground opacity-90">
+          {msg.sender_name}
+        </span>
       )}
       <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
       <div className="flex items-center justify-between gap-2 mt-1">
@@ -269,19 +259,23 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
             title={deliveryError}
           >
             {failed ? (
-              <><AlertTriangle className="h-3 w-3" /> falhou</>
+              <>
+                <AlertTriangle className="h-3 w-3" /> falhou
+              </>
             ) : sending ? (
-              <><Clock className="h-3 w-3" /> enviando</>
+              <>
+                <Clock className="h-3 w-3" /> enviando
+              </>
             ) : sent ? (
-              <><CheckCheck className="h-3 w-3" /> enviado</>
+              <>
+                <CheckCheck className="h-3 w-3" /> enviado
+              </>
             ) : null}
           </span>
         )}
       </div>
       {failed && deliveryError && (
-        <span className="mt-1 text-[10px] leading-snug text-destructive">
-          {deliveryError}
-        </span>
+        <span className="mt-1 text-[10px] leading-snug text-destructive">{deliveryError}</span>
       )}
     </div>
   );
