@@ -140,8 +140,6 @@ async function sendViaEvolution(params: {
       body: JSON.stringify({
         number: cleanPhone,
         text: content,
-        delay: 300,
-        linkPreview: false,
       }),
     },
     15000,
