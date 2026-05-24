@@ -89,7 +89,7 @@ async function markMessage(
   metadata: Record<string, unknown>,
   evolutionMessageId?: string,
 ) {
-  await supabase
+  const { error } = await supabase
     .from("messages")
     .update({
       ...(evolutionMessageId
@@ -98,6 +98,10 @@ async function markMessage(
       metadata,
     })
     .eq("id", messageId);
+
+  if (error) {
+    throw new Error(`Falha ao atualizar status da mensagem: ${error.message}`);
+  }
 }
 
 async function checkInstanceConnected(
@@ -157,7 +161,7 @@ async function sendViaEvolution(params: {
         text: content,
       }),
     },
-    10000,
+    5000,
   );
 
   const result = await response.json().catch(() => ({}));
@@ -229,10 +233,11 @@ async function processWhatsAppSend(params: {
 }) {
   const { supabase, messageId, instance, phone, content } = params;
 
-  await markMessage(supabase, messageId, {
+  const sendingMetadata = {
     delivery_status: "sending",
     sending_at: new Date().toISOString(),
-  });
+  };
+  await markMessage(supabase, messageId, sendingMetadata);
 
   try {
     const whatsappMessageId = await sendToWhatsApp({
@@ -242,29 +247,34 @@ async function processWhatsAppSend(params: {
       content,
     });
 
-    await markMessage(supabase, messageId, {
+    const sentMetadata = {
       delivery_status: "sent",
       sent_at: new Date().toISOString(),
-    }, whatsappMessageId);
+    };
+    await markMessage(supabase, messageId, sentMetadata, whatsappMessageId);
+    return { metadata: sentMetadata, evolutionMessageId: whatsappMessageId };
   } catch (sendError: any) {
     const errorMessage = sendError?.message || String(sendError);
     if (isSendTextTimeout(sendError)) {
       console.warn("[send-message] Evolution accepted request but did not answer in time:", errorMessage);
-      await markMessage(supabase, messageId, {
+      const acceptedMetadata = {
         delivery_status: "sent",
         sent_at: new Date().toISOString(),
         gateway_status: "sent_without_evolution_response",
         warning: errorMessage,
-      });
-      return;
+      };
+      await markMessage(supabase, messageId, acceptedMetadata);
+      return { metadata: acceptedMetadata };
     }
 
     console.error("[send-message] send failed:", errorMessage);
-    await markMessage(supabase, messageId, {
+    const failedMetadata = {
       delivery_status: "failed",
       failed_at: new Date().toISOString(),
       error: errorMessage,
-    });
+    };
+    await markMessage(supabase, messageId, failedMetadata);
+    return { metadata: failedMetadata };
   }
 }
 
