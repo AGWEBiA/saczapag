@@ -18,6 +18,11 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms = 15000) {
   const t = setTimeout(() => ctrl.abort(), ms);
   try {
     return await fetch(url, { ...init, signal: ctrl.signal });
+  } catch (error: any) {
+    if (error?.name === "AbortError") {
+      throw new Error(`Tempo esgotado chamando ${url}`);
+    }
+    throw error;
   } finally {
     clearTimeout(t);
   }
@@ -62,25 +67,16 @@ async function markMessage(
 
 async function sendViaEvolution(params: {
   supabase: ReturnType<typeof createClient>;
-  messageId: string;
   instanceName: string;
   phone: string;
   content: string;
 }) {
-  const { supabase, messageId, instanceName, phone, content } = params;
+  const { supabase, instanceName, phone, content } = params;
   const { apiUrl, apiKey } = await resolveEvolutionConfig(supabase);
   const cleanPhone = String(phone).replace(/@.+$/, "").replace(/\D/g, "");
 
-  const stateResponse = await fetchWithTimeout(
-    `${apiUrl}/instance/connectionState/${instanceName}`,
-    { method: "GET", headers: { apikey: apiKey } },
-    6000,
-  );
-  const stateResult = await stateResponse.json().catch(() => ({}));
-  const instanceState = stateResult?.instance?.state ?? stateResult?.state;
-
-  if (stateResponse.ok && instanceState && instanceState !== "open") {
-    throw new Error(`A instância ${instanceName} não está conectada ao WhatsApp (estado atual: ${instanceState}). Reconecte a instância antes de enviar mensagens.`);
+  if (cleanPhone.length < 10) {
+    throw new Error(`Telefone inválido para envio: ${phone}`);
   }
 
   const response = await fetchWithTimeout(
@@ -98,7 +94,7 @@ async function sendViaEvolution(params: {
         linkPreview: false,
       }),
     },
-    25000,
+    45000,
   );
 
   const result = await response.json().catch(() => ({}));
@@ -118,7 +114,7 @@ async function sendViaEvolution(params: {
         textMessage: { text: content },
       }),
     },
-    25000,
+    45000,
   );
 
   const fallbackResult = await fallbackResponse.json().catch(() => ({}));
