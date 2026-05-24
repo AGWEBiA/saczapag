@@ -33,10 +33,6 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms = 15000) {
   }
 }
 
-function isSendTextTimeout(error: any) {
-  return error?.name === "TimeoutError" && String(error?.message || "").includes("/message/sendText/");
-}
-
 function evolutionErrorMessage(prefix: string, response: Response, body: unknown) {
   const raw = typeof body === "string" ? body : JSON.stringify(body);
   const parsed = typeof body === "object" && body ? body as any : {};
@@ -114,6 +110,43 @@ async function checkInstanceConnected(
   }
 }
 
+async function getEvolutionMajorVersion(apiUrl: string): Promise<number | null> {
+  try {
+    const res = await fetchWithTimeout(apiUrl, { method: "GET" }, 4000);
+    const body = await res.json().catch(() => ({}));
+    const major = Number(String(body?.version || "").split(".")[0]);
+    return Number.isFinite(major) ? major : null;
+  } catch {
+    return null;
+  }
+}
+
+async function postEvolutionText(
+  sendUrl: string,
+  apiKey: string,
+  body: Record<string, unknown>,
+) {
+  const response = await fetchWithTimeout(
+    sendUrl,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: apiKey,
+      },
+      body: JSON.stringify(body),
+    },
+    20000,
+  );
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(evolutionErrorMessage("Evolution", response, result));
+  }
+
+  return result;
+}
+
 async function sendViaEvolution(params: {
   supabase: SupabaseClientLike;
   instanceName: string;
@@ -139,26 +172,23 @@ async function sendViaEvolution(params: {
   }
 
   const sendUrl = `${apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
-  const response = await fetchWithTimeout(
+  const versionMajor = await getEvolutionMajorVersion(apiUrl);
+  const v1Payload = {
+    number: cleanPhone,
+    textMessage: { text: content },
+    options: { delay: 0, linkPreview: false },
+  };
+  const v2Payload = {
+    number: cleanPhone,
+    text: content,
+    delay: 0,
+    linkPreview: false,
+  };
+  const result = await postEvolutionText(
     sendUrl,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: apiKey,
-      },
-      body: JSON.stringify({
-        number: cleanPhone,
-        text: content,
-      }),
-    },
-    5000,
+    apiKey,
+    versionMajor === 1 ? v1Payload : v2Payload,
   );
-
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(evolutionErrorMessage("Evolution", response, result));
-  }
 
   return (result?.key?.id || result?.message?.key?.id || result?.id) as string | undefined;
 }
