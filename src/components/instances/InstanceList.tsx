@@ -423,7 +423,20 @@ export function InstanceList() {
                             Logout
                           </Button>
                         )}
-                        
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          title="Configurar webhook (necessário p/ receber mensagens)"
+                          onClick={() => setWebhookMutation.mutate(instance.evolution_instance_name)}
+                          disabled={setWebhookMutation.isPending}
+                        >
+                          {setWebhookMutation.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : null}
+                          Configurar Webhook
+                        </Button>
+
                         <Button
                           variant="ghost"
                           size="icon"
