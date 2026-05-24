@@ -346,6 +346,33 @@ export function InstanceList() {
             <p className="text-sm font-medium text-center">
               Instância: <span className="text-primary">{qrCodeData?.name}</span>
             </p>
+            <div className="w-full space-y-3 rounded-md border bg-muted/40 p-3">
+              <p className="text-xs text-muted-foreground">
+                Se o WhatsApp rejeitar o QR, use o pareamento por número: informe o telefone com DDI e DDD e conecte em Aparelhos conectados &gt; Conectar com número de telefone.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  inputMode="numeric"
+                  placeholder="5511999999999"
+                  value={pairingPhone}
+                  onChange={(event) => setPairingPhone(event.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => qrCodeData?.name && getPairingMutation.mutate(qrCodeData.name)}
+                  disabled={getPairingMutation.isPending}
+                >
+                  {getPairingMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Gerar código"}
+                </Button>
+              </div>
+              {pairingCode ? (
+                <div className="rounded-md bg-background p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Código para {pairingCode.name}</p>
+                  <p className="text-2xl font-bold tracking-widest text-primary">{pairingCode.code}</p>
+                </div>
+              ) : null}
+            </div>
             <Button 
               variant="outline" 
               className="w-full"
