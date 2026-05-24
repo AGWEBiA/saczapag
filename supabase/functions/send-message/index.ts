@@ -9,9 +9,14 @@ const corsHeaders = {
 
 type SupabaseClientLike = any;
 
-declare const EdgeRuntime: {
-  waitUntil(promise: Promise<unknown>): void;
-};
+function runInBackground(promise: Promise<unknown>) {
+  const edgeRuntime = (globalThis as any).EdgeRuntime;
+  if (edgeRuntime?.waitUntil) {
+    edgeRuntime.waitUntil(promise);
+    return;
+  }
+  promise.catch((error) => console.error("[send-message] background send failed:", error));
+}
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -321,7 +326,7 @@ serve(async (req) => {
         content,
       });
 
-    EdgeRuntime.waitUntil(sendPromise);
+    runInBackground(sendPromise);
 
     return jsonResponse({
       ...message,
