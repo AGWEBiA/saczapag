@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef } from "react";
+import { useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -21,8 +21,10 @@ type Msg = {
   sender_name: string | null;
   is_internal: boolean | null;
   evolution_message_id?: string | null;
-  metadata?: Record<string, any> | null;
+  metadata?: Record<string, unknown> | null;
 };
+
+type MessagesInfiniteData = InfiniteData<Msg[], string | null>;
 
 export function MessageList({ conversationId, isGroup }: MessageListProps) {
   const queryClient = useQueryClient();
@@ -31,7 +33,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
   const lastScrollHeightRef = useRef<number>(0);
   const initialScrollDone = useRef(false);
 
-  const queryKey = ["messages", conversationId];
+  const queryKey = useMemo(() => ["messages", conversationId] as const, [conversationId]);
 
   const {
     data,
@@ -84,7 +86,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
         },
         (payload) => {
           const newMsg = payload.new as Msg;
-          queryClient.setQueryData<any>(queryKey, (old: any) => {
+          queryClient.setQueryData<MessagesInfiniteData>(queryKey, (old) => {
             if (!old) return old;
             const pages = [...old.pages];
             const first = pages[0] ?? [];
@@ -105,7 +107,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
         },
         (payload) => {
           const updatedMsg = payload.new as Msg;
-          queryClient.setQueryData<any>(queryKey, (old: any) => {
+          queryClient.setQueryData<MessagesInfiniteData>(queryKey, (old) => {
             if (!old) return old;
             const pages = old.pages.map((page: Msg[]) =>
               page.map((msg) => msg.id === updatedMsg.id ? updatedMsg : msg)
