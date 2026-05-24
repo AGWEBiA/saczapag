@@ -182,8 +182,11 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button variant={filter !== "all" ? "secondary" : "ghost"} size="icon" className="relative">
                   <Filter className="h-4 w-4" />
+                  {filter !== "all" && (
+                    <span className="absolute top-0 right-0 w-2 h-2 bg-primary rounded-full" />
+                  )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
