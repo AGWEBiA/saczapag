@@ -36,10 +36,6 @@ type CachedMessage = {
 
 type CachedMessages = InfiniteData<CachedMessage[], string | null>;
 
-type ConversationPhoneResult = {
-  contact?: { phone_number?: string | null } | null;
-};
-
 export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
   const [content, setContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
@@ -92,7 +88,7 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
         });
 
         if (error) throw error;
-        return { success: true };
+        return null;
       }
 
       const data = await sendMessageFn({
@@ -103,7 +99,7 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
         },
       });
 
-      return data;
+      return data as CachedMessage;
     },
     onSuccess: (data) => {
       setContent("");
