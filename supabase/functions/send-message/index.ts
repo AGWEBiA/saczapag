@@ -309,39 +309,23 @@ serve(async (req) => {
       })
       .eq("id", conversationId);
 
-    await markMessage(supabase, message.id, {
-      delivery_status: "sending",
-      sending_at: new Date().toISOString(),
-    });
-
-    try {
-      const whatsappMessageId = await sendToWhatsApp({
+    const sendPromise = processWhatsAppSend({
         supabase,
+        messageId: message.id,
         instance: conversation.instance,
         phone,
         content,
       });
 
-      await markMessage(supabase, message.id, {
-        delivery_status: "sent",
-        sent_at: new Date().toISOString(),
-      }, whatsappMessageId);
+    EdgeRuntime.waitUntil(sendPromise);
 
-      return jsonResponse({
-        ...message,
-        metadata: { delivery_status: "sent" },
-        evolution_message_id: whatsappMessageId,
-      }, 200);
-    } catch (sendError: any) {
-      const errorMessage = sendError?.message || String(sendError);
-      console.error("[send-message] send failed:", errorMessage);
-      await markMessage(supabase, message.id, {
-        delivery_status: "failed",
-        failed_at: new Date().toISOString(),
-        error: errorMessage,
-      });
-      throw new Error(errorMessage);
-    }
+    return jsonResponse({
+      ...message,
+      metadata: {
+        delivery_status: "queued",
+        queued_at: message.metadata?.queued_at ?? new Date().toISOString(),
+      },
+    }, 202);
   } catch (error: any) {
     return jsonResponse({ error: error?.message || String(error) }, 400);
   }
