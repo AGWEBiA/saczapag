@@ -77,7 +77,7 @@ export function InstanceList() {
                 .from("whatsapp_instances")
                 .update({
                   status: newStatus,
-                  last_connected_at: newStatus === "connected" ? new Date().toISOString() : inst.last_connected_at,
+                  last_connected_at: newStatus === "connected" ? new Date().toISOString() : null,
                 })
                 .eq("id", inst.id);
               if (newStatus === "connected") {
