@@ -172,23 +172,18 @@ async function sendViaEvolution(params: {
   }
 
   const sendUrl = `${apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
-  const versionMajor = await getEvolutionMajorVersion(apiUrl);
   const v1Payload = {
     number: cleanPhone,
     textMessage: { text: content },
-    options: { delay: 0, linkPreview: false },
   };
   const v2Payload = {
     number: cleanPhone,
     text: content,
-    delay: 0,
-    linkPreview: false,
   };
-  const result = await postEvolutionText(
-    sendUrl,
-    apiKey,
-    versionMajor === 1 ? v1Payload : v2Payload,
-  );
+  const result = await postEvolutionText(sendUrl, apiKey, v1Payload).catch(async (error) => {
+    if (error?.name === "TimeoutError") throw error;
+    return await postEvolutionText(sendUrl, apiKey, v2Payload);
+  });
 
   return (result?.key?.id || result?.message?.key?.id || result?.id) as string | undefined;
 }
