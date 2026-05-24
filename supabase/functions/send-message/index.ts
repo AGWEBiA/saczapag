@@ -223,19 +223,35 @@ serve(async (req) => {
       })
       .eq("id", conversationId);
 
-    const backgroundTask = sendInBackground({
-      supabase,
-      messageId: message.id,
-      instance: conversation.instance,
-      phone,
-      content,
+    await markMessage(supabase, message.id, {
+      delivery_status: "sending",
+      sending_at: new Date().toISOString(),
     });
 
-    const edgeRuntime = (globalThis as any).EdgeRuntime;
-    if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(backgroundTask);
-    else backgroundTask.catch((error) => console.error("[send-message] async send failed:", error));
+    try {
+      const whatsappMessageId = await sendToWhatsApp({
+        supabase,
+        instance: conversation.instance,
+        phone,
+        content,
+      });
 
-    return jsonResponse(message, 202);
+      await markMessage(supabase, message.id, {
+        delivery_status: "sent",
+        sent_at: new Date().toISOString(),
+      }, whatsappMessageId);
+
+      return jsonResponse({ ...message, metadata: { delivery_status: "sent" }, evolution_message_id: whatsappMessageId }, 200);
+    } catch (sendError: any) {
+      const errorMessage = sendError?.message || String(sendError);
+      console.error("[send-message] send failed:", errorMessage);
+      await markMessage(supabase, message.id, {
+        delivery_status: "failed",
+        failed_at: new Date().toISOString(),
+        error: errorMessage,
+      });
+      throw new Error(errorMessage);
+    }
   } catch (error: any) {
     return jsonResponse({ error: error?.message || String(error) }, 400);
   }
