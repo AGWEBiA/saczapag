@@ -3,8 +3,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
+
+type SupabaseClientLike = any;
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -18,12 +21,19 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms = 15000) {
   const t = setTimeout(() => ctrl.abort(), ms);
   try {
     return await fetch(url, { ...init, signal: ctrl.signal });
+  } catch (error: any) {
+    if (error?.name === "AbortError") {
+      throw new Error(`Tempo esgotado chamando ${url}`);
+    }
+    throw error;
   } finally {
     clearTimeout(t);
   }
 }
 
-async function resolveEvolutionConfig(supabase: ReturnType<typeof createClient>) {
+async function resolveEvolutionConfig(
+  supabase: SupabaseClientLike,
+) {
   const { data: configs } = await supabase
     .from("evolution_configs")
     .select("id, api_url, api_key, is_primary, priority, is_active")
@@ -36,7 +46,9 @@ async function resolveEvolutionConfig(supabase: ReturnType<typeof createClient>)
   const apiKey = chosen?.api_key ?? Deno.env.get("EVOLUTION_API_KEY") ?? null;
 
   if (!apiUrl || !apiKey) {
-    throw new Error("Nenhuma configuração Evolution API encontrada. Cadastre em Configurações > API.");
+    throw new Error(
+      "Nenhuma configuração Evolution API encontrada. Cadastre em Configurações > API.",
+    );
   }
 
   return {
@@ -46,7 +58,7 @@ async function resolveEvolutionConfig(supabase: ReturnType<typeof createClient>)
 }
 
 async function markMessage(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClientLike,
   messageId: string,
   metadata: Record<string, unknown>,
   evolutionMessageId?: string,
@@ -54,33 +66,26 @@ async function markMessage(
   await supabase
     .from("messages")
     .update({
-      ...(evolutionMessageId ? { evolution_message_id: evolutionMessageId } : {}),
+      ...(evolutionMessageId
+        ? { evolution_message_id: evolutionMessageId }
+        : {}),
       metadata,
     })
     .eq("id", messageId);
 }
 
 async function sendViaEvolution(params: {
-  supabase: ReturnType<typeof createClient>;
-  messageId: string;
+  supabase: SupabaseClientLike;
   instanceName: string;
   phone: string;
   content: string;
 }) {
-  const { supabase, messageId, instanceName, phone, content } = params;
+  const { supabase, instanceName, phone, content } = params;
   const { apiUrl, apiKey } = await resolveEvolutionConfig(supabase);
   const cleanPhone = String(phone).replace(/@.+$/, "").replace(/\D/g, "");
 
-  const stateResponse = await fetchWithTimeout(
-    `${apiUrl}/instance/connectionState/${instanceName}`,
-    { method: "GET", headers: { apikey: apiKey } },
-    6000,
-  );
-  const stateResult = await stateResponse.json().catch(() => ({}));
-  const instanceState = stateResult?.instance?.state ?? stateResult?.state;
-
-  if (stateResponse.ok && instanceState && instanceState !== "open") {
-    throw new Error(`A instância ${instanceName} não está conectada ao WhatsApp (estado atual: ${instanceState}). Reconecte a instância antes de enviar mensagens.`);
+  if (cleanPhone.length < 10) {
+    throw new Error(`Telefone inválido para envio: ${phone}`);
   }
 
   const response = await fetchWithTimeout(
@@ -98,7 +103,7 @@ async function sendViaEvolution(params: {
         linkPreview: false,
       }),
     },
-    25000,
+    45000,
   );
 
   const result = await response.json().catch(() => ({}));
@@ -118,88 +123,70 @@ async function sendViaEvolution(params: {
         textMessage: { text: content },
       }),
     },
-    25000,
+    45000,
   );
 
   const fallbackResult = await fallbackResponse.json().catch(() => ({}));
   if (!fallbackResponse.ok) {
-    throw new Error(fallbackResult?.message || result?.message || `Evolution retornou ${fallbackResponse.status}`);
+    throw new Error(
+      fallbackResult?.message || result?.message ||
+        `Evolution retornou ${fallbackResponse.status}`,
+    );
   }
 
   return fallbackResult?.key?.id as string | undefined;
 }
 
-async function sendInBackground(params: {
-  supabase: ReturnType<typeof createClient>;
-  messageId: string;
+async function sendToWhatsApp(params: {
+  supabase: SupabaseClientLike;
   instance: any;
   phone: string;
   content: string;
 }) {
-  const { supabase, messageId, instance, phone, content } = params;
+  const { supabase, instance, phone, content } = params;
 
-  try {
-    await markMessage(supabase, messageId, {
-      delivery_status: "sending",
-      sending_at: new Date().toISOString(),
-    });
-
-    let whatsappMessageId: string | undefined;
-
-    if (instance?.evolution_instance_name) {
-      whatsappMessageId = await sendViaEvolution({
-        supabase,
-        messageId,
-        instanceName: instance.evolution_instance_name,
-        phone,
-        content,
-      });
-    } else {
-      const WHATSAPP_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
-      const PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
-
-      if (!WHATSAPP_TOKEN || !PHONE_NUMBER_ID) {
-        throw new Error("WhatsApp API credentials not configured");
-      }
-
-      const response = await fetchWithTimeout(
-        `https://graph.facebook.com/v17.0/${PHONE_NUMBER_ID}/messages`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${WHATSAPP_TOKEN}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: phone,
-            type: "text",
-            text: { body: content },
-          }),
-        },
-        25000,
-      );
-
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error?.message || "Failed to send message via WhatsApp");
-      whatsappMessageId = result.messages?.[0]?.id;
-    }
-
-    await markMessage(supabase, messageId, {
-      delivery_status: "sent",
-      sent_at: new Date().toISOString(),
-    }, whatsappMessageId);
-  } catch (error: any) {
-    console.error("[send-message] background send failed:", error?.message || error);
-    await markMessage(supabase, messageId, {
-      delivery_status: "failed",
-      failed_at: new Date().toISOString(),
-      error: error?.name === "AbortError"
-        ? "Tempo esgotado ao enviar pela Evolution. Verifique se a instância está conectada e se a Evolution respondeu ao envio."
-        : error?.message || String(error),
+  if (instance?.evolution_instance_name) {
+    return await sendViaEvolution({
+      supabase,
+      instanceName: instance.evolution_instance_name,
+      phone,
+      content,
     });
   }
+
+  const WHATSAPP_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
+  const PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
+
+  if (!WHATSAPP_TOKEN || !PHONE_NUMBER_ID) {
+    throw new Error("WhatsApp API credentials not configured");
+  }
+
+  const response = await fetchWithTimeout(
+    `https://graph.facebook.com/v17.0/${PHONE_NUMBER_ID}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: phone,
+        type: "text",
+        text: { body: content },
+      }),
+    },
+    45000,
+  );
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      result.error?.message || "Failed to send message via WhatsApp",
+    );
+  }
+  return result.messages?.[0]?.id as string | undefined;
 }
 
 serve(async (req) => {
@@ -210,7 +197,7 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
     const { conversationId, content, phone, senderName } = await req.json();
@@ -252,19 +239,39 @@ serve(async (req) => {
       })
       .eq("id", conversationId);
 
-    const backgroundTask = sendInBackground({
-      supabase,
-      messageId: message.id,
-      instance: conversation.instance,
-      phone,
-      content,
+    await markMessage(supabase, message.id, {
+      delivery_status: "sending",
+      sending_at: new Date().toISOString(),
     });
 
-    const edgeRuntime = (globalThis as any).EdgeRuntime;
-    if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(backgroundTask);
-    else backgroundTask.catch((error) => console.error("[send-message] async send failed:", error));
+    try {
+      const whatsappMessageId = await sendToWhatsApp({
+        supabase,
+        instance: conversation.instance,
+        phone,
+        content,
+      });
 
-    return jsonResponse(message, 202);
+      await markMessage(supabase, message.id, {
+        delivery_status: "sent",
+        sent_at: new Date().toISOString(),
+      }, whatsappMessageId);
+
+      return jsonResponse({
+        ...message,
+        metadata: { delivery_status: "sent" },
+        evolution_message_id: whatsappMessageId,
+      }, 200);
+    } catch (sendError: any) {
+      const errorMessage = sendError?.message || String(sendError);
+      console.error("[send-message] send failed:", errorMessage);
+      await markMessage(supabase, message.id, {
+        delivery_status: "failed",
+        failed_at: new Date().toISOString(),
+        error: errorMessage,
+      });
+      throw new Error(errorMessage);
+    }
   } catch (error: any) {
     return jsonResponse({ error: error?.message || String(error) }, 400);
   }

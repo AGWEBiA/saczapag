@@ -1,10 +1,10 @@
-import { useEffect, useRef } from "react";
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef } from "react";
+import { useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, CheckCheck, Clock, Loader2 } from "lucide-react";
 
 interface MessageListProps {
   conversationId: string;
@@ -20,7 +20,11 @@ type Msg = {
   direction: string;
   sender_name: string | null;
   is_internal: boolean | null;
+  evolution_message_id?: string | null;
+  metadata?: Record<string, unknown> | null;
 };
+
+type MessagesInfiniteData = InfiniteData<Msg[], string | null>;
 
 export function MessageList({ conversationId, isGroup }: MessageListProps) {
   const queryClient = useQueryClient();
@@ -29,22 +33,18 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
   const lastScrollHeightRef = useRef<number>(0);
   const initialScrollDone = useRef(false);
 
-  const queryKey = ["messages", conversationId];
+  const queryKey = useMemo(() => ["messages", conversationId] as const, [conversationId]);
 
-  const {
-    data,
-    isLoading,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useInfiniteQuery({
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey,
     initialPageParam: null as string | null,
     staleTime: 1000 * 60 * 30,
     queryFn: async ({ pageParam }) => {
       let q = supabase
         .from("messages")
-        .select("id, content, created_at, direction, sender_name, is_internal")
+        .select(
+          "id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata",
+        )
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE);
@@ -64,9 +64,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
   });
 
   // Mensagens em ordem cronológica
-  const messages: Msg[] = data
-    ? data.pages.flat().slice().reverse()
-    : [];
+  const messages: Msg[] = data ? data.pages.flat().slice().reverse() : [];
 
   // Realtime: anexa novas mensagens à primeira "página" sem refetch completo
   useEffect(() => {
@@ -82,7 +80,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
         },
         (payload) => {
           const newMsg = payload.new as Msg;
-          queryClient.setQueryData<any>(queryKey, (old: any) => {
+          queryClient.setQueryData<MessagesInfiniteData>(queryKey, (old) => {
             if (!old) return old;
             const pages = [...old.pages];
             const first = pages[0] ?? [];
@@ -93,12 +91,31 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
           });
         },
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          const updatedMsg = payload.new as Msg;
+          queryClient.setQueryData<MessagesInfiniteData>(queryKey, (old) => {
+            if (!old) return old;
+            const pages = old.pages.map((page: Msg[]) =>
+              page.map((msg) => (msg.id === updatedMsg.id ? updatedMsg : msg)),
+            );
+            return { ...old, pages };
+          });
+        },
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId, queryClient]);
+  }, [conversationId, queryClient, queryKey]);
 
   // IntersectionObserver no topo: dispara fetchNextPage
   useEffect(() => {
@@ -145,8 +162,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
       return;
     }
     // Se está perto do fim, faz auto-scroll
-    const nearBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+    const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
     if (nearBottom) {
       container.scrollTop = container.scrollHeight;
     }
@@ -167,10 +183,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
   }
 
   return (
-    <div
-      ref={scrollContainerRef}
-      className="flex-1 overflow-y-auto p-4 bg-muted/30"
-    >
+    <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 bg-muted/30">
       <div ref={topSentinelRef} />
       {isFetchingNextPage && (
         <div className="flex justify-center py-2">
@@ -183,9 +196,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
             Inicie a conversa enviando uma mensagem.
           </div>
         ) : (
-          messages.map((msg) => (
-            <MessageBubble key={msg.id} msg={msg} isGroup={isGroup} />
-          ))
+          messages.map((msg) => <MessageBubble key={msg.id} msg={msg} isGroup={isGroup} />)
         )}
       </div>
     </div>
@@ -195,6 +206,13 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
 import * as React from "react";
 
 const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolean }) => {
+  const deliveryStatus = msg.metadata?.delivery_status as string | undefined;
+  const deliveryError = msg.metadata?.error as string | undefined;
+  const isOutbound = msg.direction === "outbound" && !msg.is_internal;
+  const failed = isOutbound && deliveryStatus === "failed";
+  const sending = isOutbound && (deliveryStatus === "queued" || deliveryStatus === "sending");
+  const sent = isOutbound && (deliveryStatus === "sent" || !!msg.evolution_message_id);
+
   return (
     <div
       className={cn(
@@ -213,7 +231,9 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
         <span className="text-[10px] font-bold mb-1 text-primary">{msg.sender_name}</span>
       )}
       {msg.direction === "outbound" && msg.sender_name && (
-        <span className="text-[10px] font-bold mb-1 text-primary-foreground opacity-90">{msg.sender_name}</span>
+        <span className="text-[10px] font-bold mb-1 text-primary-foreground opacity-90">
+          {msg.sender_name}
+        </span>
       )}
       <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
       <div className="flex items-center justify-between gap-2 mt-1">
@@ -229,7 +249,34 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
         >
           {format(new Date(msg.created_at), "HH:mm", { locale: ptBR })}
         </span>
+        {isOutbound && (
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 text-[10px] opacity-80",
+              failed && "text-destructive opacity-100",
+              !failed && "text-primary-foreground",
+            )}
+            title={deliveryError}
+          >
+            {failed ? (
+              <>
+                <AlertTriangle className="h-3 w-3" /> falhou
+              </>
+            ) : sending ? (
+              <>
+                <Clock className="h-3 w-3" /> enviando
+              </>
+            ) : sent ? (
+              <>
+                <CheckCheck className="h-3 w-3" /> enviado
+              </>
+            ) : null}
+          </span>
+        )}
       </div>
+      {failed && deliveryError && (
+        <span className="mt-1 text-[10px] leading-snug text-destructive">{deliveryError}</span>
+      )}
     </div>
   );
 });
