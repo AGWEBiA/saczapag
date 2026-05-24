@@ -136,6 +136,42 @@ async function postEvolutionText(
   return result;
 }
 
+async function resolveWhatsAppRecipient(
+  apiUrl: string,
+  apiKey: string,
+  instanceName: string,
+  phone: string,
+) {
+  const cleanPhone = String(phone).replace(/@.+$/, "").replace(/\D/g, "");
+  if (cleanPhone.length < 10) {
+    throw new Error(`Telefone inválido para envio: ${phone}`);
+  }
+
+  const response = await fetchWithTimeout(
+    `${apiUrl}/chat/whatsappNumbers/${encodeURIComponent(instanceName)}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: apiKey,
+      },
+      body: JSON.stringify({ numbers: [cleanPhone] }),
+    },
+    12000,
+  );
+  const result = await response.json().catch(() => []);
+  if (!response.ok) {
+    throw new Error(evolutionErrorMessage("Evolution whatsappNumbers", response, result));
+  }
+
+  const checked = Array.isArray(result) ? result[0] : result;
+  if (checked && checked.exists === false) {
+    throw new Error(`O número ${cleanPhone} não foi confirmado como WhatsApp pela Evolution.`);
+  }
+
+  return String(checked?.jid || cleanPhone);
+}
+
 async function sendViaEvolution(params: {
   supabase: SupabaseClientLike;
   instanceName: string;
@@ -144,13 +180,7 @@ async function sendViaEvolution(params: {
 }) {
   const { supabase, instanceName, phone, content } = params;
   const { apiUrl, apiKey } = await resolveEvolutionConfig(supabase);
-  const rawPhone = String(phone).trim();
-  const cleanPhone = rawPhone.replace(/@.+$/, "").replace(/\D/g, "");
-  const evolutionRecipient = rawPhone.includes("@") ? rawPhone : cleanPhone;
-
-  if (cleanPhone.length < 10) {
-    throw new Error(`Telefone inválido para envio: ${phone}`);
-  }
+  const evolutionRecipient = await resolveWhatsAppRecipient(apiUrl, apiKey, instanceName, phone);
 
   // Verifica se a instância está conectada antes de tentar enviar.
   // Se não estiver "open", o sendText do Evolution trava aguardando o socket.
