@@ -117,6 +117,47 @@ export function InstanceList() {
     },
   });
 
+  const regenerateQrMutation = useMutation({
+    mutationFn: async (evolutionName: string) => {
+      // Força reinício da sessão para invalidar QR antigo e gerar novo
+      try {
+        await supabase.functions.invoke("evolution-api", {
+          body: { action: "logout-instance", instanceName: evolutionName },
+        });
+      } catch (err) {
+        console.warn("logout antes de regenerar falhou (pode estar desconectado):", err);
+      }
+      try {
+        await supabase.functions.invoke("evolution-api", {
+          body: { action: "restart-instance", instanceName: evolutionName },
+        });
+      } catch (err) {
+        console.warn("restart falhou (seguindo para connect):", err);
+      }
+      await new Promise((r) => setTimeout(r, 800));
+      const { data, error } = await supabase.functions.invoke("evolution-api", {
+        body: { action: "get-qr-code", instanceName: evolutionName },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data, variables) => {
+      setPairingCode(null);
+      if (data?.base64) {
+        setQrCodeData({ name: variables, base64: data.base64 });
+        setIsQrDialogOpen(true);
+        toast.success("Novo QR code gerado.");
+      } else {
+        toast.error("Não foi possível gerar um novo QR code.");
+      }
+      queryClient.invalidateQueries({ queryKey: instancesQueryOptions.queryKey });
+    },
+    onError: (error) => {
+      toast.error("Erro ao recriar QR code: " + error.message);
+    },
+  });
+
   const getPairingMutation = useMutation({
     mutationFn: async (evolutionName: string) => {
       const phone = pairingPhone.replace(/\D/g, "");
