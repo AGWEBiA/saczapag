@@ -181,8 +181,8 @@ export function ChatInterface() {
     <div className="flex h-full overflow-hidden bg-background shadow-2xl rounded-2xl border m-2 lg:m-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="w-20 lg:w-80 flex-shrink-0 border-r bg-card/50 backdrop-blur-xl">
         <ChatSidebar 
-          selectedId={selectedId} 
-          onSelect={setSelectedId} 
+          selectedId={selectedConversationId} 
+          onSelect={setSelectedConversationId} 
         />
       </div>
       <div className="flex-1 flex flex-col min-w-0 relative bg-muted/5">
