@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, CheckCheck, Clock, Loader2 } from "lucide-react";
 
 interface MessageListProps {
   conversationId: string;
@@ -20,6 +20,8 @@ type Msg = {
   direction: string;
   sender_name: string | null;
   is_internal: boolean | null;
+  evolution_message_id?: string | null;
+  metadata?: Record<string, any> | null;
 };
 
 export function MessageList({ conversationId, isGroup }: MessageListProps) {
@@ -44,7 +46,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
     queryFn: async ({ pageParam }) => {
       let q = supabase
         .from("messages")
-        .select("id, content, created_at, direction, sender_name, is_internal")
+        .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata")
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE);
@@ -89,6 +91,25 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
             // first page é DESC: prepend
             if (first.some((m: Msg) => m.id === newMsg.id)) return old;
             pages[0] = [newMsg, ...first];
+            return { ...old, pages };
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          const updatedMsg = payload.new as Msg;
+          queryClient.setQueryData<any>(queryKey, (old: any) => {
+            if (!old) return old;
+            const pages = old.pages.map((page: Msg[]) =>
+              page.map((msg) => msg.id === updatedMsg.id ? updatedMsg : msg)
+            );
             return { ...old, pages };
           });
         },
