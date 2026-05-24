@@ -280,6 +280,8 @@ serve(async (req) => {
             contact = newContact;
           }
 
+          if (!contact) break;
+
           // 3. Get or Create Conversation
           let { data: conversation } = await supabaseClient
             .from("conversations")
@@ -301,6 +303,8 @@ serve(async (req) => {
               .single();
             conversation = newConv;
           }
+
+          if (!conversation) break;
 
           // 4. Insert Message
           await supabaseClient
@@ -337,8 +341,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+  } catch (error: any) {
+    return new Response(JSON.stringify({ error: error?.message || String(error) }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,
     });
