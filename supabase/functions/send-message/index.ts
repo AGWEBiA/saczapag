@@ -74,6 +74,25 @@ async function markMessage(
     .eq("id", messageId);
 }
 
+async function checkInstanceConnected(
+  apiUrl: string,
+  apiKey: string,
+  instanceName: string,
+): Promise<{ ok: boolean; state: string }> {
+  try {
+    const res = await fetchWithTimeout(
+      `${apiUrl}/instance/connectionState/${instanceName}`,
+      { method: "GET", headers: { apikey: apiKey } },
+      8000,
+    );
+    const body = await res.json().catch(() => ({}));
+    const state = body?.instance?.state ?? body?.state ?? "unknown";
+    return { ok: state === "open", state };
+  } catch (e: any) {
+    return { ok: false, state: `check_failed:${e?.message || e}` };
+  }
+}
+
 async function sendViaEvolution(params: {
   supabase: SupabaseClientLike;
   instanceName: string;
@@ -86,6 +105,16 @@ async function sendViaEvolution(params: {
 
   if (cleanPhone.length < 10) {
     throw new Error(`Telefone inválido para envio: ${phone}`);
+  }
+
+  // Verifica se a instância está conectada antes de tentar enviar.
+  // Se não estiver "open", o sendText do Evolution trava aguardando o socket.
+  const conn = await checkInstanceConnected(apiUrl, apiKey, instanceName);
+  if (!conn.ok) {
+    throw new Error(
+      `Instância "${instanceName}" não está conectada ao WhatsApp (estado: ${conn.state}). ` +
+        `Abra Instâncias e escaneie o QR Code novamente.`,
+    );
   }
 
   const response = await fetchWithTimeout(
@@ -103,7 +132,7 @@ async function sendViaEvolution(params: {
         linkPreview: false,
       }),
     },
-    45000,
+    20000,
   );
 
   const result = await response.json().catch(() => ({}));
@@ -123,8 +152,9 @@ async function sendViaEvolution(params: {
         textMessage: { text: content },
       }),
     },
-    45000,
+    20000,
   );
+
 
   const fallbackResult = await fallbackResponse.json().catch(() => ({}));
   if (!fallbackResponse.ok) {
