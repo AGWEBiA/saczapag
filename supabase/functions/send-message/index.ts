@@ -169,7 +169,7 @@ async function resolveWhatsAppRecipient(
     throw new Error(`O número ${cleanPhone} não foi confirmado como WhatsApp pela Evolution.`);
   }
 
-  return String(checked?.jid || cleanPhone);
+  return String(checked?.number || cleanPhone).replace(/\D/g, "");
 }
 
 async function sendViaEvolution(params: {
