@@ -242,6 +242,23 @@ export function InstanceList() {
     },
   });
 
+  const setWebhookMutation = useMutation({
+    mutationFn: async (evolutionName: string) => {
+      const { data, error } = await supabase.functions.invoke("evolution-api", {
+        body: { action: "set-webhook", instanceName: evolutionName },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success("Webhook configurado! Mensagens recebidas vão aparecer no Chat.");
+      console.log("[set-webhook] url:", data?.webhookUrl);
+    },
+    onError: (e: any) => toast.error("Erro ao configurar webhook: " + e.message),
+  });
+
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
