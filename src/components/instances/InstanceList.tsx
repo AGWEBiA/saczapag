@@ -567,31 +567,30 @@ function WebhookTester() {
         return;
       }
 
-      const { error } = await supabase.functions.invoke("evolution-api", {
-        body: { 
-          action: "webhook", 
+      const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evolution-webhook`;
+      const res = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event: "messages.upsert",
+          instance: instances[0].evolution_instance_name,
           data: {
-            instance: instances[0].evolution_instance_name,
-            event: "messages.upsert",
-            data: {
-              key: {
-                remoteJid: `${phone}@s.whatsapp.net`,
-                fromMe: false,
-                id: `TEST_${Date.now()}`
-              },
-              pushName: "Test User",
-              message: {
-                conversation: content
-              }
-            }
-          }
-        },
+            key: {
+              remoteJid: `${phone}@s.whatsapp.net`,
+              fromMe: false,
+              id: `TEST_${Date.now()}`,
+            },
+            pushName: "Test User",
+            message: { conversation: content },
+          },
+        }),
       });
 
-      if (error) throw error;
-      toast.success("Evento de webhook simulado! Verifique o chat.");
+      const text = await res.text();
+      if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+      toast.success("Evento simulado! Verifique o chat.");
     } catch (err: any) {
-      toast.error("Falha no teste: " + err.message);
+      toast.error("Falha no teste: " + (err?.message || String(err)));
     } finally {
       setLoading(false);
     }
