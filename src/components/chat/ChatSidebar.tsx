@@ -164,11 +164,11 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
   }, [queryClient, selectedId, onSelect]);
 
   return (
-    <div className="flex flex-col h-full border-r bg-card">
-      <div className="p-4 border-b">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold">Conversas</h2>
-          <div className="flex items-center gap-1">
+    <div className="flex flex-col h-full bg-card/40 overflow-hidden">
+      <div className="p-3 lg:p-4 border-b space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold tracking-tight hidden lg:block">Inbox</h2>
+          <div className="flex items-center gap-1 w-full lg:w-auto justify-center lg:justify-end">
             <NewConversationDialog onCreated={(id) => onSelect(id)} />
             <GroupImportDialog />
             <Button
@@ -201,21 +201,24 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
             </DropdownMenu>
           </div>
         </div>
-        <div className="relative">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+        <div className="relative hidden lg:block">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 transition-colors group-focus-within:text-primary" />
           <Input 
-            placeholder="Buscar..." 
-            className="pl-8" 
+            placeholder="Pesquisar mensagens..." 
+            className="pl-9 h-10 bg-muted/50 border-transparent focus-visible:bg-background transition-all rounded-xl" 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
       </div>
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 px-2">
         {isLoading ? (
-          <div className="p-4 text-center text-sm text-muted-foreground">Carregando...</div>
+          <div className="p-8 text-center">
+            <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground mx-auto mb-2 opacity-20" />
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">Sincronizando...</div>
+          </div>
         ) : conversations?.length === 0 ? (
-          <div className="p-4 text-center text-sm text-muted-foreground">Nenhuma conversa encontrada.</div>
+          <div className="p-8 text-center text-muted-foreground/60 italic text-sm">Nenhuma conversa</div>
         ) : (
           conversations?.map((conv) => (
             <ChatItem 
@@ -271,7 +274,7 @@ const ChatItem = React.memo(({ conv, selectedId, onSelect }: { conv: any, select
           )}
         </div>
         {conv.unread_count > 0 && (
-          <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full absolute right-4 bottom-4">
+          <span className="bg-primary text-primary-foreground text-[10px] font-black px-1.5 py-0.5 rounded-full absolute top-3 right-3 shadow-md shadow-primary/30 animate-in zoom-in">
             {conv.unread_count}
           </span>
         )}

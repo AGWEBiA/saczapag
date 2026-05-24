@@ -54,43 +54,67 @@ function AuthenticatedLayout() {
   ];
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <aside className="w-64 border-r bg-card flex flex-col">
-        <div className="p-6 border-b">
-          <div className="font-bold text-xl tracking-tight text-primary">AG SAC</div>
-          <div className="text-xs text-muted-foreground mt-1 truncate">{user?.email}</div>
+    <div className="flex h-screen overflow-hidden bg-background">
+      <aside className="w-20 lg:w-64 border-r bg-card flex flex-col transition-all duration-300">
+        <div className="p-4 lg:p-6 border-b flex flex-col items-center lg:items-start overflow-hidden">
+          <div className="font-bold text-xl tracking-tighter text-primary flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/20 shrink-0">
+              AG
+            </div>
+            <span className="hidden lg:inline animate-in fade-in slide-in-from-left-2">SAC</span>
+          </div>
+          <div className="hidden lg:block text-[10px] uppercase font-bold text-muted-foreground/60 tracking-widest mt-4">
+            Sistema de Atendimento
+          </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto">
           {navItems.map((item) => (
             <Link
               key={item.to}
               to={item.to}
               preload="intent"
-              className="flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors hover:bg-accent group"
-              activeProps={{ className: "bg-primary/10 text-primary font-medium" }}
+              className="flex items-center gap-3 px-3 py-3 lg:py-2.5 rounded-xl text-sm transition-all duration-200 hover:bg-accent group relative"
+              activeProps={{ className: "bg-primary text-primary-foreground shadow-md shadow-primary/20 font-semibold" }}
             >
-              <item.icon className="h-4 w-4" />
-              {item.label}
+              <item.icon className="h-5 w-5 shrink-0" />
+              <span className="hidden lg:inline">{item.label}</span>
+              
+              {/* Tooltip para mobile */}
+              <div className="lg:hidden absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-xl border">
+                {item.label}
+              </div>
             </Link>
           ))}
         </nav>
 
-        <div className="p-4 border-t">
+        <div className="p-4 border-t space-y-4">
+          <div className="hidden lg:flex items-center gap-3 px-2 py-2 rounded-xl bg-muted/50 border border-transparent hover:border-border transition-colors group cursor-pointer">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs uppercase">
+              {user?.email?.charAt(0) || "U"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold truncate leading-none mb-1">{user?.email?.split("@")[0]}</div>
+              <div className="text-[10px] text-muted-foreground truncate leading-none">Status: Online</div>
+            </div>
+          </div>
+          
           <Button
             variant="ghost"
-            className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            className="w-full justify-center lg:justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl px-3"
             onClick={handleLogout}
           >
-            <LogOut className="mr-3 h-4 w-4" />
-            Sair
+            <LogOut className="h-5 w-5 lg:mr-3 shrink-0" />
+            <span className="hidden lg:inline font-medium">Sair</span>
           </Button>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto bg-muted/10 p-8 animate-in fade-in duration-300">
-        <div className="max-w-7xl mx-auto">
-          <Outlet />
+      <main className="flex-1 min-w-0 overflow-auto bg-muted/5 relative">
+        <div className="h-full flex flex-col p-4 lg:p-8 overflow-auto animate-in fade-in zoom-in-95 duration-500">
+          <div className="max-w-7xl mx-auto w-full flex-1 flex flex-col">
+            <Outlet />
+          </div>
         </div>
       </main>
     </div>

@@ -178,14 +178,14 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="flex h-full overflow-hidden bg-background">
-      <div className="w-80 flex-shrink-0">
+    <div className="flex h-full overflow-hidden bg-background shadow-2xl rounded-2xl border m-2 lg:m-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="w-20 lg:w-80 flex-shrink-0 border-r bg-card/50 backdrop-blur-xl">
         <ChatSidebar 
-          selectedId={selectedConversationId} 
-          onSelect={setSelectedConversationId} 
+          selectedId={selectedId} 
+          onSelect={setSelectedId} 
         />
       </div>
-      <div className="flex-1 flex flex-col min-w-0 relative">
+      <div className="flex-1 flex flex-col min-w-0 relative bg-muted/5">
         {selectedConversationId ? (
           <div className="flex-1 flex min-w-0 min-h-0">
             <div className="flex-1 flex flex-col h-full min-h-0 border-r">
