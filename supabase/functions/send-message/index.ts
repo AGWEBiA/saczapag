@@ -33,6 +33,33 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms = 15000) {
   }
 }
 
+async function fetchJsonWithFullTimeout(url: string, init: RequestInit, ms = 15000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const response = await fetch(url, { ...init, signal: ctrl.signal });
+    const text = await response.text();
+    let body: unknown = {};
+    if (text) {
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = text;
+      }
+    }
+    return { response, body };
+  } catch (error: any) {
+    if (error?.name === "AbortError") {
+      const timeoutError = new Error(`Tempo esgotado chamando ${url}`);
+      timeoutError.name = "TimeoutError";
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 function evolutionErrorMessage(prefix: string, response: Response, body: unknown) {
   const raw = typeof body === "string" ? body : JSON.stringify(body);
   const parsed = typeof body === "object" && body ? body as any : {};
@@ -115,7 +142,7 @@ async function postEvolutionText(
   apiKey: string,
   body: Record<string, unknown>,
 ) {
-  const response = await fetchWithTimeout(
+  const { response, body: result } = await fetchJsonWithFullTimeout(
     sendUrl,
     {
       method: "POST",
@@ -125,10 +152,9 @@ async function postEvolutionText(
       },
       body: JSON.stringify(body),
     },
-    20000,
+    12000,
   );
 
-  const result = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(evolutionErrorMessage("Evolution", response, result));
   }
@@ -193,18 +219,11 @@ async function sendViaEvolution(params: {
   }
 
   const sendUrl = `${apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
-  const v1Payload = {
-    number: evolutionRecipient,
-    textMessage: { text: content },
-  };
   const v2Payload = {
     number: evolutionRecipient,
     text: content,
   };
-  const result = await postEvolutionText(sendUrl, apiKey, v1Payload).catch(async (error) => {
-    if (error?.name === "TimeoutError") throw error;
-    return await postEvolutionText(sendUrl, apiKey, v2Payload);
-  });
+  const result = await postEvolutionText(sendUrl, apiKey, v2Payload) as any;
 
   return (result?.key?.id || result?.message?.key?.id || result?.id) as string | undefined;
 }
