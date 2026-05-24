@@ -113,6 +113,7 @@ async function sendViaEvolution(params: {
   const { supabase, instanceName, phone, content } = params;
   const { apiUrl, apiKey } = await resolveEvolutionConfig(supabase);
   const cleanPhone = String(phone).replace(/@.+$/, "").replace(/\D/g, "");
+  const jidPhone = String(phone).trim();
 
   if (cleanPhone.length < 10) {
     throw new Error(`Telefone inválido para envio: ${phone}`);
@@ -129,6 +130,10 @@ async function sendViaEvolution(params: {
   }
 
   const sendUrl = `${apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
+  const recipientCandidates = Array.from(new Set([jidPhone, cleanPhone].filter(Boolean)));
+  let lastError = "";
+
+  for (const recipient of recipientCandidates) {
   const response = await fetchWithTimeout(
     sendUrl,
     {
@@ -138,7 +143,7 @@ async function sendViaEvolution(params: {
         apikey: apiKey,
       },
       body: JSON.stringify({
-        number: cleanPhone,
+        number: recipient,
         text: content,
       }),
     },
@@ -152,6 +157,8 @@ async function sendViaEvolution(params: {
 
   if (response.status !== 400) {
     throw new Error(evolutionErrorMessage("Evolution", response, result));
+  }
+  lastError = evolutionErrorMessage("Evolution", response, result);
   }
 
   const fallbackResponse = await fetchWithTimeout(
@@ -174,7 +181,7 @@ async function sendViaEvolution(params: {
 
   const fallbackResult = await fallbackResponse.json().catch(() => ({}));
   if (!fallbackResponse.ok) {
-    throw new Error(evolutionErrorMessage("Evolution", fallbackResponse, fallbackResult));
+    throw new Error(lastError || evolutionErrorMessage("Evolution", fallbackResponse, fallbackResult));
   }
 
   return (fallbackResult?.key?.id || fallbackResult?.message?.key?.id || fallbackResult?.id) as string | undefined;
