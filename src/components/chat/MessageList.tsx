@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { AlertTriangle, CheckCheck, Clock, Loader2 } from "lucide-react";
+import { AlertTriangle, CheckCheck, Clock, Loader2, Info } from "lucide-react";
 
 interface MessageListProps {
   conversationId: string;
@@ -216,30 +216,33 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
   return (
     <div
       className={cn(
-        "flex flex-col max-w-[80%] rounded-lg p-3",
+        "flex flex-col max-w-[85%] lg:max-w-[70%] rounded-2xl p-3 lg:p-4 shadow-sm transition-all animate-in fade-in zoom-in-95 duration-300",
         msg.is_internal
-          ? "bg-yellow-50 border-yellow-200 self-center max-w-[90%] w-full border text-yellow-900"
+          ? "bg-yellow-50/80 border-yellow-200/50 self-center max-w-[95%] w-full border text-yellow-900 backdrop-blur-sm mb-4"
           : msg.direction === "outbound"
-            ? "bg-primary text-primary-foreground self-end rounded-tr-none"
-            : "bg-card self-start rounded-tl-none border",
+            ? "bg-primary text-primary-foreground self-end rounded-tr-none shadow-primary/20"
+            : "bg-card self-start rounded-tl-none border-border/50 border shadow-black/5",
       )}
     >
       {msg.is_internal && (
-        <span className="text-[10px] font-bold uppercase mb-1 text-yellow-700">Nota Interna</span>
+        <div className="flex items-center gap-1.5 mb-2 border-b border-yellow-200/50 pb-1">
+          <Info className="h-3 w-3 text-yellow-600" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-yellow-700">Nota Interna</span>
+        </div>
       )}
       {isGroup && msg.direction === "inbound" && msg.sender_name && (
-        <span className="text-[10px] font-bold mb-1 text-primary">{msg.sender_name}</span>
+        <span className="text-[10px] font-black mb-1.5 text-primary tracking-wide uppercase">{msg.sender_name}</span>
       )}
       {msg.direction === "outbound" && msg.sender_name && (
-        <span className="text-[10px] font-bold mb-1 text-primary-foreground opacity-90">
+        <span className="text-[10px] font-black mb-1.5 text-primary-foreground/80 tracking-wide uppercase">
           {msg.sender_name}
         </span>
       )}
-      <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
-      <div className="flex items-center justify-between gap-2 mt-1">
+      <p className="text-sm lg:text-[15px] leading-relaxed whitespace-pre-wrap break-words font-medium">{msg.content}</p>
+      <div className="flex items-center justify-between gap-3 mt-2 pt-1 border-t border-current/5">
         <span
           className={cn(
-            "text-[10px] opacity-70",
+            "text-[10px] font-bold opacity-60",
             msg.is_internal
               ? "text-yellow-600"
               : msg.direction === "outbound"
@@ -252,30 +255,30 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
         {isOutbound && (
           <span
             className={cn(
-              "inline-flex items-center gap-1 text-[10px] opacity-80",
-              failed && "text-destructive opacity-100",
+              "inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-tighter opacity-80",
+              failed && "text-red-200 opacity-100",
               !failed && "text-primary-foreground",
             )}
             title={deliveryError}
           >
             {failed ? (
               <>
-                <AlertTriangle className="h-3 w-3" /> falhou
+                <AlertTriangle className="h-3 w-3" /> Erro
               </>
             ) : sending ? (
               <>
-                <Clock className="h-3 w-3" /> enviando
+                <Clock className="h-3 w-3 animate-pulse" /> Pendente
               </>
             ) : sent ? (
               <>
-                <CheckCheck className="h-3 w-3" /> enviado
+                <CheckCheck className="h-3 w-3" /> Enviado
               </>
             ) : null}
           </span>
         )}
       </div>
       {failed && deliveryError && (
-        <span className="mt-1 text-[10px] leading-snug text-destructive">{deliveryError}</span>
+        <span className="mt-2 text-[10px] leading-tight text-red-100 bg-red-900/20 p-2 rounded-lg font-medium border border-red-500/20">{deliveryError}</span>
       )}
     </div>
   );
