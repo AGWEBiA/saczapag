@@ -105,7 +105,7 @@ export function InstanceList() {
     };
 
     syncOnce();
-    const interval = setInterval(syncOnce, 5000);
+    const interval = setInterval(syncOnce, 10000); // Aumentado para 10s para evitar 429/timeout
     return () => {
       cancelled = true;
       clearInterval(interval);
