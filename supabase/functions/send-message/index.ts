@@ -276,18 +276,6 @@ async function processWhatsAppSend(params: {
     return { metadata: sentMetadata, evolutionMessageId: whatsappMessageId };
   } catch (sendError: any) {
     const errorMessage = sendError?.message || String(sendError);
-    if (isSendTextTimeout(sendError)) {
-      console.warn("[send-message] Evolution accepted request but did not answer in time:", errorMessage);
-      const acceptedMetadata = {
-        delivery_status: "sent",
-        sent_at: new Date().toISOString(),
-        gateway_status: "sent_without_evolution_response",
-        warning: errorMessage,
-      };
-      await markMessage(supabase, messageId, acceptedMetadata);
-      return { metadata: acceptedMetadata };
-    }
-
     console.error("[send-message] send failed:", errorMessage);
     const failedMetadata = {
       delivery_status: "failed",
