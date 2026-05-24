@@ -216,6 +216,13 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
 import * as React from "react";
 
 const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolean }) => {
+  const deliveryStatus = msg.metadata?.delivery_status as string | undefined;
+  const deliveryError = msg.metadata?.error as string | undefined;
+  const isOutbound = msg.direction === "outbound" && !msg.is_internal;
+  const failed = isOutbound && deliveryStatus === "failed";
+  const sending = isOutbound && (deliveryStatus === "queued" || deliveryStatus === "sending");
+  const sent = isOutbound && (deliveryStatus === "sent" || !!msg.evolution_message_id);
+
   return (
     <div
       className={cn(
@@ -250,7 +257,30 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
         >
           {format(new Date(msg.created_at), "HH:mm", { locale: ptBR })}
         </span>
+        {isOutbound && (
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 text-[10px] opacity-80",
+              failed && "text-destructive opacity-100",
+              !failed && "text-primary-foreground",
+            )}
+            title={deliveryError}
+          >
+            {failed ? (
+              <><AlertTriangle className="h-3 w-3" /> falhou</>
+            ) : sending ? (
+              <><Clock className="h-3 w-3" /> enviando</>
+            ) : sent ? (
+              <><CheckCheck className="h-3 w-3" /> enviado</>
+            ) : null}
+          </span>
+        )}
       </div>
+      {failed && deliveryError && (
+        <span className="mt-1 text-[10px] leading-snug text-destructive">
+          {deliveryError}
+        </span>
+      )}
     </div>
   );
 });
