@@ -207,7 +207,12 @@ serve(async (req) => {
             headers: { "apikey": EVOLUTION_API_KEY },
             signal: ctrl.signal,
           });
-          result = await response.json().catch(() => ({}));
+          
+          if (response.status === 404) {
+             result = { state: "disconnected", error: "Instance not found on Evolution" };
+          } else {
+             result = await response.json().catch(() => ({}));
+          }
         } catch (e: any) {
           result = { error: e?.name === "AbortError" ? "timeout(8s)" : (e?.message || String(e)), state: "unknown" };
         } finally {
