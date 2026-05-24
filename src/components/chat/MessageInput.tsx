@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery, type InfiniteData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,19 @@ interface MessageInputProps {
   conversationId: string;
   isGroup?: boolean;
 }
+
+type CachedMessage = {
+  id: string;
+  content: string | null;
+  created_at: string;
+  direction: string;
+  sender_name: string | null;
+  is_internal: boolean | null;
+  evolution_message_id?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+type CachedMessages = InfiniteData<CachedMessage[], string | null>;
 
 export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
   const [content, setContent] = useState("");
@@ -107,8 +120,26 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       setContent("");
+      if (data?.id) {
+        queryClient.setQueryData<CachedMessages>(["messages", conversationId], (old) => {
+          if (!old) return old;
+          const returnedMessage = data as CachedMessage;
+          let found = false;
+          const pages = old.pages.map((page) =>
+            page.map((message) => {
+              if (message.id !== returnedMessage.id) return message;
+              found = true;
+              return returnedMessage;
+            }),
+          );
+          if (!found) {
+            pages[0] = [returnedMessage, ...(pages[0] ?? [])];
+          }
+          return { ...old, pages };
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },
