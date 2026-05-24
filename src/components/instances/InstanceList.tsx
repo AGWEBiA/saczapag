@@ -307,15 +307,35 @@ export function InstanceList() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         {instance.status !== "connected" ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => getQrMutation.mutate(instance.evolution_instance_name)}
-                            disabled={getQrMutation.isPending}
-                          >
-                            <QrCode className="mr-2 h-4 w-4" />
-                            Conectar
-                          </Button>
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => getQrMutation.mutate(instance.evolution_instance_name)}
+                              disabled={getQrMutation.isPending}
+                            >
+                              <QrCode className="mr-2 h-4 w-4" />
+                              Conectar
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              title="Recriar QR code"
+                              onClick={() => {
+                                if (confirm("Recriar o QR code? Isso encerra a sessão atual e gera um novo código.")) {
+                                  regenerateQrMutation.mutate(instance.evolution_instance_name);
+                                }
+                              }}
+                              disabled={regenerateQrMutation.isPending}
+                            >
+                              {regenerateQrMutation.isPending ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <RotateCw className="mr-2 h-4 w-4" />
+                              )}
+                              Recriar QR
+                            </Button>
+                          </>
                         ) : (
                           <Button
                             variant="outline"
