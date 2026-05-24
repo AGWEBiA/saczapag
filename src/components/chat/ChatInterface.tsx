@@ -430,10 +430,18 @@ export function ChatInterface() {
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8">
-            <MessageSquare className="h-12 w-12 mb-4 opacity-20" />
-            <p className="text-lg font-medium">Selecione uma conversa</p>
-            <p className="text-sm">Clique em um contato na lista lateral para iniciar o atendimento.</p>
+          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center animate-in fade-in zoom-in duration-1000">
+            <div className="bg-primary/5 p-8 rounded-full mb-6 relative">
+              <MessageSquare className="h-16 w-16 text-primary/20" />
+              <div className="absolute inset-0 bg-primary/10 rounded-full animate-ping opacity-20" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground mb-2">Sua Central de Atendimento</h3>
+            <p className="max-w-xs text-sm leading-relaxed">Selecione uma conversa ao lado para começar a atender seus clientes com excelência.</p>
+            <div className="mt-8 flex gap-2 lg:hidden">
+              <Button variant="outline" onClick={() => setMobileView("list")}>
+                <Menu className="mr-2 h-4 w-4" /> Ver Conversas
+              </Button>
+            </div>
           </div>
         )}
       </div>
