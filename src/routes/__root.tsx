@@ -141,6 +141,15 @@ function RootComponent() {
   const isLoading = useRouterState({ select: (s) => s.status === 'pending' });
 
   useEffect(() => {
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(err => {
+          console.log('SW registration failed: ', err);
+        });
+      });
+    }
+
     // Instala o profiler de queries (somente no cliente)
     import("@/lib/query-profiler").then((m) => m.installQueryProfiler());
 
