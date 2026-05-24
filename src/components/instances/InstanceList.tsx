@@ -22,7 +22,8 @@ import {
   LogOut,
   CheckCircle2,
   XCircle,
-  Play
+  Play,
+  RotateCw
 } from "lucide-react";
 import { toast } from "sonner";
 import { CreateInstanceDialog } from "./CreateInstanceDialog";
@@ -114,6 +115,47 @@ export function InstanceList() {
     },
     onError: (error) => {
       toast.error("Erro ao buscar QR code: " + error.message);
+    },
+  });
+
+  const regenerateQrMutation = useMutation({
+    mutationFn: async (evolutionName: string) => {
+      // Força reinício da sessão para invalidar QR antigo e gerar novo
+      try {
+        await supabase.functions.invoke("evolution-api", {
+          body: { action: "logout-instance", instanceName: evolutionName },
+        });
+      } catch (err) {
+        console.warn("logout antes de regenerar falhou (pode estar desconectado):", err);
+      }
+      try {
+        await supabase.functions.invoke("evolution-api", {
+          body: { action: "restart-instance", instanceName: evolutionName },
+        });
+      } catch (err) {
+        console.warn("restart falhou (seguindo para connect):", err);
+      }
+      await new Promise((r) => setTimeout(r, 800));
+      const { data, error } = await supabase.functions.invoke("evolution-api", {
+        body: { action: "get-qr-code", instanceName: evolutionName },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data, variables) => {
+      setPairingCode(null);
+      if (data?.base64) {
+        setQrCodeData({ name: variables, base64: data.base64 });
+        setIsQrDialogOpen(true);
+        toast.success("Novo QR code gerado.");
+      } else {
+        toast.error("Não foi possível gerar um novo QR code.");
+      }
+      queryClient.invalidateQueries({ queryKey: instancesQueryOptions.queryKey });
+    },
+    onError: (error) => {
+      toast.error("Erro ao recriar QR code: " + error.message);
     },
   });
 
@@ -265,15 +307,35 @@ export function InstanceList() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         {instance.status !== "connected" ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => getQrMutation.mutate(instance.evolution_instance_name)}
-                            disabled={getQrMutation.isPending}
-                          >
-                            <QrCode className="mr-2 h-4 w-4" />
-                            Conectar
-                          </Button>
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => getQrMutation.mutate(instance.evolution_instance_name)}
+                              disabled={getQrMutation.isPending}
+                            >
+                              <QrCode className="mr-2 h-4 w-4" />
+                              Conectar
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              title="Recriar QR code"
+                              onClick={() => {
+                                if (confirm("Recriar o QR code? Isso encerra a sessão atual e gera um novo código.")) {
+                                  regenerateQrMutation.mutate(instance.evolution_instance_name);
+                                }
+                              }}
+                              disabled={regenerateQrMutation.isPending}
+                            >
+                              {regenerateQrMutation.isPending ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <RotateCw className="mr-2 h-4 w-4" />
+                              )}
+                              Recriar QR
+                            </Button>
+                          </>
                         ) : (
                           <Button
                             variant="outline"
@@ -374,13 +436,28 @@ export function InstanceList() {
                 </div>
               ) : null}
             </div>
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={() => setIsQrDialogOpen(false)}
-            >
-              Fechar
-            </Button>
+            <div className="flex w-full gap-2">
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => qrCodeData?.name && regenerateQrMutation.mutate(qrCodeData.name)}
+                disabled={regenerateQrMutation.isPending}
+              >
+                {regenerateQrMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RotateCw className="mr-2 h-4 w-4" />
+                )}
+                Recriar QR
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setIsQrDialogOpen(false)}
+              >
+                Fechar
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

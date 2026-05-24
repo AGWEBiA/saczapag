@@ -145,6 +145,18 @@ serve(async (req) => {
         break;
       }
 
+      case "restart-instance": {
+        const response = await fetch(`${evolutionUrl}/instance/restart/${instanceName}`, {
+          method: "POST",
+          headers: { "apikey": EVOLUTION_API_KEY },
+        });
+        result = await response.json();
+        if (!response.ok) {
+          throw new Error(result?.message || result?.error || `Evolution API retornou ${response.status}`);
+        }
+        break;
+      }
+
       case "delete-instance": {
         const response = await fetch(`${evolutionUrl}/instance/delete/${instanceName}`, {
           method: "DELETE",
