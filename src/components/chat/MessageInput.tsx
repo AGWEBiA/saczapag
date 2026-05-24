@@ -1,17 +1,17 @@
 import { useState } from "react";
-import { useMutation, useQueryClient, useQuery, type InfiniteData } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueryClient,
+  useQuery,
+  type InfiniteData,
+} from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, Loader2, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Command,
   CommandEmpty,
@@ -39,6 +39,10 @@ type CachedMessage = {
 
 type CachedMessages = InfiniteData<CachedMessage[], string | null>;
 
+type ConversationPhoneResult = {
+  contact?: { phone_number?: string | null } | null;
+};
+
 export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
   const [content, setContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
@@ -48,13 +52,11 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
   const { data: profile } = useQuery({
     queryKey: ["current_profile"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return null;
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
+      const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
       return data;
     },
   });
@@ -62,38 +64,35 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
   const { data: quickReplies } = useQuery({
     queryKey: ["quick-replies"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("quick_replies")
-        .select("*")
-        .order("shortcut");
+      const { data, error } = await supabase.from("quick_replies").select("*").order("shortcut");
       if (error) throw error;
       return data;
-    }
+    },
   });
 
   const sendMutation = useMutation({
     mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
-      const senderName = profile?.full_name || user.email?.split('@')[0] || "Agente";
-      const jobTitle = (profile as any)?.position || profile?.role || "Atendimento";
+      const senderName = profile?.full_name || user.email?.split("@")[0] || "Agente";
+      const jobTitle = profile?.role || "Atendimento";
       const signature = `[${senderName} - ${jobTitle}]: `;
       const finalContent = isGroup ? `${signature}${content.trim()}` : content.trim();
 
       if (isInternal) {
-        const { error } = await supabase
-          .from("messages")
-          .insert({
-            conversation_id: conversationId,
-            direction: "outbound",
-            content: content.trim(),
-            is_internal: true,
-            sender_user_id: user.id,
-            sender_name: senderName,
-            type: 'internal'
-          });
-        
+        const { error } = await supabase.from("messages").insert({
+          conversation_id: conversationId,
+          direction: "outbound",
+          content: content.trim(),
+          is_internal: true,
+          sender_user_id: user.id,
+          sender_name: senderName,
+          type: "internal",
+        });
+
         if (error) throw error;
         return { success: true };
       }
@@ -104,16 +103,16 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
         .select("contact:contacts(phone_number)")
         .eq("id", conversationId)
         .single();
-      
-      const phone = (convData as any)?.contact?.phone_number;
+
+      const phone = (convData as ConversationPhoneResult | null)?.contact?.phone_number;
       if (!phone) throw new Error("Telefone do contato não encontrado");
 
       const { data, error } = await supabase.functions.invoke("send-message", {
-        body: { 
-          conversationId, 
+        body: {
+          conversationId,
           content: finalContent,
           phone: phone,
-          senderName: senderName
+          senderName: senderName,
         },
       });
 
@@ -157,12 +156,15 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
   return (
     <div className="p-4 border-t bg-card space-y-2">
       <div className="flex gap-2 mb-2 items-center">
-        <Button 
-          type="button" 
-          variant={isInternal ? "secondary" : "ghost"} 
+        <Button
+          type="button"
+          variant={isInternal ? "secondary" : "ghost"}
           size="sm"
           onClick={() => setIsInternal(!isInternal)}
-          className={cn("text-xs gap-1", isInternal && "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-200")}
+          className={cn(
+            "text-xs gap-1",
+            isInternal && "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-200",
+          )}
         >
           {isInternal ? "Nota Interna Ativada" : "Nota Interna"}
         </Button>
@@ -190,7 +192,9 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
                     >
                       <div className="flex flex-col">
                         <span className="font-bold text-xs text-primary">/{reply.shortcut}</span>
-                        <span className="text-xs text-muted-foreground line-clamp-1">{reply.content}</span>
+                        <span className="text-xs text-muted-foreground line-clamp-1">
+                          {reply.content}
+                        </span>
                       </div>
                     </CommandItem>
                   ))}
@@ -202,15 +206,20 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
       </div>
       <form onSubmit={handleSubmit} className="flex gap-2">
         <Input
-          placeholder={isInternal ? "Digite uma nota apenas para a equipe..." : "Digite sua mensagem..."}
+          placeholder={
+            isInternal ? "Digite uma nota apenas para a equipe..." : "Digite sua mensagem..."
+          }
           value={content}
           onChange={(e) => setContent(e.target.value)}
           disabled={sendMutation.isPending}
-          className={cn("flex-1", isInternal && "border-yellow-300 focus-visible:ring-yellow-400 bg-yellow-50/50")}
+          className={cn(
+            "flex-1",
+            isInternal && "border-yellow-300 focus-visible:ring-yellow-400 bg-yellow-50/50",
+          )}
         />
-        <Button 
-          type="submit" 
-          size="icon" 
+        <Button
+          type="submit"
+          size="icon"
           disabled={!content.trim() || sendMutation.isPending}
           className={cn(isInternal && "bg-yellow-600 hover:bg-yellow-700")}
         >
