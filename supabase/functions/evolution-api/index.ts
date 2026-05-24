@@ -83,6 +83,25 @@ serve(async (req) => {
         break;
       }
 
+      case "debug-instances": {
+        const response = await fetch(`${evolutionUrl}/instance/fetchInstances`, {
+          method: "GET",
+          headers: { "apikey": EVOLUTION_API_KEY },
+        });
+        const instances = await response.json().catch(() => []);
+        if (!response.ok) {
+          throw new Error(instances?.message || instances?.error || `Evolution API retornou ${response.status}`);
+        }
+        result = (Array.isArray(instances) ? instances : [instances]).map((item: any) => ({
+          instanceName: item?.name || item?.instanceName || item?.instance?.instanceName,
+          state: item?.connectionStatus?.state || item?.instance?.state || item?.state || item?.status,
+          ownerJid: item?.ownerJid || item?.instance?.ownerJid || item?.instance?.owner,
+          profileName: item?.profileName || item?.instance?.profileName,
+          number: item?.number || item?.instance?.number,
+        }));
+        break;
+      }
+
       case "create-instance": {
         const response = await fetch(`${evolutionUrl}/instance/create`, {
           method: "POST",
@@ -261,6 +280,8 @@ serve(async (req) => {
             contact = newContact;
           }
 
+          if (!contact) break;
+
           // 3. Get or Create Conversation
           let { data: conversation } = await supabaseClient
             .from("conversations")
@@ -282,6 +303,8 @@ serve(async (req) => {
               .single();
             conversation = newConv;
           }
+
+          if (!conversation) break;
 
           // 4. Insert Message
           await supabaseClient
@@ -318,8 +341,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+  } catch (error: any) {
+    return new Response(JSON.stringify({ error: error?.message || String(error) }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,
     });

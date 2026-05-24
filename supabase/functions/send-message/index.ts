@@ -33,10 +33,6 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms = 15000) {
   }
 }
 
-function isSendTextTimeout(error: any) {
-  return error?.name === "TimeoutError" && String(error?.message || "").includes("/message/sendText/");
-}
-
 function evolutionErrorMessage(prefix: string, response: Response, body: unknown) {
   const raw = typeof body === "string" ? body : JSON.stringify(body);
   const parsed = typeof body === "object" && body ? body as any : {};
@@ -114,6 +110,68 @@ async function checkInstanceConnected(
   }
 }
 
+async function postEvolutionText(
+  sendUrl: string,
+  apiKey: string,
+  body: Record<string, unknown>,
+) {
+  const response = await fetchWithTimeout(
+    sendUrl,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: apiKey,
+      },
+      body: JSON.stringify(body),
+    },
+    20000,
+  );
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(evolutionErrorMessage("Evolution", response, result));
+  }
+
+  return result;
+}
+
+async function resolveWhatsAppRecipient(
+  apiUrl: string,
+  apiKey: string,
+  instanceName: string,
+  phone: string,
+) {
+  const cleanPhone = String(phone).replace(/@.+$/, "").replace(/\D/g, "");
+  if (cleanPhone.length < 10) {
+    throw new Error(`Telefone inválido para envio: ${phone}`);
+  }
+
+  const response = await fetchWithTimeout(
+    `${apiUrl}/chat/whatsappNumbers/${encodeURIComponent(instanceName)}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: apiKey,
+      },
+      body: JSON.stringify({ numbers: [cleanPhone] }),
+    },
+    12000,
+  );
+  const result = await response.json().catch(() => []);
+  if (!response.ok) {
+    throw new Error(evolutionErrorMessage("Evolution whatsappNumbers", response, result));
+  }
+
+  const checked = Array.isArray(result) ? result[0] : result;
+  if (checked && checked.exists === false) {
+    throw new Error(`O número ${cleanPhone} não foi confirmado como WhatsApp pela Evolution.`);
+  }
+
+  return String(checked?.jid || cleanPhone);
+}
+
 async function sendViaEvolution(params: {
   supabase: SupabaseClientLike;
   instanceName: string;
@@ -122,11 +180,7 @@ async function sendViaEvolution(params: {
 }) {
   const { supabase, instanceName, phone, content } = params;
   const { apiUrl, apiKey } = await resolveEvolutionConfig(supabase);
-  const cleanPhone = String(phone).replace(/@.+$/, "").replace(/\D/g, "");
-
-  if (cleanPhone.length < 10) {
-    throw new Error(`Telefone inválido para envio: ${phone}`);
-  }
+  const evolutionRecipient = await resolveWhatsAppRecipient(apiUrl, apiKey, instanceName, phone);
 
   // Verifica se a instância está conectada antes de tentar enviar.
   // Se não estiver "open", o sendText do Evolution trava aguardando o socket.
@@ -139,26 +193,18 @@ async function sendViaEvolution(params: {
   }
 
   const sendUrl = `${apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
-  const response = await fetchWithTimeout(
-    sendUrl,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: apiKey,
-      },
-      body: JSON.stringify({
-        number: cleanPhone,
-        text: content,
-      }),
-    },
-    5000,
-  );
-
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(evolutionErrorMessage("Evolution", response, result));
-  }
+  const v1Payload = {
+    number: evolutionRecipient,
+    textMessage: { text: content },
+  };
+  const v2Payload = {
+    number: evolutionRecipient,
+    text: content,
+  };
+  const result = await postEvolutionText(sendUrl, apiKey, v1Payload).catch(async (error) => {
+    if (error?.name === "TimeoutError") throw error;
+    return await postEvolutionText(sendUrl, apiKey, v2Payload);
+  });
 
   return (result?.key?.id || result?.message?.key?.id || result?.id) as string | undefined;
 }
@@ -246,18 +292,6 @@ async function processWhatsAppSend(params: {
     return { metadata: sentMetadata, evolutionMessageId: whatsappMessageId };
   } catch (sendError: any) {
     const errorMessage = sendError?.message || String(sendError);
-    if (isSendTextTimeout(sendError)) {
-      console.warn("[send-message] Evolution accepted request but did not answer in time:", errorMessage);
-      const acceptedMetadata = {
-        delivery_status: "sent",
-        sent_at: new Date().toISOString(),
-        gateway_status: "sent_without_evolution_response",
-        warning: errorMessage,
-      };
-      await markMessage(supabase, messageId, acceptedMetadata);
-      return { metadata: acceptedMetadata };
-    }
-
     console.error("[send-message] send failed:", errorMessage);
     const failedMetadata = {
       delivery_status: "failed",
