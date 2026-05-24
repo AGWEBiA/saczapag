@@ -6,6 +6,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function fetchWithTimeout(url: string, init: RequestInit, ms = 15000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -23,57 +33,108 @@ serve(async (req) => {
       throw new Error("Content and phone are required");
     }
 
-    // Get conversation and instance info
     const { data: conversation, error: convError } = await supabase
       .from("conversations")
-      .select(`
-        *,
-        instance:whatsapp_instances(*)
-      `)
+      .select(`*, instance:whatsapp_instances(*)`)
       .eq("id", conversationId)
       .single();
 
     if (convError || !conversation) throw new Error("Conversation not found");
 
     const instance = conversation.instance;
-    let whatsappMessageId;
+    let whatsappMessageId: string | undefined;
 
-    if (instance.evolution_instance_name) {
-      const EVOLUTION_API_URL = Deno.env.get("EVOLUTION_API_URL");
-      const EVOLUTION_API_KEY = Deno.env.get("EVOLUTION_API_KEY");
+    if (instance?.evolution_instance_name) {
+      // Resolve Evolution credentials: prefer DB configs, fallback to env
+      let EVOLUTION_API_URL: string | null = null;
+      let EVOLUTION_API_KEY: string | null = null;
+
+      const { data: configs } = await supabase
+        .from("evolution_configs")
+        .select("id, api_url, api_key, is_primary, priority, is_active")
+        .eq("is_active", true)
+        .order("is_primary", { ascending: false })
+        .order("priority", { ascending: true });
+
+      const chosen = (configs ?? [])[0];
+      if (chosen) {
+        EVOLUTION_API_URL = chosen.api_url;
+        EVOLUTION_API_KEY = chosen.api_key;
+      } else {
+        EVOLUTION_API_URL = Deno.env.get("EVOLUTION_API_URL") ?? null;
+        EVOLUTION_API_KEY = Deno.env.get("EVOLUTION_API_KEY") ?? null;
+      }
 
       if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
-        throw new Error("Evolution API credentials not configured");
+        throw new Error("Nenhuma configuração Evolution API encontrada. Cadastre em Configurações > API.");
       }
 
-      const evolutionUrl = EVOLUTION_API_URL.endsWith("/") 
-        ? EVOLUTION_API_URL.slice(0, -1) 
+      const evolutionUrl = EVOLUTION_API_URL.endsWith("/")
+        ? EVOLUTION_API_URL.slice(0, -1)
         : EVOLUTION_API_URL;
 
-      const response = await fetch(`${evolutionUrl}/message/sendText/${instance.evolution_instance_name}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": EVOLUTION_API_KEY,
-        },
-        body: JSON.stringify({
-          number: phone,
-          options: {
-            delay: 1200,
-            presence: "composing",
-            linkPreview: false,
-          },
-          textMessage: {
-            text: content,
-          },
-        }),
-      });
+      const cleanPhone = String(phone).replace(/\D/g, "");
 
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.message || "Failed to send message via Evolution API");
+      let response: Response;
+      try {
+        // Try Evolution v2 payload first
+        response = await fetchWithTimeout(
+          `${evolutionUrl}/message/sendText/${instance.evolution_instance_name}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: EVOLUTION_API_KEY,
+            },
+            body: JSON.stringify({
+              number: cleanPhone,
+              text: content,
+              delay: 1200,
+              linkPreview: false,
+            }),
+          },
+          15000
+        );
+      } catch (e: any) {
+        const msg = e?.name === "AbortError"
+          ? "Tempo esgotado ao conectar com o servidor Evolution. Verifique se o servidor está acessível pela internet."
+          : `Falha de conexão com Evolution: ${e?.message || e}`;
+        throw new Error(msg);
       }
-      whatsappMessageId = result.key?.id;
+
+      let result: any = {};
+      try { result = await response.json(); } catch { /* empty body */ }
+
+      if (!response.ok) {
+        // Fallback to v1 payload shape
+        try {
+          const r2 = await fetchWithTimeout(
+            `${evolutionUrl}/message/sendText/${instance.evolution_instance_name}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                apikey: EVOLUTION_API_KEY,
+              },
+              body: JSON.stringify({
+                number: cleanPhone,
+                options: { delay: 1200, presence: "composing", linkPreview: false },
+                textMessage: { text: content },
+              }),
+            },
+            15000
+          );
+          const r2json = await r2.json().catch(() => ({}));
+          if (!r2.ok) {
+            throw new Error(r2json?.message || result?.message || `Evolution retornou ${r2.status}`);
+          }
+          whatsappMessageId = r2json?.key?.id;
+        } catch (e: any) {
+          throw new Error(e?.message || "Falha ao enviar mensagem via Evolution API");
+        }
+      } else {
+        whatsappMessageId = result?.key?.id;
+      }
     } else {
       // Official WhatsApp API Fallback
       const WHATSAPP_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
@@ -88,7 +149,7 @@ serve(async (req) => {
         {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${WHATSAPP_TOKEN}`,
+            Authorization: `Bearer ${WHATSAPP_TOKEN}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -116,7 +177,7 @@ serve(async (req) => {
         content: content,
         sender_name: senderName,
         evolution_message_id: whatsappMessageId,
-        status: "sent"
+        status: "sent",
       })
       .select()
       .single();
@@ -125,9 +186,9 @@ serve(async (req) => {
 
     await supabase
       .from("conversations")
-      .update({ 
+      .update({
         last_message_at: new Date().toISOString(),
-        last_message_content: content
+        last_message_content: content,
       })
       .eq("id", conversationId);
 
@@ -135,8 +196,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+  } catch (error: any) {
+    return new Response(JSON.stringify({ error: error?.message || String(error) }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,
     });
