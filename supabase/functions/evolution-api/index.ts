@@ -123,7 +123,7 @@ serve(async (req) => {
         for (const v of variants) {
           const started = Date.now();
           const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), 15000);
+          const timer = setTimeout(() => ctrl.abort(), 8000);
           try {
             const r = await fetch(sendUrl, {
               method: "POST",
@@ -149,7 +149,7 @@ serve(async (req) => {
             attempts.push({
               variant: v.name,
               ms: Date.now() - started,
-              error: e?.name === "AbortError" ? "timeout(15s)" : (e?.message || String(e)),
+              error: e?.name === "AbortError" ? "timeout(8s)" : (e?.message || String(e)),
             });
           } finally {
             clearTimeout(timer);
