@@ -7,6 +7,8 @@ import { Send, Loader2, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useServerFn } from "@tanstack/react-start";
+import { sendMessage } from "@/lib/send-message.functions";
 import {
   Command,
   CommandEmpty,
@@ -34,15 +36,12 @@ type CachedMessage = {
 
 type CachedMessages = InfiniteData<CachedMessage[], string | null>;
 
-type ConversationPhoneResult = {
-  contact?: { phone_number?: string | null } | null;
-};
-
 export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
   const [content, setContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
   const [openQuickReplies, setOpenQuickReplies] = useState(false);
   const queryClient = useQueryClient();
+  const sendMessageFn = useServerFn(sendMessage);
 
   const { data: profile } = useQuery({
     queryKey: ["current_profile"],
@@ -89,30 +88,18 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
         });
 
         if (error) throw error;
-        return { success: true };
+        return null;
       }
 
-      // Fetch phone number for WhatsApp API
-      const { data: convData } = await supabase
-        .from("conversations")
-        .select("contact:contacts(phone_number)")
-        .eq("id", conversationId)
-        .single();
-
-      const phone = (convData as ConversationPhoneResult | null)?.contact?.phone_number;
-      if (!phone) throw new Error("Telefone do contato não encontrado");
-
-      const { data, error } = await supabase.functions.invoke("send-message", {
-        body: {
+      const data = await sendMessageFn({
+        data: {
           conversationId,
           content: finalContent,
-          phone: phone,
           senderName: senderName,
         },
       });
 
-      if (error) throw error;
-      return data;
+      return data as CachedMessage;
     },
     onSuccess: (data) => {
       setContent("");
