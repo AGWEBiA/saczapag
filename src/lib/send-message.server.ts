@@ -13,7 +13,9 @@ type EvolutionConfig = {
 };
 
 function cleanPhone(value: string) {
-  return String(value || "").replace(/@.+$/, "").replace(/\D/g, "");
+  const str = String(value || "");
+  if (str.endsWith("@g.us")) return str;
+  return str.replace(/@.+$/, "").replace(/\D/g, "");
 }
 
 function jsonErrorMessage(prefix: string, response: Response, body: unknown) {
@@ -77,6 +79,10 @@ async function resolveEvolutionConfig(): Promise<EvolutionConfig> {
 }
 
 async function resolveWhatsAppRecipient(config: EvolutionConfig, instanceName: string, phone: string) {
+  if (phone.endsWith("@g.us")) {
+    return phone;
+  }
+
   const number = cleanPhone(phone);
   if (number.length < 10) throw new Error(`Telefone inválido para envio: ${phone}`);
 

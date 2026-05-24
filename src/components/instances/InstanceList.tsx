@@ -26,6 +26,8 @@ import {
   RotateCw
 } from "lucide-react";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
+import { syncGroups } from "@/lib/sync-groups.functions";
 import { CreateInstanceDialog } from "./CreateInstanceDialog";
 import {
   Dialog,
@@ -44,6 +46,7 @@ export function InstanceList() {
   const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
   const [pairingPhone, setPairingPhone] = useState("");
   const [pairingCode, setPairingCode] = useState<{ name: string; code: string } | null>(null);
+  const syncGroupsFn = useServerFn(syncGroups);
 
   const { data: instances, isLoading, refetch } = useQuery({
     ...instancesQueryOptions,
@@ -266,7 +269,17 @@ export function InstanceList() {
     },
     onError: (e: any) => toast.error("Erro ao configurar webhook: " + e.message),
   });
-
+  const syncGroupsMutation = useMutation({
+    mutationFn: async (instanceId: string) => {
+      const result = await syncGroupsFn({ data: instanceId });
+      return result;
+    },
+    onSuccess: (data) => {
+      toast.success(`${(data as any).count} grupos sincronizados com sucesso!`);
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (e: any) => toast.error("Erro ao sincronizar grupos: " + e.message),
+  });
 
   if (isLoading) {
     return (
@@ -417,20 +430,36 @@ export function InstanceList() {
                             </Button>
                           </>
                         ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-orange-500 hover:text-orange-600 hover:bg-orange-50"
-                            onClick={() => {
-                              if (confirm("Deseja desconectar esta instância?")) {
-                                logoutMutation.mutate(instance.evolution_instance_name);
-                              }
-                            }}
-                            disabled={logoutMutation.isPending}
-                          >
-                            <LogOut className="mr-2 h-4 w-4" />
-                            Logout
-                          </Button>
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              onClick={() => syncGroupsMutation.mutate(instance.id)}
+                              disabled={syncGroupsMutation.isPending}
+                            >
+                              {syncGroupsMutation.isPending ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                              )}
+                              Sincronizar Grupos
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-orange-500 hover:text-orange-600 hover:bg-orange-50"
+                              onClick={() => {
+                                if (confirm("Deseja desconectar esta instância?")) {
+                                  logoutMutation.mutate(instance.evolution_instance_name);
+                                }
+                              }}
+                              disabled={logoutMutation.isPending}
+                            >
+                              <LogOut className="mr-2 h-4 w-4" />
+                              Logout
+                            </Button>
+                          </>
                         )}
 
                         <Button

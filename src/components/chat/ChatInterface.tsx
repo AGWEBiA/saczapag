@@ -194,13 +194,35 @@ export function ChatInterface() {
                   <Avatar className="h-10 w-10">
                     <AvatarFallback><User /></AvatarFallback>
                   </Avatar>
-                  <div>
-                    <h3 className="font-semibold">{selectedConversation?.contact?.name || "Contato"}</h3>
-                    <p className="text-xs text-muted-foreground">{selectedConversation?.contact?.phone_number}</p>
+                  <div className="min-w-0">
+                    <h3 className="font-semibold truncate">{selectedConversation?.contact?.name || "Contato"}</h3>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-muted-foreground truncate">{selectedConversation?.contact?.phone_number}</p>
+                      {selectedConversation?.assigned_to ? (
+                        <Badge variant="outline" className="text-[10px] h-4 py-0">
+                          Atendido por: {agents?.find(a => a.id === selectedConversation.assigned_to)?.full_name || "Agente"}
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive" className="text-[10px] h-4 py-0">
+                          Aguardando Atendimento
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
                 
                 <div className="flex items-center gap-2">
+                  {!selectedConversation?.assigned_to && (
+                    <Button 
+                      size="sm" 
+                      className="h-8 bg-green-600 hover:bg-green-700"
+                      onClick={() => supabase.auth.getUser().then(({ data: { user } }) => {
+                        if (user) handleAssign(user.id);
+                      })}
+                    >
+                      Assumir Conversa
+                    </Button>
+                  )}
                   <Dialog>
                     <DialogTrigger asChild>
                       <Button variant="ghost" size="sm" className="gap-2">

@@ -49,13 +49,15 @@ export function NewConversationDialog({ onCreated }: NewConversationDialogProps)
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const cleanPhone = phone.replace(/\D/g, "");
-      if (cleanPhone.length < 12) {
+      const isGroup = phone.includes("@g.us");
+      const cleanPhoneValue = isGroup ? phone.trim() : phone.replace(/\D/g, "");
+      
+      if (!isGroup && cleanPhoneValue.length < 12) {
         throw new Error("Informe o número com DDI e DDD. Ex: 5511999999999");
       }
       if (!instanceId) throw new Error("Selecione uma instância conectada");
 
-      const jid = `${cleanPhone}@s.whatsapp.net`;
+      const jid = isGroup ? cleanPhoneValue : `${cleanPhoneValue}@s.whatsapp.net`;
 
       // get or create contact
       let { data: contact } = await supabase
@@ -67,7 +69,7 @@ export function NewConversationDialog({ onCreated }: NewConversationDialogProps)
       if (!contact) {
         const { data: nc, error } = await supabase
           .from("contacts")
-          .insert({ phone_number: jid, name: name.trim() || cleanPhone })
+          .insert({ phone_number: jid, name: name.trim() || (isGroup ? "Grupo" : cleanPhoneValue) })
           .select("id")
           .single();
         if (error) throw error;
@@ -90,7 +92,7 @@ export function NewConversationDialog({ onCreated }: NewConversationDialogProps)
           .insert({
             contact_id: contact!.id,
             instance_id: instanceId,
-            is_group: false,
+            is_group: isGroup,
             status: "aberta",
           })
           .select("id")
