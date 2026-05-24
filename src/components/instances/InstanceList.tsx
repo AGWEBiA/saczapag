@@ -41,6 +41,8 @@ export function InstanceList() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [qrCodeData, setQrCodeData] = useState<{ name: string; base64: string } | null>(null);
   const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
+  const [pairingPhone, setPairingPhone] = useState("");
+  const [pairingCode, setPairingCode] = useState<{ name: string; code: string } | null>(null);
 
   const { data: instances, isLoading, refetch } = useQuery({
     ...instancesQueryOptions,
@@ -100,6 +102,7 @@ export function InstanceList() {
     },
     onSuccess: (data, variables) => {
       if (data?.base64) {
+        setPairingCode(null);
         setQrCodeData({ name: variables, base64: data.base64 });
         setIsQrDialogOpen(true);
       } else if (data?.instance?.state === "open") {
@@ -111,6 +114,35 @@ export function InstanceList() {
     },
     onError: (error) => {
       toast.error("Erro ao buscar QR code: " + error.message);
+    },
+  });
+
+  const getPairingMutation = useMutation({
+    mutationFn: async (evolutionName: string) => {
+      const phone = pairingPhone.replace(/\D/g, "");
+      if (phone.length < 12) throw new Error("Informe o número com DDI e DDD. Ex: 5511999999999");
+
+      const { data, error } = await supabase.functions.invoke("evolution-api", {
+        body: { action: "get-qr-code", instanceName: evolutionName, data: { number: phone } },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data, variables) => {
+      const code = data?.pairingCode || data?.pairing_code;
+      if (code) {
+        setPairingCode({ name: variables, code });
+        toast.success("Código de pareamento gerado.");
+      } else if (data?.base64) {
+        setQrCodeData({ name: variables, base64: data.base64 });
+        setIsQrDialogOpen(true);
+      } else {
+        toast.error("Não foi possível gerar o código. Remova a instância e crie novamente se ela ficou presa em conexão.");
+      }
+    },
+    onError: (error) => {
+      toast.error("Erro ao gerar código: " + error.message);
     },
   });
 
@@ -315,6 +347,33 @@ export function InstanceList() {
             <p className="text-sm font-medium text-center">
               Instância: <span className="text-primary">{qrCodeData?.name}</span>
             </p>
+            <div className="w-full space-y-3 rounded-md border bg-muted/40 p-3">
+              <p className="text-xs text-muted-foreground">
+                Se o WhatsApp rejeitar o QR, use o pareamento por número: informe o telefone com DDI e DDD e conecte em Aparelhos conectados &gt; Conectar com número de telefone.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  inputMode="numeric"
+                  placeholder="5511999999999"
+                  value={pairingPhone}
+                  onChange={(event) => setPairingPhone(event.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => qrCodeData?.name && getPairingMutation.mutate(qrCodeData.name)}
+                  disabled={getPairingMutation.isPending}
+                >
+                  {getPairingMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Gerar código"}
+                </Button>
+              </div>
+              {pairingCode ? (
+                <div className="rounded-md bg-background p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Código para {pairingCode.name}</p>
+                  <p className="text-2xl font-bold tracking-widest text-primary">{pairingCode.code}</p>
+                </div>
+              ) : null}
+            </div>
             <Button 
               variant="outline" 
               className="w-full"
