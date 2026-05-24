@@ -23,12 +23,18 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms = 15000) {
     return await fetch(url, { ...init, signal: ctrl.signal });
   } catch (error: any) {
     if (error?.name === "AbortError") {
-      throw new Error(`Tempo esgotado chamando ${url}`);
+      const timeoutError = new Error(`Tempo esgotado chamando ${url}`);
+      timeoutError.name = "TimeoutError";
+      throw timeoutError;
     }
     throw error;
   } finally {
     clearTimeout(t);
   }
+}
+
+function isSendTextTimeout(error: any) {
+  return error?.name === "TimeoutError" && String(error?.message || "").includes("/message/sendText/");
 }
 
 function evolutionErrorMessage(prefix: string, response: Response, body: unknown) {
@@ -203,6 +209,54 @@ async function sendToWhatsApp(params: {
     );
   }
   return result.messages?.[0]?.id as string | undefined;
+}
+
+async function processWhatsAppSend(params: {
+  supabase: SupabaseClientLike;
+  messageId: string;
+  instance: any;
+  phone: string;
+  content: string;
+}) {
+  const { supabase, messageId, instance, phone, content } = params;
+
+  await markMessage(supabase, messageId, {
+    delivery_status: "sending",
+    sending_at: new Date().toISOString(),
+  });
+
+  try {
+    const whatsappMessageId = await sendToWhatsApp({
+      supabase,
+      instance,
+      phone,
+      content,
+    });
+
+    await markMessage(supabase, messageId, {
+      delivery_status: "sent",
+      sent_at: new Date().toISOString(),
+    }, whatsappMessageId);
+  } catch (sendError: any) {
+    const errorMessage = sendError?.message || String(sendError);
+    if (isSendTextTimeout(sendError)) {
+      console.warn("[send-message] Evolution accepted request but did not answer in time:", errorMessage);
+      await markMessage(supabase, messageId, {
+        delivery_status: "sent",
+        sent_at: new Date().toISOString(),
+        gateway_status: "sent_without_evolution_response",
+        warning: errorMessage,
+      });
+      return;
+    }
+
+    console.error("[send-message] send failed:", errorMessage);
+    await markMessage(supabase, messageId, {
+      delivery_status: "failed",
+      failed_at: new Date().toISOString(),
+      error: errorMessage,
+    });
+  }
 }
 
 serve(async (req) => {
