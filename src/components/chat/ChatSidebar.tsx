@@ -139,9 +139,20 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold">Conversas</h2>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Atualizar conversas"
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Filter className="h-4 w-4" />
                 <Filter className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
