@@ -153,19 +153,19 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon">
                   <Filter className="h-4 w-4" />
-                <Filter className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>Filtrar por</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuRadioGroup value={filter} onValueChange={setFilter}>
-                <DropdownMenuRadioItem value="all">Todas</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="mine">Minhas</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="unassigned">Não Atribuídas</DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Filtrar por</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuRadioGroup value={filter} onValueChange={setFilter}>
+                  <DropdownMenuRadioItem value="all">Todas</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="mine">Minhas</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="unassigned">Não Atribuídas</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
         <div className="relative">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
