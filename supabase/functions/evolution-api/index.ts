@@ -93,7 +93,7 @@ serve(async (req) => {
           body: JSON.stringify({
             instanceName: instanceName,
             token: payload?.token || "",
-            qrcode: true,
+            qrcode: payload?.qrcode ?? false,
             integration: payload?.integration || "WHATSAPP-BAILEYS",
           }),
         });
@@ -103,7 +103,11 @@ serve(async (req) => {
       }
 
       case "get-qr-code": {
-        const response = await fetch(`${evolutionUrl}/instance/connect/${instanceName}`, {
+        const connectUrl = new URL(`${evolutionUrl}/instance/connect/${instanceName}`);
+        const phoneNumber = String(payload?.number || "").replace(/\D/g, "");
+        if (phoneNumber) connectUrl.searchParams.set("number", phoneNumber);
+
+        const response = await fetch(connectUrl.toString(), {
           method: "GET",
           headers: {
             "apikey": EVOLUTION_API_KEY,
@@ -111,6 +115,9 @@ serve(async (req) => {
         });
 
         result = await response.json();
+        if (!response.ok) {
+          throw new Error(result?.message || result?.error || `Evolution API retornou ${response.status}`);
+        }
         break;
       }
 
