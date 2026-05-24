@@ -117,8 +117,31 @@ async function sendViaEvolution(params: {
     );
   }
 
+  const sendUrl = `${apiUrl}/message/sendText/${instanceName}`;
   const response = await fetchWithTimeout(
-    `${apiUrl}/message/sendText/${instanceName}`,
+    sendUrl,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: apiKey,
+      },
+      body: JSON.stringify({
+        number: cleanPhone,
+        options: { delay: 300, presence: "composing", linkPreview: false },
+        textMessage: { text: content },
+      }),
+    },
+    30000,
+  );
+
+  const result = await response.json().catch(() => ({}));
+  if (response.ok) {
+    return (result?.key?.id || result?.message?.key?.id || result?.id) as string | undefined;
+  }
+
+  const fallbackResponse = await fetchWithTimeout(
+    sendUrl,
     {
       method: "POST",
       headers: {
@@ -132,27 +155,7 @@ async function sendViaEvolution(params: {
         linkPreview: false,
       }),
     },
-    20000,
-  );
-
-  const result = await response.json().catch(() => ({}));
-  if (response.ok) return result?.key?.id as string | undefined;
-
-  const fallbackResponse = await fetchWithTimeout(
-    `${apiUrl}/message/sendText/${instanceName}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: apiKey,
-      },
-      body: JSON.stringify({
-        number: cleanPhone,
-        options: { delay: 300, presence: "composing", linkPreview: false },
-        textMessage: { text: content },
-      }),
-    },
-    20000,
+    30000,
   );
 
 
@@ -164,7 +167,7 @@ async function sendViaEvolution(params: {
     );
   }
 
-  return fallbackResult?.key?.id as string | undefined;
+  return (fallbackResult?.key?.id || fallbackResult?.message?.key?.id || fallbackResult?.id) as string | undefined;
 }
 
 async function sendToWhatsApp(params: {
