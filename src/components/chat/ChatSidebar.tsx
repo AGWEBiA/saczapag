@@ -19,6 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { NewConversationDialog } from "./NewConversationDialog";
 
 interface ChatSidebarProps {
   selectedId?: string;
