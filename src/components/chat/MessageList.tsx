@@ -115,7 +115,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId, queryClient]);
+  }, [conversationId, queryClient, queryKey]);
 
   // IntersectionObserver no topo: dispara fetchNextPage
   useEffect(() => {
