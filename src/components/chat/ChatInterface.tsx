@@ -189,22 +189,25 @@ export function ChatInterface() {
         {selectedConversationId ? (
           <div className="flex-1 flex min-w-0 min-h-0">
             <div className="flex-1 flex flex-col h-full min-h-0 border-r">
-              <div className="p-4 border-b bg-card flex items-center justify-between">
+              <div className="p-3 lg:p-4 border-b bg-card/50 backdrop-blur-md flex items-center justify-between sticky top-0 z-10">
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback><User /></AvatarFallback>
-                  </Avatar>
+                  <div className="relative">
+                    <Avatar className="h-10 w-10 border-2 border-primary/10">
+                      <AvatarFallback className="bg-primary/5 text-primary"><User /></AvatarFallback>
+                    </Avatar>
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full" />
+                  </div>
                   <div className="min-w-0">
-                    <h3 className="font-semibold truncate">{selectedConversation?.contact?.name || "Contato"}</h3>
+                    <h3 className="font-bold text-sm lg:text-base truncate tracking-tight">{selectedConversation?.contact?.name || "Contato"}</h3>
                     <div className="flex items-center gap-2">
-                      <p className="text-xs text-muted-foreground truncate">{selectedConversation?.contact?.phone_number}</p>
+                      <p className="text-[10px] lg:text-xs text-muted-foreground font-medium truncate">{selectedConversation?.contact?.phone_number}</p>
                       {selectedConversation?.assigned_to ? (
-                        <Badge variant="outline" className="text-[10px] h-4 py-0">
-                          Atendido por: {agents?.find(a => a.id === selectedConversation.assigned_to)?.full_name || "Agente"}
+                        <Badge variant="secondary" className="text-[9px] lg:text-[10px] h-4 py-0 font-bold uppercase tracking-wider bg-primary/10 text-primary hover:bg-primary/20 transition-colors border-none">
+                          {agents?.find(a => a.id === selectedConversation.assigned_to)?.full_name?.split(' ')[0] || "Agente"}
                         </Badge>
                       ) : (
-                        <Badge variant="destructive" className="text-[10px] h-4 py-0">
-                          Aguardando Atendimento
+                        <Badge variant="destructive" className="text-[9px] lg:text-[10px] h-4 py-0 font-bold uppercase tracking-wider animate-pulse">
+                          Aguardando
                         </Badge>
                       )}
                     </div>
