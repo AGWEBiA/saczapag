@@ -199,14 +199,20 @@ serve(async (req) => {
       }
 
       case "get-status": {
-        const response = await fetch(`${evolutionUrl}/instance/connectionState/${instanceName}`, {
-          method: "GET",
-          headers: {
-            "apikey": EVOLUTION_API_KEY,
-          },
-        });
-
-        result = await response.json();
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 8000);
+        try {
+          const response = await fetch(`${evolutionUrl}/instance/connectionState/${instanceName}`, {
+            method: "GET",
+            headers: { "apikey": EVOLUTION_API_KEY },
+            signal: ctrl.signal,
+          });
+          result = await response.json().catch(() => ({}));
+        } catch (e: any) {
+          result = { error: e?.name === "AbortError" ? "timeout(8s)" : (e?.message || String(e)), state: "unknown" };
+        } finally {
+          clearTimeout(t);
+        }
         break;
       }
 
