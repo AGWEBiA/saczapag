@@ -168,6 +168,43 @@ serve(async (req) => {
         result = await response.json();
         break;
       }
+
+      case "set-webhook": {
+        const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-webhook`;
+        const events = [
+          "MESSAGES_UPSERT",
+          "CONNECTION_UPDATE",
+          "QRCODE_UPDATED",
+        ];
+        // Evolution v2 shape
+        const response = await fetch(`${evolutionUrl}/webhook/set/${instanceName}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: EVOLUTION_API_KEY },
+          body: JSON.stringify({
+            webhook: {
+              enabled: true,
+              url: webhookUrl,
+              byEvents: false,
+              base64: false,
+              events,
+            },
+          }),
+        });
+        result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          // try v1 shape as fallback
+          const r2 = await fetch(`${evolutionUrl}/webhook/set/${instanceName}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", apikey: EVOLUTION_API_KEY },
+            body: JSON.stringify({ url: webhookUrl, enabled: true, events }),
+          });
+          result = await r2.json().catch(() => ({}));
+          if (!r2.ok) throw new Error(result?.message || `Evolution retornou ${r2.status}`);
+        }
+        result.webhookUrl = webhookUrl;
+        break;
+      }
+      
       
       case "webhook": {
         // Handle Evolution API webhooks

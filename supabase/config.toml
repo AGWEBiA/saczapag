@@ -1,1 +1,7 @@
 project_id = "tdfibiqtvvnmkxkswlwr"
+
+[functions.evolution-webhook]
+verify_jwt = false
+
+[functions.whatsapp-webhook]
+verify_jwt = false
