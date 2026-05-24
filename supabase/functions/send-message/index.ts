@@ -110,17 +110,6 @@ async function checkInstanceConnected(
   }
 }
 
-async function getEvolutionMajorVersion(apiUrl: string): Promise<number | null> {
-  try {
-    const res = await fetchWithTimeout(apiUrl, { method: "GET" }, 4000);
-    const body = await res.json().catch(() => ({}));
-    const major = Number(String(body?.version || "").split(".")[0]);
-    return Number.isFinite(major) ? major : null;
-  } catch {
-    return null;
-  }
-}
-
 async function postEvolutionText(
   sendUrl: string,
   apiKey: string,
