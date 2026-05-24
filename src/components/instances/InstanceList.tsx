@@ -269,7 +269,17 @@ export function InstanceList() {
     },
     onError: (e: any) => toast.error("Erro ao configurar webhook: " + e.message),
   });
-
+  const syncGroupsMutation = useMutation({
+    mutationFn: async (instanceId: string) => {
+      const result = await syncGroupsFn({ data: instanceId });
+      return result;
+    },
+    onSuccess: (data) => {
+      toast.success(`${(data as any).count} grupos sincronizados com sucesso!`);
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (e: any) => toast.error("Erro ao sincronizar grupos: " + e.message),
+  });
 
   if (isLoading) {
     return (
