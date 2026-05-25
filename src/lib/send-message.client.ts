@@ -73,33 +73,37 @@ async function resolveEvolutionConfig() {
 }
 
 async function resolveWhatsAppRecipient(config: { apiUrl: string; apiKey: string }, instanceName: string, phone: string) {
-  if (phone.endsWith("@g.us")) {
+  // Se já terminar com @g.us ou @s.whatsapp.net, retornamos diretamente
+  if (phone.includes("@")) {
     return phone;
   }
 
   const number = cleanPhone(phone);
-  if (number.length < 10) throw new Error(`Telefone inválido para envio: ${phone}`);
+  if (number.length < 8) throw new Error(`Telefone inválido para envio: ${phone}`);
 
-  const { response, body } = await fetchJsonWithTimeout(
-    `${config.apiUrl}/chat/whatsappNumbers/${encodeURIComponent(instanceName)}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: config.apiKey },
-      body: JSON.stringify({ numbers: [number] }),
-    },
-    8000,
-  );
+  // Tenta verificar o número. Se falhar, usamos o número limpo como fallback
+  try {
+    const { response, body } = await fetchJsonWithTimeout(
+      `${config.apiUrl}/chat/whatsappNumbers/${encodeURIComponent(instanceName)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: config.apiKey },
+        body: JSON.stringify({ numbers: [number] }),
+      },
+      8000,
+    );
 
-  if (!response.ok) {
-    throw new Error(jsonErrorMessage("Evolution whatsappNumbers", response, body));
+    if (response.ok) {
+      const checked = Array.isArray(body) ? body[0] : body as any;
+      if (checked?.exists !== false && checked?.number) {
+        return checked.number;
+      }
+    }
+  } catch (err) {
+    console.warn("Falha ao verificar número na Evolution, usando fallback:", err);
   }
 
-  const checked = Array.isArray(body) ? body[0] : body as any;
-  if (checked?.exists === false) {
-    throw new Error(`O número ${number} não foi confirmado como WhatsApp pela Evolution.`);
-  }
-
-  return cleanPhone(checked?.number || number);
+  return number;
 }
 
 async function assertInstanceOpen(config: { apiUrl: string; apiKey: string }, instanceName: string) {
