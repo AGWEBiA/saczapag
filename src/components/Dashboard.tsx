@@ -19,6 +19,8 @@ import {
   Clock,
   CheckCircle2,
   Inbox,
+  AlertCircle,
+  CheckSquare,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import {
@@ -38,8 +40,11 @@ import {
 } from "recharts";
 import { format, subDays, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useAuth } from "@/hooks/use-auth";
 
 export function Dashboard() {
+  const { user } = useAuth();
+  
   const { data: instances } = useQuery({
     queryKey: ["dash_instances"],
     staleTime: 1000 * 60 * 60, // 1h
@@ -54,7 +59,6 @@ export function Dashboard() {
     queryKey: ["dash_contacts"],
     staleTime: 1000 * 60 * 60 * 2, // 2h
     queryFn: async () => {
-      // Usando query otimizada apenas para contagem
       const { count, error } = await supabase
         .from("contacts")
         .select("*", { count: 'estimated', head: true });
@@ -71,6 +75,21 @@ export function Dashboard() {
       if (error) throw error;
       return data;
     },
+  });
+
+  const { data: tasks } = useQuery({
+    queryKey: ["dash_tasks", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data } = await supabase
+        .from("tasks" as any)
+        .select("*")
+        .eq("created_by", user.id)
+        .eq("status", "todo")
+        .limit(5);
+      return data || [];
+    },
+    enabled: !!user,
   });
 
   const { data: messages, isLoading: loadingMsgs } = useQuery({
@@ -141,78 +160,83 @@ export function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 pb-8 p-4 lg:p-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Painel Multicanal</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard da Agência</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Visão centralizada do seu atendimento — últimos 7 dias
+            Acompanhe o desempenho do time e as interações no WhatsApp.
           </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="rounded-full">
+            Exportar Relatório
+          </Button>
+          <Button size="sm" className="rounded-full shadow-lg shadow-primary/20">
+            Nova Campanha
+          </Button>
         </div>
       </div>
 
       {/* KPIs */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KpiCard
-          title="Instâncias Conectadas"
+          title="Canais WhatsApp"
           value={`${stats.activeInstances}/${stats.totalInstances}`}
           icon={Smartphone}
-          hint="Canais WhatsApp ativos"
+          hint="Instâncias conectadas"
         />
         <KpiCard
-          title="Atendimentos Abertos"
+          title="Inbox Aberta"
           value={stats.open}
           icon={Inbox}
-          hint="Conversas em andamento"
+          hint="Aguardando fechamento"
         />
         <KpiCard
-          title="Aguardando Agente"
+          title="Sem Atribuição"
           value={stats.unassigned}
           icon={Clock}
-          hint="Sem atribuição"
+          hint="Novos leads pendentes"
           accent={stats.unassigned > 0 ? "destructive" : undefined}
         />
         <KpiCard
-          title="Contatos Totais"
+          title="Contatos Ativos"
           value={stats.totalContacts}
           icon={Users}
-          hint="Base sincronizada"
+          hint="Base total sincronizada"
         />
       </div>
 
-      {/* Charts */}
       <div className="grid gap-6 lg:grid-cols-3">
+        {/* Charts Section */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-primary" />
-              Volume de Mensagens
+              Engajamento (7 dias)
             </CardTitle>
-            <CardDescription>Recebidas vs Enviadas nos últimos 7 dias</CardDescription>
+            <CardDescription>Volume de mensagens inbound vs outbound</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-72 w-full">
+            <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData}>
                   <defs>
                     <linearGradient id="recv" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
                       <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                     </linearGradient>
-                    <linearGradient id="sent" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--muted-foreground))" stopOpacity={0} />
-                    </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
                   <Tooltip
                     contentStyle={{
                       background: "hsl(var(--card))",
                       border: "1px solid hsl(var(--border))",
-                      borderRadius: 8,
+                      borderRadius: 12,
                       fontSize: 12,
+                      boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
                     }}
                   />
                   <Area
@@ -220,13 +244,14 @@ export function Dashboard() {
                     dataKey="recebidas"
                     stroke="hsl(var(--primary))"
                     fill="url(#recv)"
-                    strokeWidth={2}
+                    strokeWidth={3}
                   />
                   <Area
                     type="monotone"
                     dataKey="enviadas"
                     stroke="hsl(var(--muted-foreground))"
-                    fill="url(#sent)"
+                    strokeDasharray="5 5"
+                    fill="transparent"
                     strokeWidth={2}
                   />
                 </AreaChart>
@@ -235,98 +260,95 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
+        {/* Tasks & Notifications Sidebar */}
+        <div className="space-y-6">
+          <Card className="h-full">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <CheckSquare className="h-5 w-5 text-primary" />
+                Minhas Tarefas
+              </CardTitle>
+              <CardDescription>Criadas a partir de conversas</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {tasks?.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                    <CheckCircle2 className="h-10 w-10 mb-2 opacity-20" />
+                    <p className="text-xs">Tudo limpo por aqui!</p>
+                  </div>
+                ) : (
+                  tasks?.map((task: any) => (
+                    <div key={task.id} className="group flex items-start gap-3 p-3 rounded-xl border bg-card/50 hover:border-primary/50 transition-all cursor-pointer">
+                      <div className="mt-0.5 h-4 w-4 rounded border border-primary/50 flex items-center justify-center shrink-0 group-hover:bg-primary/10">
+                        <CheckCircle2 className="h-3 w-3 text-primary opacity-0 group-hover:opacity-100" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold truncate leading-none mb-1">{task.title}</div>
+                        <div className="text-[10px] text-muted-foreground line-clamp-2 leading-relaxed">
+                          {task.description}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+                <Button variant="ghost" className="w-full text-xs text-muted-foreground hover:text-primary h-8" asChild>
+                  <Link to="/chat">Ver todas as tarefas no Chat</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Status Breakdown */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-primary" />
+              <AlertCircle className="h-4 w-4 text-primary" />
               Funil de Atendimento
             </CardTitle>
-            <CardDescription>Distribuição por status</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-72 w-full">
+          <CardContent className="flex justify-center">
+            <div className="h-48 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={funnelData}
                     dataKey="value"
                     nameKey="name"
-                    innerRadius={50}
+                    innerRadius={60}
                     outerRadius={80}
-                    paddingAngle={2}
+                    paddingAngle={5}
                   >
                     {funnelData.map((_, i) => (
-                      <Cell key={i} fill={FUNNEL_COLORS[i]} />
+                      <Cell key={i} fill={FUNNEL_COLORS[i]} stroke="none" />
                     ))}
                   </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      background: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: 8,
-                      fontSize: 12,
-                    }}
-                  />
-                  <Legend
-                    wrapperStyle={{ fontSize: 11 }}
-                    iconType="circle"
-                  />
+                  <Tooltip />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Daily bar */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4 text-primary" />
-            Atividade Diária
-          </CardTitle>
-          <CardDescription>Total de mensagens trocadas por dia</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-56 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <Tooltip
-                  contentStyle={{
-                    background: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                />
-                <Bar dataKey="recebidas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="enviadas" fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-
-      {(!instances || instances.length === 0) && (
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Comece agora</CardTitle>
-            <CardDescription>
-              Conecte sua primeira instância do WhatsApp para começar a centralizar atendimentos.
-            </CardDescription>
+            <CardTitle>Últimas Atualizações do WhatsApp</CardTitle>
+            <CardDescription>Mensagens mais recentes em grupos e 1:1</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button asChild>
-              <Link to="/instances">
-                <Plus className="mr-2 h-4 w-4" /> Configurar Instância
-              </Link>
-            </Button>
+             <div className="space-y-4">
+                <p className="text-sm text-muted-foreground italic">Integração ativa com Evolution API v2.0</p>
+                <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-700 text-xs font-medium">
+                  <Smartphone className="h-4 w-4" />
+                  Todas as instâncias operando normalmente.
+                </div>
+             </div>
           </CardContent>
         </Card>
-      )}
+      </div>
     </div>
   );
 }
@@ -345,16 +367,19 @@ function KpiCard({
   accent?: "destructive";
 }) {
   return (
-    <Card>
+    <Card className="border-none shadow-md bg-card/60 backdrop-blur-sm overflow-hidden relative group">
+      <div className={cn("absolute top-0 left-0 w-1 h-full", accent === "destructive" ? "bg-red-500" : "bg-primary")} />
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <Icon className={`h-4 w-4 ${accent === "destructive" ? "text-destructive" : "text-primary"}`} />
+        <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground/70">{title}</CardTitle>
+        <div className={cn("p-2 rounded-lg", accent === "destructive" ? "bg-red-500/10 text-red-500" : "bg-primary/10 text-primary")}>
+          <Icon className="h-4 w-4" />
+        </div>
       </CardHeader>
       <CardContent>
-        <div className={`text-2xl font-bold ${accent === "destructive" ? "text-destructive" : ""}`}>
+        <div className={cn("text-3xl font-black tracking-tighter", accent === "destructive" ? "text-red-600" : "text-foreground")}>
           {value}
         </div>
-        <p className="text-xs text-muted-foreground mt-1">{hint}</p>
+        <p className="text-xs text-muted-foreground mt-1 font-medium">{hint}</p>
       </CardContent>
     </Card>
   );
