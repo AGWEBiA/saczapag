@@ -404,7 +404,15 @@ export async function sendMessageServer(
     .eq("id", input.conversationId);
 
   try {
-    const { error } = await supabase.functions.invoke("send-message", {
+    const evolutionMessageId = await sendText(config, instanceName, recipient, content, isGroup);
+    return await updateMessage(
+      supabase,
+      message,
+      { delivery_status: "sent", sent_at: new Date().toISOString() },
+      evolutionMessageId,
+    );
+
+    /* const { error } = await supabase.functions.invoke("send-message", {
       body: {
         conversationId: input.conversationId,
         existingMessageId: message.id,
@@ -418,9 +426,9 @@ export async function sendMessageServer(
 
     if (error) throw new Error(error.message || "Falha ao acionar envio pela Evolution.");
 
-    return message;
+    return message; */
   } catch (error: unknown) {
-    console.error("Erro ao enfileirar envio WhatsApp:", error);
+    console.error("Erro ao enviar WhatsApp pela Evolution:", error);
     return await updateMessage(supabase, message, {
       delivery_status: "failed",
       failed_at: new Date().toISOString(),
