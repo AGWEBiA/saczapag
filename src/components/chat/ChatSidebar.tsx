@@ -40,9 +40,8 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
       const { data } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", user.id)
-        .single();
-      return data;
+        .eq("id", user.id);
+      return data?.[0] || null;
     },
     staleTime: Infinity, // Profile doesn't change often
   });
