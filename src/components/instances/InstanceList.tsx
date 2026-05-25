@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
-import { syncGroups } from "@/lib/sync-groups.functions";
+import { syncGroupsClient as syncGroups } from "@/lib/sync-groups.client";
 import { CreateInstanceDialog } from "./CreateInstanceDialog";
 import {
   Dialog,
@@ -271,7 +271,7 @@ export function InstanceList() {
   });
   const syncGroupsMutation = useMutation({
     mutationFn: async (instanceId: string) => {
-      const result = await syncGroupsFn({ data: instanceId });
+      const result = await syncGroups(instanceId);
       return result;
     },
     onSuccess: (data) => {
