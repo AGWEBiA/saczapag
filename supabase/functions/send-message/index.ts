@@ -9,10 +9,6 @@ const corsHeaders = {
 
 type SupabaseClientLike = any;
 
-const edgeRuntime = globalThis as unknown as {
-  EdgeRuntime?: { waitUntil?: (promise: Promise<unknown>) => void };
-};
-
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -62,6 +58,27 @@ async function fetchJsonWithFullTimeout(url: string, init: RequestInit, ms = 150
   } finally {
     clearTimeout(t);
   }
+}
+
+function runAfterResponse(task: Promise<unknown>) {
+  const runtime = globalThis as unknown as {
+    EdgeRuntime?: { waitUntil?: (promise: Promise<unknown>) => void };
+    waitUntil?: (promise: Promise<unknown>) => void;
+  };
+
+  if (typeof runtime.EdgeRuntime?.waitUntil === "function") {
+    runtime.EdgeRuntime.waitUntil(task);
+    return;
+  }
+
+  if (typeof runtime.waitUntil === "function") {
+    runtime.waitUntil(task);
+    return;
+  }
+
+  task.catch((error: any) => {
+    console.error("[send-message] detached task failed:", error?.message || String(error));
+  });
 }
 
 function evolutionErrorMessage(prefix: string, response: Response, body: unknown) {
@@ -217,25 +234,24 @@ async function sendViaEvolution(params: {
   phone: string;
   content: string;
   isGroup?: boolean;
+  skipPreflight?: boolean;
 }) {
-  const { supabase, instanceName, phone, content, isGroup = false } = params;
+  const { supabase, instanceName, phone, content, isGroup = false, skipPreflight = false } = params;
   const { apiUrl, apiKey } = await resolveEvolutionConfig(supabase);
-  const evolutionRecipient = await resolveWhatsAppRecipient(
-    apiUrl,
-    apiKey,
-    instanceName,
-    phone,
-    isGroup,
-  );
+  const evolutionRecipient = skipPreflight
+    ? phone
+    : await resolveWhatsAppRecipient(apiUrl, apiKey, instanceName, phone, isGroup);
 
   // Verifica se a instância está conectada antes de tentar enviar.
   // Se não estiver "open", o sendText do Evolution trava aguardando o socket.
-  const conn = await checkInstanceConnected(apiUrl, apiKey, instanceName);
-  if (!conn.ok) {
-    throw new Error(
-      `Instância "${instanceName}" não está conectada ao WhatsApp (estado: ${conn.state}). ` +
-        `Abra Instâncias e escaneie o QR Code novamente.`,
-    );
+  if (!skipPreflight) {
+    const conn = await checkInstanceConnected(apiUrl, apiKey, instanceName);
+    if (!conn.ok) {
+      throw new Error(
+        `Instância "${instanceName}" não está conectada ao WhatsApp (estado: ${conn.state}). ` +
+          `Abra Instâncias e escaneie o QR Code novamente.`,
+      );
+    }
   }
 
   const sendUrl = `${apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
@@ -264,6 +280,7 @@ async function sendToWhatsApp(params: {
       phone,
       content,
       isGroup,
+      skipPreflight: true,
     });
   }
 
@@ -419,9 +436,7 @@ serve(async (req) => {
       console.error("[send-message] background task failed:", error?.message || String(error));
     });
 
-    if (edgeRuntime.EdgeRuntime?.waitUntil) {
-      edgeRuntime.EdgeRuntime.waitUntil(backgroundTask);
-    }
+    runAfterResponse(backgroundTask);
 
     return jsonResponse({
       ...message,
