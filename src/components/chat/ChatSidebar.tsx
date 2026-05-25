@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Search, Filter, Users, RefreshCw } from "lucide-react";
+import { User, Search, Filter, Users, RefreshCw, Bell } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -171,6 +171,19 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
           <div className="flex items-center gap-1 justify-end">
             <NewConversationDialog onCreated={(id) => onSelect(id)} />
             <GroupImportDialog />
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Notificações"
+              onClick={() => {
+                // Future: show notification list dialog
+                toast.info("Em breve: Central de Notificações");
+              }}
+              className="relative"
+            >
+              <Bell className="h-4 w-4" />
+              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-background animate-pulse" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
