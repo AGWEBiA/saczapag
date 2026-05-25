@@ -61,6 +61,35 @@ function jsonErrorMessage(prefix: string, response: Response, body: unknown) {
   return `${prefix} retornou ${response.status}${raw && raw !== "{}" ? `: ${raw}` : ""}`;
 }
 
+function normalizeEvolutionState(value: string | undefined) {
+  const state = String(value || "unknown").toLowerCase();
+  if (state === "open" || state === "connected") return "open";
+  if (state.includes("connect") && !state.includes("dis")) return "connecting";
+  if (state.includes("close") || state.includes("logout")) return "disconnected";
+  return state;
+}
+
+function readInstanceSnapshot(value: unknown) {
+  const record = asRecord(value);
+  const instance = asRecord(record.instance);
+  const connectionStatus = asRecord(record.connectionStatus);
+  const ownerJid =
+    asMessage(record.ownerJid) || asMessage(instance.ownerJid) || asMessage(instance.owner);
+  const rawState =
+    asMessage(connectionStatus.state) ||
+    asMessage(record.connectionStatus) ||
+    asMessage(instance.state) ||
+    asMessage(record.state) ||
+    asMessage(record.status);
+
+  return {
+    instanceName:
+      asMessage(record.name) || asMessage(record.instanceName) || asMessage(instance.instanceName),
+    state: ownerJid ? "open" : normalizeEvolutionState(rawState),
+    ownerJid,
+  };
+}
+
 async function fetchJsonWithTimeout(url: string, init: RequestInit, ms = 12000) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
@@ -178,9 +207,31 @@ async function assertEvolutionInstanceOpen(config: EvolutionConfig, instanceName
   }
 
   const state =
-    asMessage(asRecord(asRecord(body).instance).state) ||
-    asMessage(asRecord(body).state) ||
-    "unknown";
+    normalizeEvolutionState(
+      asMessage(asRecord(asRecord(body).instance).state) || asMessage(asRecord(body).state),
+    );
+
+  if (state !== "open") {
+    try {
+      const snapshot = await fetchJsonWithTimeout(
+        `${config.apiUrl}/instance/fetchInstances`,
+        {
+          method: "GET",
+          headers: { apikey: config.apiKey, "User-Agent": "Lovable-Agent/1.0" },
+        },
+        5000,
+      );
+      if (snapshot.response.ok) {
+        const list = Array.isArray(snapshot.body) ? snapshot.body : [snapshot.body];
+        const found = list
+          .map(readInstanceSnapshot)
+          .find((item) => item.instanceName === instanceName);
+        if (found?.state === "open") return;
+      }
+    } catch (error) {
+      console.warn("Falha ao confirmar estado via fetchInstances:", error);
+    }
+  }
 
   if (state !== "open") {
     throw new Error(

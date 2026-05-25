@@ -6,6 +6,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function normalizeConnectionStatus(value: unknown) {
+  const state = String(value || "unknown").toLowerCase();
+  if (state === "open" || state === "connected") return "connected";
+  if (state.includes("connect") && !state.includes("dis")) return "connecting";
+  if (state === "close" || state === "closed" || state === "disconnected" || state.includes("logout")) return "disconnected";
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -32,8 +40,14 @@ serve(async (req) => {
     const evNorm = event.toLowerCase().replace(/_/g, ".");
 
     if (evNorm === "connection.update") {
-      const state = data?.state || data?.status;
-      const status = state === "open" ? "connected" : state === "connecting" ? "connecting" : "disconnected";
+      const state = data?.state || data?.status || data?.instance?.state;
+      const ownerJid = data?.ownerJid || data?.instance?.ownerJid || data?.instance?.owner;
+      const status = ownerJid ? "connected" : normalizeConnectionStatus(state);
+      if (!status) {
+        return new Response(JSON.stringify({ ok: true, skipped: `unknown connection state: ${state}` }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       await supabase
         .from("whatsapp_instances")
         .update({
