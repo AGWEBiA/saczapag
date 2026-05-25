@@ -18,6 +18,32 @@ function unwrapMessageData(data: any) {
   return data?.key && data?.message ? data : data?.messages?.[0] || data?.message || data;
 }
 
+function extractMessageKeyId(item: any) {
+  return item?.key?.id || item?.message?.key?.id || item?.data?.key?.id || null;
+}
+
+function extractRemoteJid(item: any, data: any) {
+  return item?.key?.remoteJid || item?.message?.key?.remoteJid || data?.key?.remoteJid || data?.remoteJid || null;
+}
+
+function extractFromMe(item: any, data: any) {
+  return Boolean(item?.key?.fromMe ?? item?.message?.key?.fromMe ?? data?.key?.fromMe ?? data?.fromMe);
+}
+
+function extractContent(item: any, message: any) {
+  return (
+    message?.conversation ||
+    message?.extendedTextMessage?.text ||
+    message?.ephemeralMessage?.message?.conversation ||
+    message?.ephemeralMessage?.message?.extendedTextMessage?.text ||
+    message?.imageMessage?.caption ||
+    message?.videoMessage?.caption ||
+    item?.text ||
+    item?.content ||
+    "[Mídia]"
+  );
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -63,26 +89,21 @@ serve(async (req) => {
 
     if (evNorm === "messages.upsert" || evNorm === "send.message") {
       const item = unwrapMessageData(data);
-      const key = item?.key;
-      const message = item?.message;
-      if (!message || !key) {
+      const keyId = extractMessageKeyId(item);
+      const remoteJid: string | null = extractRemoteJid(item, data);
+      const fromMe = extractFromMe(item, data);
+      const message = item?.message || data?.message || {};
+
+      if (!remoteJid) {
         return new Response(JSON.stringify({ ok: true, skipped: "empty-message" }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const remoteJid: string = key.remoteJid;
       const isGroup = remoteJid.endsWith("@g.us");
-      const direction = key.fromMe ? "outbound" : "inbound";
-      const pushName = key.fromMe ? "Você" : item.pushName || item.participant || data.participant || "Contato";
-      const content =
-        message.conversation ||
-        message.extendedTextMessage?.text ||
-        message.ephemeralMessage?.message?.conversation ||
-        message.ephemeralMessage?.message?.extendedTextMessage?.text ||
-        message.imageMessage?.caption ||
-        message.videoMessage?.caption ||
-        "[Mídia]";
+      const direction = fromMe ? "outbound" : "inbound";
+      const pushName = fromMe ? "Você" : item.pushName || item.participant || data.participant || "Contato";
+      const content = extractContent(item, message);
 
       const { data: instance } = await supabase
         .from("whatsapp_instances")
@@ -123,22 +144,48 @@ serve(async (req) => {
         conversation = nc;
       }
 
-      const { data: existing } = key.id
+      const { data: existing } = keyId
         ? await supabase
             .from("messages")
             .select("id")
-            .eq("evolution_message_id", key.id)
+            .eq("evolution_message_id", keyId)
             .maybeSingle()
         : { data: null };
 
-      if (!existing) await supabase.from("messages").insert({
-        conversation_id: conversation!.id,
-        direction,
-        content,
-        evolution_message_id: key.id,
-        sender_name: pushName,
-        type: "whatsapp",
-      });
+      if (!existing) {
+        if (direction === "outbound") {
+          const { error: reconcileError } = await supabase
+            .from("messages")
+            .update({
+              evolution_message_id: keyId,
+              metadata: {
+                delivery_status: "sent",
+                sent_at: new Date().toISOString(),
+              },
+            })
+            .eq("conversation_id", conversation!.id)
+            .eq("direction", "outbound")
+            .is("evolution_message_id", null)
+            .order("created_at", { ascending: false })
+            .limit(1);
+
+          if (reconcileError) {
+            console.error("[evolution-webhook] failed to reconcile outbound message:", reconcileError.message);
+          }
+        }
+
+        await supabase.from("messages").insert({
+          conversation_id: conversation!.id,
+          direction,
+          content,
+          evolution_message_id: keyId,
+          sender_name: pushName,
+          type: "whatsapp",
+          metadata: direction === "outbound"
+            ? { delivery_status: "sent", sent_at: new Date().toISOString() }
+            : undefined,
+        });
+      }
 
       await supabase.from("conversations").update({
         last_message_at: new Date().toISOString(),
