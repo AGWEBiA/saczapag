@@ -59,30 +59,6 @@ async function fetchJsonWithFullTimeout(url: string, init: RequestInit, ms = 150
   }
 }
 
-function runAfterResponse(createTask: () => Promise<unknown>) {
-  const runtime = globalThis as unknown as {
-    EdgeRuntime?: { waitUntil?: (promise: Promise<unknown>) => void };
-    waitUntil?: (promise: Promise<unknown>) => void;
-  };
-
-  const run = () =>
-    createTask().catch((error: any) => {
-      console.error("[send-message] detached task failed:", error?.message || String(error));
-    });
-
-  if (typeof runtime.EdgeRuntime?.waitUntil === "function") {
-    runtime.EdgeRuntime.waitUntil(run());
-    return;
-  }
-
-  if (typeof runtime.waitUntil === "function") {
-    runtime.waitUntil(run());
-    return;
-  }
-
-  setTimeout(run, 0);
-}
-
 function evolutionErrorMessage(prefix: string, response: Response, body: unknown) {
   const raw = typeof body === "string" ? body : JSON.stringify(body);
   const parsed = typeof body === "object" && body ? (body as any) : {};
@@ -535,22 +511,32 @@ serve(async (req) => {
       })
       .eq("id", conversationId);
 
-    runAfterResponse(() =>
-      processWhatsAppSend({
-        supabase,
-        messageId: message.id,
-        instance: conversation.instance,
-        phone,
-        content,
-        isGroup: Boolean(conversation.is_group),
-      }).catch((error: any) => {
-        console.error("[send-message] background task failed:", error?.message || String(error));
-      }),
-    );
+    console.log("[send-message] processing message now", {
+      messageId: message.id,
+      conversationId,
+      phone,
+      isGroup: Boolean(conversation.is_group),
+      instanceName: conversation.instance?.evolution_instance_name ?? null,
+    });
+
+    const sendResult = await processWhatsAppSend({
+      supabase,
+      messageId: message.id,
+      instance: conversation.instance,
+      phone,
+      content,
+      isGroup: Boolean(conversation.is_group),
+    });
+
+    const { data: refreshedMessage } = await supabase
+      .from("messages")
+      .select()
+      .eq("id", message.id)
+      .single();
 
     return jsonResponse({
-      ...message,
-      metadata: queuedMetadata,
+      ...(refreshedMessage ?? message),
+      metadata: refreshedMessage?.metadata ?? sendResult.metadata ?? queuedMetadata,
     });
   } catch (error: any) {
     return jsonResponse({ error: error?.message || String(error) }, 400);
