@@ -142,6 +142,26 @@
     color: var(--color-foreground);
   }
 }
+  
+  /* Melhorias na barra de rolagem */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.554 0.046 257.417 / 0.2);
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.554 0.046 257.417 / 0.4);
+  }
+}
 
 @keyframes progress-bar {
   0% { transform: translateX(-100%); }
