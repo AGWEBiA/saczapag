@@ -133,18 +133,18 @@ async function sendText(config: { apiUrl: string; apiKey: string }, instanceName
 }
 
 async function updateMessage(messageId: string, metadata: any, evolutionMessageId?: string) {
-  const { data, error } = await supabase
+  const { data: messageData, error: error } = await supabase
     .from("messages")
     .update({
       metadata,
       ...(evolutionMessageId ? { evolution_message_id: evolutionMessageId } : {}),
     })
     .eq("id", messageId)
-    .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata")
-    .single();
+    .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata");
 
   if (error) throw new Error(error.message);
-  return data;
+  if (!messageData || messageData.length === 0) throw new Error("Mensagem não encontrada após atualização.");
+  return messageData[0];
 }
 
 export async function sendMessageClient(input: SendMessageInput) {
