@@ -3,8 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 type SupabaseClientLike = any;
@@ -86,18 +85,18 @@ function runAfterResponse(createTask: () => Promise<unknown>) {
 
 function evolutionErrorMessage(prefix: string, response: Response, body: unknown) {
   const raw = typeof body === "string" ? body : JSON.stringify(body);
-  const parsed = typeof body === "object" && body ? body as any : {};
-  return parsed?.response?.message?.join?.("; ") ||
+  const parsed = typeof body === "object" && body ? (body as any) : {};
+  return (
+    parsed?.response?.message?.join?.("; ") ||
     parsed?.response?.message ||
     parsed?.message?.join?.("; ") ||
     parsed?.message ||
     parsed?.error ||
-    `${prefix} retornou ${response.status}${raw && raw !== "{}" ? `: ${raw}` : ""}`;
+    `${prefix} retornou ${response.status}${raw && raw !== "{}" ? `: ${raw}` : ""}`
+  );
 }
 
-async function resolveEvolutionConfig(
-  supabase: SupabaseClientLike,
-) {
+async function resolveEvolutionConfig(supabase: SupabaseClientLike) {
   const { data: configs } = await supabase
     .from("evolution_configs")
     .select("id, api_url, api_key, is_primary, priority, is_active")
@@ -134,9 +133,7 @@ async function markMessage(
   const { error } = await supabase
     .from("messages")
     .update({
-      ...(evolutionMessageId
-        ? { evolution_message_id: evolutionMessageId }
-        : {}),
+      ...(evolutionMessageId ? { evolution_message_id: evolutionMessageId } : {}),
       metadata,
     })
     .eq("id", messageId);
@@ -144,6 +141,30 @@ async function markMessage(
   if (error) {
     throw new Error(`Falha ao atualizar status da mensagem: ${error.message}`);
   }
+}
+
+function readEvolutionState(item: any) {
+  const raw =
+    item?.connectionStatus?.state ||
+    item?.connectionStatus ||
+    item?.instance?.state ||
+    item?.state ||
+    item?.status;
+  const state = String(raw || "unknown").toLowerCase();
+  if (state === "open" || state === "connected") return "open";
+  if (state.includes("connect")) return state.includes("dis") ? "disconnected" : "connecting";
+  if (state.includes("close") || state.includes("logout")) return "disconnected";
+  return state;
+}
+
+function mapEvolutionInstance(item: any) {
+  const ownerJid = item?.ownerJid || item?.instance?.ownerJid || item?.instance?.owner;
+  return {
+    instanceName:
+      item?.name || item?.instanceName || item?.instance?.instanceName || item?.instance?.name,
+    state: ownerJid ? "open" : readEvolutionState(item),
+    ownerJid,
+  };
 }
 
 async function checkInstanceConnected(
@@ -158,8 +179,25 @@ async function checkInstanceConnected(
       8000,
     );
     const body = await res.json().catch(() => ({}));
-    const state = body?.instance?.state ?? body?.state ?? "unknown";
-    return { ok: state === "open", state };
+    const directState = readEvolutionState(body);
+    if (directState === "open") return { ok: true, state: "open" };
+
+    const snapshotRes = await fetchWithTimeout(
+      `${apiUrl}/instance/fetchInstances`,
+      { method: "GET", headers: { apikey: apiKey } },
+      8000,
+    ).catch(() => null);
+
+    const snapshotBody = snapshotRes ? await snapshotRes.json().catch(() => []) : [];
+    const found = (Array.isArray(snapshotBody) ? snapshotBody : [snapshotBody])
+      .map(mapEvolutionInstance)
+      .find((item: any) => item.instanceName === instanceName);
+
+    if (found?.state === "open") {
+      return { ok: true, state: "open" };
+    }
+
+    return { ok: false, state: found?.state || directState };
   } catch (e: any) {
     return { ok: false, state: `check_failed:${e?.message || e}` };
   }
@@ -252,17 +290,23 @@ async function ensureEvolutionGroupReady(
     },
     5000,
   ).catch((error) => {
-    console.warn("[send-message] could not force groupsIgnore=false:", error?.message || String(error));
+    console.warn(
+      "[send-message] could not force groupsIgnore=false:",
+      error?.message || String(error),
+    );
   });
 
   for (const url of [
     `${apiUrl}/group/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=false`,
     `${apiUrl}/chat/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=false`,
   ]) {
-    const result = await fetchJsonWithFullTimeout(url, { method: "GET", headers }, 8000).catch(() => null);
+    const result = await fetchJsonWithFullTimeout(url, { method: "GET", headers }, 8000).catch(
+      () => null,
+    );
     if (!result?.response.ok) continue;
     const groups = Array.isArray(result.body) ? result.body : [result.body];
-    if (groups.some((group: any) => group?.id === groupJid || group?.remoteJid === groupJid)) return;
+    if (groups.some((group: any) => group?.id === groupJid || group?.remoteJid === groupJid))
+      return;
   }
 }
 
@@ -280,9 +324,10 @@ async function sendViaEvolution(params: {
     ? phone
     : await resolveWhatsAppRecipient(apiUrl, apiKey, instanceName, phone, isGroup);
 
-  const normalizedGroupRecipient = isGroup && !evolutionRecipient.endsWith("@g.us")
-    ? `${String(evolutionRecipient).replace(/@.+$/, "").replace(/\D/g, "")}@g.us`
-    : evolutionRecipient;
+  const normalizedGroupRecipient =
+    isGroup && !evolutionRecipient.endsWith("@g.us")
+      ? `${String(evolutionRecipient).replace(/@.+$/, "").replace(/\D/g, "")}@g.us`
+      : evolutionRecipient;
 
   // Verifica se a instância está conectada antes de tentar enviar.
   // Se não estiver "open", o sendText do Evolution trava aguardando o socket.
@@ -297,7 +342,8 @@ async function sendViaEvolution(params: {
   }
 
   const sendUrl = `${apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
-  if (isGroup) await ensureEvolutionGroupReady(apiUrl, apiKey, instanceName, normalizedGroupRecipient);
+  if (isGroup)
+    await ensureEvolutionGroupReady(apiUrl, apiKey, instanceName, normalizedGroupRecipient);
 
   const payload = {
     number: normalizedGroupRecipient,
@@ -306,7 +352,7 @@ async function sendViaEvolution(params: {
     linkPreview: false,
   };
 
-  const result = await postEvolutionText(sendUrl, apiKey, payload, 45000) as any;
+  const result = (await postEvolutionText(sendUrl, apiKey, payload, 45000)) as any;
 
   return (result?.key?.id || result?.message?.key?.id || result?.id) as string | undefined;
 }
@@ -321,13 +367,19 @@ async function sendToWhatsApp(params: {
   const { supabase, instance, phone, content, isGroup = false } = params;
 
   if (instance?.evolution_instance_name) {
+    console.log("[send-message] sending via Evolution", {
+      instanceName: instance.evolution_instance_name,
+      phone,
+      isGroup,
+    });
+
     return await sendViaEvolution({
       supabase,
       instanceName: instance.evolution_instance_name,
       phone,
       content,
       isGroup,
-      skipPreflight: true,
+      skipPreflight: false,
     });
   }
 
@@ -359,9 +411,7 @@ async function sendToWhatsApp(params: {
 
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(
-      result.error?.message || "Failed to send message via WhatsApp",
-    );
+    throw new Error(result.error?.message || "Failed to send message via WhatsApp");
   }
   return result.messages?.[0]?.id as string | undefined;
 }
@@ -432,7 +482,8 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const { conversationId, content, phone, senderName, senderUserId, existingMessageId } = await req.json();
+    const { conversationId, content, phone, senderName, senderUserId, existingMessageId } =
+      await req.json();
 
     if (!conversationId || !content || !phone) {
       throw new Error("Conversation, content and phone are required");
