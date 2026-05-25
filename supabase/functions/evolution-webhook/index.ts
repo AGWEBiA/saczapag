@@ -61,6 +61,20 @@ function extractContent(item: any, message: any) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  const requestId =
+    globalThis.crypto?.randomUUID?.() ??
+    `wh_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const log = (event: string, extra: Record<string, unknown> = {}) =>
+    console.log(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        request_id: requestId,
+        fn: "evolution-webhook",
+        event,
+        ...extra,
+      }),
+    );
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -68,7 +82,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    console.log("[evolution-webhook] event:", JSON.stringify(body).slice(0, 500));
+    log("received", { event: body.event, instance: body.instance });
 
     // Evolution v2 sends { event, instance, data, ... } at the top level.
     const event: string = body.event || body.type || "";
