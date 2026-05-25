@@ -580,6 +580,20 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  const requestId =
+    globalThis.crypto?.randomUUID?.() ??
+    `req_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const log = (event: string, extra: Record<string, unknown> = {}) =>
+    console.log(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        request_id: requestId,
+        fn: "send-message",
+        event,
+        ...extra,
+      }),
+    );
+
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -588,6 +602,8 @@ serve(async (req) => {
 
     const { conversationId, content, phone, senderName, senderUserId, existingMessageId } =
       await req.json();
+
+    log("received", { conversationId, phone, existingMessageId: existingMessageId ?? null });
 
     if (!conversationId || !content || !phone) {
       throw new Error("Conversation, content and phone are required");
@@ -604,6 +620,7 @@ serve(async (req) => {
     const queuedMetadata = {
       delivery_status: "queued",
       queued_at: new Date().toISOString(),
+      request_id: requestId,
     };
 
     const messageQuery = existingMessageId
@@ -639,26 +656,42 @@ serve(async (req) => {
       })
       .eq("id", conversationId);
 
-    console.log("[send-message] processing message now", {
-      messageId: message.id,
-      conversationId,
-      phone,
-      isGroup: Boolean(conversation.is_group),
-      instanceName: conversation.instance?.evolution_instance_name ?? null,
+    log("persisted", {
+      message_id: message.id,
+      conversation_id: conversationId,
+      is_group: Boolean(conversation.is_group),
+      instance: conversation.instance?.evolution_instance_name ?? null,
     });
 
-      const sendResult = await processWhatsAppSend({
+    const sendResult = await processWhatsAppSend({
       supabase,
       messageId: message.id,
-        instance: {
-          ...conversation.instance,
-          contactId: conversation.contact_id,
-          contactName: conversation.contact?.name ?? null,
-        },
+      instance: {
+        ...conversation.instance,
+        contactId: conversation.contact_id,
+        contactName: conversation.contact?.name ?? null,
+      },
       phone,
       content,
       isGroup: Boolean(conversation.is_group),
     });
+
+    log("done", {
+      message_id: message.id,
+      delivery_status: (sendResult.metadata as any)?.delivery_status,
+      evolution_message_id: (sendResult as any)?.evolutionMessageId ?? null,
+    });
+
+    // Garante request_id no metadata final
+    try {
+      const { data: cur } = await supabase
+        .from("messages")
+        .select("metadata")
+        .eq("id", message.id)
+        .single();
+      const merged = { ...((cur?.metadata as any) ?? {}), request_id: requestId };
+      await supabase.from("messages").update({ metadata: merged }).eq("id", message.id);
+    } catch {}
 
     const { data: refreshedMessage } = await supabase
       .from("messages")
@@ -669,8 +702,10 @@ serve(async (req) => {
     return jsonResponse({
       ...(refreshedMessage ?? message),
       metadata: refreshedMessage?.metadata ?? sendResult.metadata ?? queuedMetadata,
+      request_id: requestId,
     });
   } catch (error: any) {
-    return jsonResponse({ error: error?.message || String(error) }, 400);
+    log("error", { error: error?.message || String(error) });
+    return jsonResponse({ error: error?.message || String(error), request_id: requestId }, 400);
   }
 });
