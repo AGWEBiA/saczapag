@@ -165,6 +165,7 @@ async function postEvolutionText(
   sendUrl: string,
   apiKey: string,
   body: Record<string, unknown>,
+  timeoutMs = 15000,
 ) {
   const { response, body: result } = await fetchJsonWithFullTimeout(
     sendUrl,
@@ -176,7 +177,7 @@ async function postEvolutionText(
       },
       body: JSON.stringify(body),
     },
-    45000,
+    timeoutMs,
   );
 
   if (!response.ok) {
@@ -258,11 +259,31 @@ async function sendViaEvolution(params: {
   }
 
   const sendUrl = `${apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
-  const v2Payload = {
-    number: evolutionRecipient,
-    text: content,
-  };
-  const result = await postEvolutionText(sendUrl, apiKey, v2Payload) as any;
+  const groupNumber = evolutionRecipient.endsWith("@g.us")
+    ? evolutionRecipient.replace(/@g\.us$/, "")
+    : evolutionRecipient;
+  const candidateNumbers = isGroup
+    ? Array.from(new Set([evolutionRecipient, groupNumber]))
+    : [evolutionRecipient];
+  const payloads = candidateNumbers.flatMap((candidate) => [
+    { number: candidate, text: content, delay: 0, linkPreview: false },
+    { number: candidate, textMessage: { text: content }, delay: 0, linkPreview: false },
+  ]);
+
+  let result: any = null;
+  let lastError: unknown = null;
+  for (const payload of payloads) {
+    try {
+      result = await postEvolutionText(sendUrl, apiKey, payload, isGroup ? 9000 : 15000) as any;
+      lastError = null;
+      break;
+    } catch (error) {
+      lastError = error;
+      console.warn("[send-message] Evolution rejected payload:", error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  if (lastError) throw lastError;
 
   return (result?.key?.id || result?.message?.key?.id || result?.id) as string | undefined;
 }

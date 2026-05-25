@@ -245,16 +245,9 @@ async function sendText(
   instanceName: string,
   number: string,
   text: string,
+  isGroup = false,
 ) {
   const sendUrl = `${config.apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
-  
-  // Payload robusto para diferentes versões da Evolution API
-  const basePayload = {
-    number,
-    text,
-    delay: 0,
-    linkPreview: false,
-  };
 
   const request = (body: Record<string, unknown>) =>
     fetchJsonWithTimeout(
@@ -268,38 +261,47 @@ async function sendText(
         },
         body: JSON.stringify(body),
       },
-      12000,
+      isGroup ? 9000 : 12000,
     );
 
-  let { response, body } = await request(basePayload);
+  const groupNumber = number.endsWith("@g.us") ? number.replace(/@g\.us$/, "") : number;
+  const candidateNumbers = isGroup
+    ? Array.from(new Set([number, groupNumber]))
+    : [number];
+  const payloads = candidateNumbers.flatMap((candidate) => [
+    { number: candidate, text, delay: 0, linkPreview: false },
+    { number: candidate, textMessage: { text }, delay: 0, linkPreview: false },
+  ]);
 
-  if (!response.ok) {
+  let lastResponse: Response | null = null;
+  let lastBody: unknown = null;
+
+  for (const payload of payloads) {
+    const { response, body } = await request(payload);
+    lastResponse = response;
+    lastBody = body;
+
+    if (response.ok) {
+      const result = asRecord(body);
+      const directId = asMessage(result.id);
+      const keyId = asMessage(asRecord(result.key).id);
+      const messageKeyId = asMessage(asRecord(asRecord(result.message).key).id);
+      return keyId || messageKeyId || directId;
+    }
+
     const message = jsonErrorMessage("Evolution sendText", response, body);
-    
-    // Tenta formato alternativo (textMessage) se o erro sugerir necessidade
-    const shouldRetryWithTextMessage =
-      response.status === 400 && /textMessage|required|text/i.test(message);
-      
-    if (shouldRetryWithTextMessage) {
-      console.log("[Evolution] Retrying with textMessage format...");
-      ({ response, body } = await request({ 
-        number, 
-        textMessage: { text },
-        delay: 0
-      }));
+    console.warn("[Evolution] sendText payload rejected:", message);
+
+    if (!isGroup && response.status !== 400) {
+      break;
     }
   }
 
-  if (!response.ok) {
-    const errorMsg = jsonErrorMessage("Evolution sendText", response, body);
-    throw new Error(errorMsg);
-  }
-
-  const result = asRecord(body);
-  const directId = asMessage(result.id);
-  const keyId = asMessage(asRecord(result.key).id);
-  const messageKeyId = asMessage(asRecord(asRecord(result.message).key).id);
-  return keyId || messageKeyId || directId;
+  throw new Error(
+    lastResponse
+      ? jsonErrorMessage("Evolution sendText", lastResponse, lastBody)
+      : "Evolution sendText não retornou resposta.",
+  );
 }
 
 async function updateMessage(
@@ -402,23 +404,15 @@ export async function sendMessageServer(
     .eq("id", input.conversationId);
 
   try {
-    const { error } = await supabase.functions.invoke("send-message", {
-      body: {
-        conversationId: input.conversationId,
-        existingMessageId: message.id,
-        content,
-        phone: recipient,
-        senderName: input.senderName || "Agente",
-        isGroup,
-        skipPreflight: true,
-      },
-    });
-
-    if (error) throw new Error(error.message || "Falha ao acionar envio pela Evolution.");
-
-    return message;
+    const evolutionMessageId = await sendText(config, instanceName, recipient, content, isGroup);
+    return await updateMessage(
+      supabase,
+      message,
+      { delivery_status: "sent", sent_at: new Date().toISOString() },
+      evolutionMessageId,
+    );
   } catch (error: unknown) {
-    console.error("Erro ao enfileirar envio WhatsApp:", error);
+    console.error("Erro ao enviar WhatsApp pela Evolution:", error);
     return await updateMessage(supabase, message, {
       delivery_status: "failed",
       failed_at: new Date().toISOString(),
