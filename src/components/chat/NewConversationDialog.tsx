@@ -67,13 +67,12 @@ export function NewConversationDialog({ onCreated }: NewConversationDialogProps)
         .maybeSingle();
 
       if (!contact) {
-        const { data: nc, error } = await supabase
+        const { data: ncs, error } = await supabase
           .from("contacts")
           .insert({ phone_number: jid, name: name.trim() || (isGroup ? "Grupo" : cleanPhoneValue) })
-          .select("id")
-          .single();
+          .select("id");
         if (error) throw error;
-        contact = nc;
+        contact = ncs?.[0];
       } else if (name.trim()) {
         await supabase.from("contacts").update({ name: name.trim() }).eq("id", contact.id);
       }
