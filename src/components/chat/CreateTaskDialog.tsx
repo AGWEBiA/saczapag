@@ -36,7 +36,7 @@ export function CreateTaskDialog({ conversationId, messageId, initialContent }: 
     }
 
     setLoading(true);
-    const { error } = await supabase.from("tasks").insert({
+    const { error } = await supabase.from("tasks" as any).insert({
       title,
       description,
       priority,
@@ -44,7 +44,7 @@ export function CreateTaskDialog({ conversationId, messageId, initialContent }: 
       message_id: messageId,
       created_by: user?.id,
       status: "todo",
-    });
+    } as any);
 
     setLoading(false);
     if (error) {
