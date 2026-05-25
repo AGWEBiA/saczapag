@@ -44,20 +44,28 @@ async function ensureGroupsEnabled(evolutionUrl: string, apiKey: string, instanc
   }
 }
 
-async function fetchEvolutionJson(url: string, apiKey: string, ms = 8000) {
+async function fetchWithTimeout(url: string, init: RequestInit = {}, ms = 15000): Promise<Response> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
   try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: { apikey: apiKey, "User-Agent": "SAC-Zap/1.0" },
-      signal: ctrl.signal,
-    });
-    const body = await response.json().catch(() => ({}));
-    return { response, body };
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } catch (e: any) {
+    if (e?.name === "AbortError") {
+      throw new Error(`Evolution API timeout (${ms}ms) em ${url}`);
+    }
+    throw e;
   } finally {
     clearTimeout(t);
   }
+}
+
+async function fetchEvolutionJson(url: string, apiKey: string, ms = 8000) {
+  const response = await fetchWithTimeout(url, {
+    method: "GET",
+    headers: { apikey: apiKey, "User-Agent": "SAC-Zap/1.0" },
+  }, ms);
+  const body = await response.json().catch(() => ({}));
+  return { response, body };
 }
 
 async function getInstanceStatus(evolutionUrl: string, apiKey: string, instanceName: string) {
