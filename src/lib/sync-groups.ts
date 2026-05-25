@@ -3,16 +3,17 @@ import { supabase } from "@/integrations/supabase/client";
 export async function syncGroupsClient(instanceId: string) {
   try {
     // 1. Get instance
-    const { data: instance, error: instanceError } = await supabase
+    const { data: instances, error: instanceError } = await supabase
       .from("whatsapp_instances")
       .select("id, evolution_instance_name")
-      .eq("id", instanceId)
-      .single();
+      .eq("id", instanceId);
 
     if (instanceError) {
       console.error("Erro ao buscar instância:", instanceError);
       throw new Error(`Erro ao buscar instância: ${instanceError.message}`);
     }
+    
+    const instance = instances?.[0];
     if (!instance) throw new Error("Instância não encontrada no banco de dados");
 
     // 2. Get evolution config (same logic as Edge Function)
