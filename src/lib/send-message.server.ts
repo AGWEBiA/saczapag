@@ -266,7 +266,7 @@ async function sendText(
 
   const groupNumber = number.endsWith("@g.us") ? number.replace(/@g\.us$/, "") : number;
   const candidateNumbers = isGroup
-    ? Array.from(new Set([groupNumber, number]))
+    ? Array.from(new Set([number, groupNumber]))
     : [number];
   const payloads = candidateNumbers.flatMap((candidate) => [
     { number: candidate, text, delay: 0, linkPreview: false },
