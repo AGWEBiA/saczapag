@@ -303,75 +303,35 @@ async function sendText(
   isGroup = false,
 ) {
   const sendUrl = `${config.apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
+  const recipient = isGroup && !number.endsWith("@g.us")
+    ? `${cleanPhone(number)}@g.us`
+    : number;
 
-  const request = (body: Record<string, unknown>) =>
-    fetchJsonWithTimeout(
-      sendUrl,
-      {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json", 
-          apikey: config.apiKey,
-          "User-Agent": "Lovable-Agent/1.0"
-        },
-        body: JSON.stringify(body),
+  const payload = { number: recipient, text, delay: 0, linkPreview: false };
+
+  const { response, body } = await fetchJsonWithTimeout(
+    sendUrl,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: config.apiKey,
+        "User-Agent": "Lovable-Agent/1.0",
       },
-      isGroup ? 9000 : 12000,
-    );
+      body: JSON.stringify(payload),
+    },
+    45000,
+  );
 
-  const groupNumber = number.endsWith("@g.us") ? number.replace(/@g\.us$/, "") : number;
-  const candidateNumbers = isGroup
-    ? Array.from(new Set([number, groupNumber]))
-    : [number];
-  const payloads = candidateNumbers.flatMap((candidate) => {
-    const base = { number: candidate, text, delay: 0, linkPreview: false };
-    return [base, { ...base, textMessage: { text } }];
-  });
-
-  let lastResponse: Response | null = null;
-  let lastBody: unknown = null;
-  let lastError: unknown = null;
-
-  for (const payload of payloads) {
-    let response: Response;
-    let body: unknown;
-    try {
-      ({ response, body } = await request(payload));
-    } catch (error) {
-      lastError = error;
-      console.warn(
-        "[Evolution] sendText payload failed:",
-        error instanceof Error ? error.message : String(error),
-      );
-      continue;
-    }
-    lastResponse = response;
-    lastBody = body;
-    lastError = null;
-
-    if (response.ok) {
-      const result = asRecord(body);
-      const directId = asMessage(result.id);
-      const keyId = asMessage(asRecord(result.key).id);
-      const messageKeyId = asMessage(asRecord(asRecord(result.message).key).id);
-      return keyId || messageKeyId || directId;
-    }
-
-    const message = jsonErrorMessage("Evolution sendText", response, body);
-    console.warn("[Evolution] sendText payload rejected:", message);
-
-    if (!isGroup && response.status !== 400) {
-      break;
-    }
+  if (!response.ok) {
+    throw new Error(jsonErrorMessage("Evolution sendText", response, body));
   }
 
-  throw new Error(
-    lastResponse
-      ? jsonErrorMessage("Evolution sendText", lastResponse, lastBody)
-      : lastError instanceof Error
-      ? lastError.message
-      : "Evolution sendText não retornou resposta.",
-  );
+  const result = asRecord(body);
+  const directId = asMessage(result.id);
+  const keyId = asMessage(asRecord(result.key).id);
+  const messageKeyId = asMessage(asRecord(asRecord(result.message).key).id);
+  return keyId || messageKeyId || directId;
 }
 
 async function updateMessage(
@@ -485,11 +445,24 @@ export async function sendMessageServer(
       evolutionMessageId,
     );
   } catch (error: unknown) {
-    console.error("Erro ao enviar WhatsApp pela Evolution:", error);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const isTimeout = error instanceof Error && error.name === "TimeoutError";
+    console.error("Erro ao enviar WhatsApp pela Evolution:", errMsg);
+
+    // Timeout HTTP da Evolution geralmente significa que a mensagem foi enviada
+    // mas o socket demorou pra responder. O webhook SEND_MESSAGE confirma depois.
+    if (isTimeout) {
+      return await updateMessage(supabase, message, {
+        delivery_status: "pending",
+        pending_at: new Date().toISOString(),
+        note: "Evolution não respondeu a tempo; aguardando confirmação via webhook.",
+      });
+    }
+
     return await updateMessage(supabase, message, {
       delivery_status: "failed",
       failed_at: new Date().toISOString(),
-      error: error instanceof Error ? error.message : String(error),
+      error: errMsg,
     });
   }
 }
