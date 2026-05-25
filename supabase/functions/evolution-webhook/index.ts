@@ -60,7 +60,7 @@ serve(async (req) => {
     if (evNorm === "messages.upsert") {
       const key = data.key;
       const message = data.message;
-      if (!message || !key || key.fromMe) {
+      if (!message || !key) {
         return new Response(JSON.stringify({ ok: true, skipped: "fromMe/empty" }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -68,7 +68,7 @@ serve(async (req) => {
 
       const remoteJid: string = key.remoteJid;
       const isGroup = remoteJid.endsWith("@g.us");
-      const pushName = data.pushName || "Contato";
+      const pushName = key.fromMe ? "Você" : data.pushName || data.participant || "Contato";
       const content =
         message.conversation ||
         message.extendedTextMessage?.text ||
@@ -117,7 +117,7 @@ serve(async (req) => {
 
       await supabase.from("messages").insert({
         conversation_id: conversation!.id,
-        direction: "inbound",
+        direction: key.fromMe ? "outbound" : "inbound",
         content,
         evolution_message_id: key.id,
         sender_name: pushName,
