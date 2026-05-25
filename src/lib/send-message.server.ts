@@ -61,6 +61,35 @@ function jsonErrorMessage(prefix: string, response: Response, body: unknown) {
   return `${prefix} retornou ${response.status}${raw && raw !== "{}" ? `: ${raw}` : ""}`;
 }
 
+function normalizeEvolutionState(value: string | undefined) {
+  const state = String(value || "unknown").toLowerCase();
+  if (state === "open" || state === "connected") return "open";
+  if (state.includes("connect") && !state.includes("dis")) return "connecting";
+  if (state.includes("close") || state.includes("logout")) return "disconnected";
+  return state;
+}
+
+function readInstanceSnapshot(value: unknown) {
+  const record = asRecord(value);
+  const instance = asRecord(record.instance);
+  const connectionStatus = asRecord(record.connectionStatus);
+  const ownerJid =
+    asMessage(record.ownerJid) || asMessage(instance.ownerJid) || asMessage(instance.owner);
+  const rawState =
+    asMessage(connectionStatus.state) ||
+    asMessage(record.connectionStatus) ||
+    asMessage(instance.state) ||
+    asMessage(record.state) ||
+    asMessage(record.status);
+
+  return {
+    instanceName:
+      asMessage(record.name) || asMessage(record.instanceName) || asMessage(instance.instanceName),
+    state: ownerJid ? "open" : normalizeEvolutionState(rawState),
+    ownerJid,
+  };
+}
+
 async function fetchJsonWithTimeout(url: string, init: RequestInit, ms = 12000) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
