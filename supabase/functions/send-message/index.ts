@@ -66,23 +66,22 @@ function runAfterResponse(createTask: () => Promise<unknown>) {
     waitUntil?: (promise: Promise<unknown>) => void;
   };
 
-  const task = Promise.resolve().then(createTask);
+  const run = () =>
+    createTask().catch((error: any) => {
+      console.error("[send-message] detached task failed:", error?.message || String(error));
+    });
 
   if (typeof runtime.EdgeRuntime?.waitUntil === "function") {
-    runtime.EdgeRuntime.waitUntil(task);
+    runtime.EdgeRuntime.waitUntil(run());
     return;
   }
 
   if (typeof runtime.waitUntil === "function") {
-    runtime.waitUntil(task);
+    runtime.waitUntil(run());
     return;
   }
 
-  setTimeout(() => {
-    task.catch((error: any) => {
-      console.error("[send-message] detached task failed:", error?.message || String(error));
-    });
-  }, 0);
+  setTimeout(run, 0);
 }
 
 function evolutionErrorMessage(prefix: string, response: Response, body: unknown) {
