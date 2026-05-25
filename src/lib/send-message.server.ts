@@ -1,5 +1,5 @@
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 type SendMessageInput = {
   conversationId: string;
@@ -10,6 +10,17 @@ type SendMessageInput = {
 type EvolutionConfig = {
   apiUrl: string;
   apiKey: string;
+};
+
+type MessageRow = {
+  id: string;
+  content: string | null;
+  created_at: string;
+  direction: string;
+  sender_name: string | null;
+  is_internal: boolean | null;
+  evolution_message_id?: string | null;
+  metadata?: Json | null;
 };
 
 function cleanPhone(value: string) {
@@ -56,8 +67,8 @@ async function fetchJsonWithTimeout(url: string, init: RequestInit, ms = 12000) 
   }
 }
 
-async function resolveEvolutionConfig(): Promise<EvolutionConfig> {
-  const { data: configs } = await supabaseAdmin
+async function resolveEvolutionConfig(supabase: SupabaseClient): Promise<EvolutionConfig> {
+  const { data: configs } = await supabase
     .from("evolution_configs")
     .select("api_url, api_key, is_primary, priority, is_active")
     .eq("is_active", true)
@@ -79,33 +90,33 @@ async function resolveEvolutionConfig(): Promise<EvolutionConfig> {
 }
 
 async function resolveWhatsAppRecipient(config: EvolutionConfig, instanceName: string, phone: string) {
-  if (phone.endsWith("@g.us")) {
+  if (phone.includes("@")) {
     return phone;
   }
 
   const number = cleanPhone(phone);
-  if (number.length < 10) throw new Error(`Telefone inválido para envio: ${phone}`);
+  if (number.length < 8) throw new Error(`Telefone inválido para envio: ${phone}`);
 
-  const { response, body } = await fetchJsonWithTimeout(
-    `${config.apiUrl}/chat/whatsappNumbers/${encodeURIComponent(instanceName)}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: config.apiKey },
-      body: JSON.stringify({ numbers: [number] }),
-    },
-    8000,
-  );
+  try {
+    const { response, body } = await fetchJsonWithTimeout(
+      `${config.apiUrl}/chat/whatsappNumbers/${encodeURIComponent(instanceName)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: config.apiKey },
+        body: JSON.stringify({ numbers: [number] }),
+      },
+      8000,
+    );
 
-  if (!response.ok) {
-    throw new Error(jsonErrorMessage("Evolution whatsappNumbers", response, body));
+    if (response.ok) {
+      const checked = Array.isArray(body) ? body[0] : body as any;
+      if (checked?.exists !== false && checked?.number) return checked.number;
+    }
+  } catch (error) {
+    console.warn("Falha ao verificar número na Evolution, usando fallback:", error);
   }
 
-  const checked = Array.isArray(body) ? body[0] : body as any;
-  if (checked?.exists === false) {
-    throw new Error(`O número ${number} não foi confirmado como WhatsApp pela Evolution.`);
-  }
-
-  return cleanPhone(checked?.number || number);
+  return number;
 }
 
 async function assertInstanceOpen(config: EvolutionConfig, instanceName: string) {
