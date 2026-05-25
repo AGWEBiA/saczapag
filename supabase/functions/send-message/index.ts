@@ -286,6 +286,94 @@ async function ensureEvolutionGroupReady(
   }
 }
 
+function normalizeGroupName(value: unknown) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+async function fetchEvolutionGroups(apiUrl: string, apiKey: string, instanceName: string) {
+  const headers = { "Content-Type": "application/json", apikey: apiKey };
+
+  for (const url of [
+    `${apiUrl}/group/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=false`,
+    `${apiUrl}/chat/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=false`,
+  ]) {
+    const result = await fetchJsonWithFullTimeout(url, { method: "GET", headers }, 12000).catch(
+      () => null,
+    );
+    if (!result?.response.ok) continue;
+    return Array.isArray(result.body) ? result.body : [result.body];
+  }
+
+  return [];
+}
+
+async function resolveEvolutionGroupRecipient(params: {
+  supabase: SupabaseClientLike;
+  apiUrl: string;
+  apiKey: string;
+  instanceName: string;
+  requestedJid: string;
+  contactId?: string;
+  contactName?: string | null;
+}) {
+  const { supabase, apiUrl, apiKey, instanceName, requestedJid, contactId, contactName } = params;
+  const normalizedRequested = requestedJid.endsWith("@g.us")
+    ? requestedJid
+    : `${String(requestedJid).replace(/@.+$/, "").replace(/\D/g, "")}@g.us`;
+
+  await ensureEvolutionGroupReady(apiUrl, apiKey, instanceName, normalizedRequested);
+  const groups = await fetchEvolutionGroups(apiUrl, apiKey, instanceName);
+
+  const exactMatch = groups.find(
+    (group: any) => group?.id === normalizedRequested || group?.remoteJid === normalizedRequested,
+  );
+  if (exactMatch) {
+    console.log("[send-message] group matched by jid", {
+      instanceName,
+      requestedJid: normalizedRequested,
+    });
+    return normalizedRequested;
+  }
+
+  const normalizedName = normalizeGroupName(contactName);
+  if (normalizedName) {
+    const nameMatches = groups.filter(
+      (group: any) => normalizeGroupName(group?.subject || group?.name) === normalizedName,
+    );
+
+    if (nameMatches.length === 1) {
+      const matchedJid = nameMatches[0]?.id || nameMatches[0]?.remoteJid;
+      console.log("[send-message] group jid healed by name", {
+        instanceName,
+        requestedJid: normalizedRequested,
+        matchedJid,
+        contactName,
+      });
+
+      if (contactId && matchedJid) {
+        await supabase
+          .from("contacts")
+          .update({
+            phone_number: matchedJid,
+            name: nameMatches[0]?.subject || contactName || matchedJid,
+          })
+          .eq("id", contactId);
+      }
+
+      if (matchedJid) return matchedJid;
+    }
+  }
+
+  throw new Error(
+    `Grupo não encontrado na instância "${instanceName}". JID atual salvo: ${normalizedRequested}. ` +
+      `Atualize/sincronize os grupos antes de enviar.`,
+  );
+}
+
 async function sendViaEvolution(params: {
   supabase: SupabaseClientLike;
   instanceName: string;
@@ -293,12 +381,33 @@ async function sendViaEvolution(params: {
   content: string;
   isGroup?: boolean;
   skipPreflight?: boolean;
+  contactId?: string;
+  contactName?: string | null;
 }) {
-  const { supabase, instanceName, phone, content, isGroup = false, skipPreflight = false } = params;
+  const {
+    supabase,
+    instanceName,
+    phone,
+    content,
+    isGroup = false,
+    skipPreflight = false,
+    contactId,
+    contactName,
+  } = params;
   const { apiUrl, apiKey } = await resolveEvolutionConfig(supabase);
-  const evolutionRecipient = skipPreflight
-    ? phone
-    : await resolveWhatsAppRecipient(apiUrl, apiKey, instanceName, phone, isGroup);
+  const evolutionRecipient = isGroup
+    ? await resolveEvolutionGroupRecipient({
+        supabase,
+        apiUrl,
+        apiKey,
+        instanceName,
+        requestedJid: phone,
+        contactId,
+        contactName,
+      })
+    : skipPreflight
+      ? phone
+      : await resolveWhatsAppRecipient(apiUrl, apiKey, instanceName, phone, isGroup);
 
   const normalizedGroupRecipient =
     isGroup && !evolutionRecipient.endsWith("@g.us")
@@ -318,9 +427,6 @@ async function sendViaEvolution(params: {
   }
 
   const sendUrl = `${apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
-  if (isGroup)
-    await ensureEvolutionGroupReady(apiUrl, apiKey, instanceName, normalizedGroupRecipient);
-
   const payload = {
     number: normalizedGroupRecipient,
     text: content,
