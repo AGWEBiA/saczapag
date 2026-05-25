@@ -34,11 +34,11 @@ function mapEvolutionInstance(item: any) {
 
 async function ensureGroupsEnabled(evolutionUrl: string, apiKey: string, instanceName: string) {
   try {
-    await fetch(`${evolutionUrl}/settings/set/${encodeURIComponent(instanceName)}`, {
+    await fetchWithTimeout(`${evolutionUrl}/settings/set/${encodeURIComponent(instanceName)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: apiKey },
       body: JSON.stringify({ groupsIgnore: false, alwaysOnline: true, readMessages: false, readStatus: false }),
-    });
+    }, 8000);
   } catch (error) {
     console.warn("Falha ao aplicar settings de grupos:", error);
   }
