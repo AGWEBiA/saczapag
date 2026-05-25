@@ -32,27 +32,26 @@ export async function syncGroupsClient(instanceId: string) {
 
     if (!chosen) throw new Error("Nenhuma configuração Evolution API ativa encontrada.");
 
-    const apiUrl = chosen.api_url;
-    const apiKey = chosen.api_key;
-    const instanceName = instance.evolution_instance_name;
-
-    if (!apiUrl || !apiKey || !instanceName) throw new Error("Configuração incompleta (URL, Key ou Nome da Instância ausente)");
-
-    const evolutionUrl = apiUrl.endsWith("/") ? apiUrl.slice(0, -1) : apiUrl;
-
-    // 3. Fetch groups from Evolution
-    console.log(`Buscando grupos para ${instanceName} em ${evolutionUrl}`);
+    // 3. Fetch groups from Evolution via Edge Function to avoid CORS
+    console.log(`Buscando grupos para ${instance.evolution_instance_name} via Edge Function`);
     
-    const response = await fetch(`${evolutionUrl}/group/fetchAllGroups/${instanceName}?getParticipants=false`, {
-      headers: { apikey: apiKey }
+    const { data: groups, error: fetchError } = await supabase.functions.invoke("evolution-api", {
+      body: { 
+        action: "fetch-groups", 
+        instanceName: instance.evolution_instance_name,
+        configId: chosen.id
+      }
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData?.message || errorData?.error || `Falha ao buscar grupos na Evolution API (${response.status})`);
+    if (fetchError) {
+      console.error("Erro ao buscar grupos via Edge Function:", fetchError);
+      throw new Error(`Falha ao buscar grupos: ${fetchError.message}`);
     }
-    
-    const groups = await response.json();
+
+    if (!Array.isArray(groups)) {
+      console.error("Resposta inválida da Evolution API:", groups);
+      throw new Error("A Evolution API não retornou uma lista de grupos válida.");
+    }
 
     // 4. Upsert groups into contacts and conversations
     let syncCount = 0;
