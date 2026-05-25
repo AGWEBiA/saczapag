@@ -299,31 +299,14 @@ async function sendViaEvolution(params: {
   const sendUrl = `${apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
   if (isGroup) await ensureEvolutionGroupReady(apiUrl, apiKey, instanceName, normalizedGroupRecipient);
 
-  const groupNumber = normalizedGroupRecipient.endsWith("@g.us")
-    ? normalizedGroupRecipient.replace(/@g\.us$/, "")
-    : normalizedGroupRecipient;
-  const candidateNumbers = isGroup
-    ? Array.from(new Set([normalizedGroupRecipient, groupNumber]))
-    : [normalizedGroupRecipient];
-  const payloads = candidateNumbers.flatMap((candidate) => {
-    const base = { number: candidate, text: content, delay: 0, linkPreview: false };
-    return [base, { ...base, textMessage: { text: content } }];
-  });
+  const payload = {
+    number: normalizedGroupRecipient,
+    text: content,
+    delay: 0,
+    linkPreview: false,
+  };
 
-  let result: any = null;
-  let lastError: unknown = null;
-  for (const payload of payloads) {
-    try {
-      result = await postEvolutionText(sendUrl, apiKey, payload, isGroup ? 9000 : 15000) as any;
-      lastError = null;
-      break;
-    } catch (error) {
-      lastError = error;
-      console.warn("[send-message] Evolution rejected payload:", error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  if (lastError) throw lastError;
+  const result = await postEvolutionText(sendUrl, apiKey, payload, 45000) as any;
 
   return (result?.key?.id || result?.message?.key?.id || result?.id) as string | undefined;
 }
@@ -417,6 +400,17 @@ async function processWhatsAppSend(params: {
   } catch (sendError: any) {
     const errorMessage = sendError?.message || String(sendError);
     console.error("[send-message] send failed:", errorMessage);
+
+    if (sendError?.name === "TimeoutError") {
+      const pendingMetadata = {
+        delivery_status: "pending",
+        pending_at: new Date().toISOString(),
+        note: "Evolution não respondeu a tempo; aguardando confirmação via webhook.",
+      };
+      await markMessage(supabase, messageId, pendingMetadata);
+      return { metadata: pendingMetadata };
+    }
+
     const failedMetadata = {
       delivery_status: "failed",
       failed_at: new Date().toISOString(),
@@ -438,7 +432,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const { conversationId, content, phone, senderName, existingMessageId } = await req.json();
+    const { conversationId, content, phone, senderName, senderUserId, existingMessageId } = await req.json();
 
     if (!conversationId || !content || !phone) {
       throw new Error("Conversation, content and phone are required");
@@ -472,6 +466,7 @@ serve(async (req) => {
             direction: "outbound",
             content: content,
             sender_name: senderName,
+            sender_user_id: senderUserId ?? null,
             metadata: queuedMetadata,
           })
           .select()
