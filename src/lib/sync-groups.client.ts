@@ -5,7 +5,7 @@ export async function syncGroupsClient(instanceId: string) {
     // 1. Get instance
     const { data: instance, error: instanceError } = await supabase
       .from("whatsapp_instances")
-      .select("*")
+      .select("id, evolution_instance_name")
       .eq("id", instanceId)
       .single();
 
