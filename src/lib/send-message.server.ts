@@ -321,6 +321,10 @@ export async function sendMessageServer(
   if (!phone) throw new Error("Telefone do contato não encontrado.");
   if (!instanceName) throw new Error("Instância WhatsApp não encontrada para esta conversa.");
 
+  const config = await resolveEvolutionConfig(supabase);
+  await assertEvolutionInstanceOpen(config, instanceName);
+  const recipient = await resolveWhatsAppRecipient(config, instanceName, phone, isGroup);
+
   const queuedMetadata = { delivery_status: "queued", queued_at: new Date().toISOString() };
   const { data: messageData, error: messageError } = await supabase
     .from("messages")
@@ -352,9 +356,10 @@ export async function sendMessageServer(
         conversationId: input.conversationId,
         existingMessageId: message.id,
         content,
-        phone,
+        phone: recipient,
         senderName: input.senderName || "Agente",
         isGroup,
+        skipPreflight: true,
       },
     });
 
