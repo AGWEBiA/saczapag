@@ -214,24 +214,30 @@ export async function sendMessageServer(input: SendMessageInput, userId: string,
     .update({ last_message_at: new Date().toISOString(), last_message_content: content })
     .eq("id", input.conversationId);
 
-  await updateMessage(supabase, message, { delivery_status: "sending", sending_at: new Date().toISOString() });
+  // Inicia o processo de envio em background para evitar timeout do servidor
+  (async () => {
+    try {
+      await updateMessage(supabase, message, { delivery_status: "sending", sending_at: new Date().toISOString() });
+      const config = await resolveEvolutionConfig(supabase);
+      await assertInstanceOpen(config, instanceName);
+      const recipient = await resolveWhatsAppRecipient(config, instanceName, phone);
+      const evolutionMessageId = await sendText(config, instanceName, recipient, content);
+      await updateMessage(
+        supabase,
+        message,
+        { delivery_status: "sent", sent_at: new Date().toISOString() },
+        evolutionMessageId,
+      );
+    } catch (error: any) {
+      console.error("Erro no envio em background:", error);
+      await updateMessage(supabase, message, {
+        delivery_status: "failed",
+        failed_at: new Date().toISOString(),
+        error: error?.message || String(error),
+      });
+    }
+  })();
 
-  try {
-    const config = await resolveEvolutionConfig(supabase);
-    await assertInstanceOpen(config, instanceName);
-    const recipient = await resolveWhatsAppRecipient(config, instanceName, phone);
-    const evolutionMessageId = await sendText(config, instanceName, recipient, content);
-    return await updateMessage(
-      supabase,
-      message,
-      { delivery_status: "sent", sent_at: new Date().toISOString() },
-      evolutionMessageId,
-    );
-  } catch (error: any) {
-    return await updateMessage(supabase, message, {
-      delivery_status: "failed",
-      failed_at: new Date().toISOString(),
-      error: error?.message || String(error),
-    });
-  }
+  // Retorna a mensagem inicial (pendente) imediatamente para a UI
+  return message;
 }
