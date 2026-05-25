@@ -215,7 +215,10 @@ export function ChatInterface() {
                     <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full" />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-bold text-sm lg:text-base truncate tracking-tight">{selectedConversation?.contact?.name || "Contato"}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-sm lg:text-base truncate tracking-tight">{selectedConversation?.contact?.name || "Contato"}</h3>
+                      <Badge variant="outline" className="text-[8px] h-3 px-1 border-green-500/50 text-green-600 bg-green-50 uppercase font-black tracking-widest">WhatsApp</Badge>
+                    </div>
                     <div className="flex items-center gap-2">
                       <p className="text-[10px] lg:text-xs text-muted-foreground font-medium truncate">{selectedConversation?.contact?.phone_number}</p>
                       {selectedConversation?.assigned_to ? (

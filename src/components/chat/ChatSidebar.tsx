@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Search, Filter, Users, RefreshCw, Bell } from "lucide-react";
+import { User, Search, Filter, Users, RefreshCw, Bell, Smartphone } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -266,8 +266,11 @@ const ChatItem = React.memo(({ conv, selectedId, onSelect }: { conv: any, select
           </AvatarFallback>
         </Avatar>
         {conv.status === 'aberta' && (
-          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-background rounded-full shadow-sm" />
+          <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full shadow-sm z-10" />
         )}
+        <div className="absolute -top-1 -right-1 bg-green-500 text-white rounded-full p-0.5 shadow-sm border border-background">
+          <Smartphone size={10} />
+        </div>
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-baseline mb-0.5">

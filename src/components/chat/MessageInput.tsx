@@ -192,7 +192,7 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
         <div className="flex-1 relative group">
           <Input
             placeholder={
-              isInternal ? "Digite uma nota apenas para a equipe..." : "Escreva sua mensagem aqui..."
+              isInternal ? "Digite uma nota apenas para a equipe... (cite com @)" : "Escreva sua mensagem aqui... (cite com @ para notificar o time)"
             }
             value={content}
             onChange={(e) => setContent(e.target.value)}
