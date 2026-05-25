@@ -211,17 +211,28 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
   const deliveryError = msg.metadata?.error as string | undefined;
   const isOutbound = msg.direction === "outbound" && !msg.is_internal;
   const createdAt = msg.created_at ? new Date(msg.created_at) : null;
-  const minutesSinceCreated = createdAt && !Number.isNaN(createdAt.getTime())
-    ? (Date.now() - createdAt.getTime()) / 60000
-    : 0;
-  const stalePending = isOutbound && !msg.evolution_message_id && (deliveryStatus === "queued" || deliveryStatus === "sending") && minutesSinceCreated > 2;
+  const minutesSinceCreated =
+    createdAt && !Number.isNaN(createdAt.getTime())
+      ? (Date.now() - createdAt.getTime()) / 60000
+      : 0;
+  const stalePending =
+    isOutbound &&
+    !msg.evolution_message_id &&
+    (deliveryStatus === "queued" || deliveryStatus === "sending") &&
+    minutesSinceCreated > 2;
   const failed = isOutbound && (deliveryStatus === "failed" || stalePending);
-  const sending = isOutbound && !failed && (deliveryStatus === "queued" || deliveryStatus === "sending");
+  const sending =
+    isOutbound && !failed && (deliveryStatus === "queued" || deliveryStatus === "sending");
   const sent = isOutbound && (deliveryStatus === "sent" || !!msg.evolution_message_id);
-  const messageTime = createdAt && !Number.isNaN(createdAt.getTime())
-    ? format(createdAt, "HH:mm", { locale: ptBR })
-    : "--:--";
-  const visibleDeliveryError = deliveryError || (stalePending ? "Envio não confirmado pelo WhatsApp. Verifique se a instância está conectada." : null);
+  const messageTime =
+    createdAt && !Number.isNaN(createdAt.getTime())
+      ? format(createdAt, "HH:mm", { locale: ptBR })
+      : "--:--";
+  const visibleDeliveryError =
+    deliveryError ||
+    (stalePending
+      ? "Envio não confirmado pelo WhatsApp. Verifique se a instância está conectada."
+      : null);
 
   return (
     <div className="group/bubble flex flex-col items-start w-full">
@@ -236,67 +247,72 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
         )}
       >
         <div className="absolute top-2 right-2 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
-           <CreateTaskDialog 
-             messageId={msg.id} 
-             initialContent={msg.content || ""} 
-           />
+          <CreateTaskDialog messageId={msg.id} initialContent={msg.content || ""} />
         </div>
-      {msg.is_internal && (
-        <div className="flex items-center gap-1.5 mb-2 border-b border-yellow-200/50 pb-1">
-          <Info className="h-3 w-3 text-yellow-600" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-yellow-700">Nota Interna</span>
-        </div>
-      )}
-      {isGroup && msg.direction === "inbound" && msg.sender_name && (
-        <span className="text-[10px] font-black mb-1.5 text-primary tracking-wide uppercase">{msg.sender_name}</span>
-      )}
-      {msg.direction === "outbound" && msg.sender_name && (
-        <span className="text-[10px] font-black mb-1.5 text-primary-foreground/80 tracking-wide uppercase">
-          {msg.sender_name}
-        </span>
-      )}
-      <p className="text-sm lg:text-[15px] leading-relaxed whitespace-pre-wrap break-words font-medium">{msg.content}</p>
-      <div className="flex items-center justify-between gap-3 mt-2 pt-1 border-t border-current/5">
-        <span
-          className={cn(
-            "text-[10px] font-bold opacity-60",
-            msg.is_internal
-              ? "text-yellow-600"
-              : msg.direction === "outbound"
-                ? "text-primary-foreground"
-                : "text-muted-foreground",
-          )}
-        >
-          {messageTime}
-        </span>
-        {isOutbound && (
-          <span
-            className={cn(
-              "inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-tighter opacity-80",
-              failed && "text-red-200 opacity-100",
-              !failed && "text-primary-foreground",
-            )}
-            title={visibleDeliveryError ?? undefined}
-          >
-            {failed ? (
-              <>
-                <AlertTriangle className="h-3 w-3" /> Erro
-              </>
-            ) : sending ? (
-              <>
-                <Clock className="h-3 w-3 animate-pulse" /> Pendente
-              </>
-            ) : sent ? (
-              <>
-                <CheckCheck className="h-3 w-3" /> Enviado
-              </>
-            ) : null}
+        {msg.is_internal && (
+          <div className="flex items-center gap-1.5 mb-2 border-b border-yellow-200/50 pb-1">
+            <Info className="h-3 w-3 text-yellow-600" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-yellow-700">
+              Nota Interna
+            </span>
+          </div>
+        )}
+        {isGroup && msg.direction === "inbound" && msg.sender_name && (
+          <span className="text-[10px] font-black mb-1.5 text-primary tracking-wide uppercase">
+            {msg.sender_name}
           </span>
         )}
-      </div>
-      {failed && visibleDeliveryError && (
-        <span className="mt-2 text-[10px] leading-tight text-red-100 bg-red-900/20 p-2 rounded-lg font-medium border border-red-500/20">{visibleDeliveryError}</span>
-      )}
+        {msg.direction === "outbound" && msg.sender_name && (
+          <span className="text-[10px] font-black mb-1.5 text-primary-foreground/80 tracking-wide uppercase">
+            {msg.sender_name}
+          </span>
+        )}
+        <p className="text-sm lg:text-[15px] leading-relaxed whitespace-pre-wrap break-words font-medium">
+          {msg.content}
+        </p>
+        <div className="flex items-center justify-between gap-3 mt-2 pt-1 border-t border-current/5">
+          <span
+            className={cn(
+              "text-[10px] font-bold opacity-60",
+              msg.is_internal
+                ? "text-yellow-600"
+                : msg.direction === "outbound"
+                  ? "text-primary-foreground"
+                  : "text-muted-foreground",
+            )}
+          >
+            {messageTime}
+          </span>
+          {isOutbound && (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-tighter opacity-80",
+                failed && "text-red-200 opacity-100",
+                !failed && "text-primary-foreground",
+              )}
+              title={visibleDeliveryError ?? undefined}
+            >
+              {failed ? (
+                <>
+                  <AlertTriangle className="h-3 w-3" /> Erro
+                </>
+              ) : sending ? (
+                <>
+                  <Clock className="h-3 w-3 animate-pulse" /> Pendente
+                </>
+              ) : sent ? (
+                <>
+                  <CheckCheck className="h-3 w-3" /> Enviado
+                </>
+              ) : null}
+            </span>
+          )}
+        </div>
+        {failed && visibleDeliveryError && (
+          <span className="mt-2 text-[10px] leading-tight text-red-100 bg-red-900/20 p-2 rounded-lg font-medium border border-red-500/20">
+            {visibleDeliveryError}
+          </span>
+        )}
       </div>
     </div>
   );
