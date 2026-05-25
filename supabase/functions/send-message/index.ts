@@ -215,7 +215,10 @@ async function resolveWhatsAppRecipient(
   if (phone.includes("@")) return phone;
 
   if (isGroup) {
-    const groupId = String(phone).replace(/@.+$/, "").replace(/\D/g, "");
+    const groupId = String(phone)
+      .replace(/@.+$/, "")
+      .replace(/[^0-9-]/g, "")
+      .trim();
     if (!groupId) throw new Error(`ID do grupo inválido para envio: ${phone}`);
     return `${groupId}@g.us`;
   }
@@ -323,7 +326,7 @@ async function resolveEvolutionGroupRecipient(params: {
   const { supabase, apiUrl, apiKey, instanceName, requestedJid, contactId, contactName } = params;
   const normalizedRequested = requestedJid.endsWith("@g.us")
     ? requestedJid
-    : `${String(requestedJid).replace(/@.+$/, "").replace(/\D/g, "")}@g.us`;
+    : `${String(requestedJid).replace(/@.+$/, "").replace(/[^0-9-]/g, "")}@g.us`;
 
   await ensureEvolutionGroupReady(apiUrl, apiKey, instanceName, normalizedRequested);
   const groups = await fetchEvolutionGroups(apiUrl, apiKey, instanceName);
@@ -370,7 +373,7 @@ async function resolveEvolutionGroupRecipient(params: {
 
   throw new Error(
     `Grupo não encontrado na instância "${instanceName}". JID atual salvo: ${normalizedRequested}. ` +
-      `Atualize/sincronize os grupos antes de enviar.`,
+      `A Evolution retornou ${groups.length} grupo(s) e nenhum bateu com esse identificador.`,
   );
 }
 
@@ -411,7 +414,7 @@ async function sendViaEvolution(params: {
 
   const normalizedGroupRecipient =
     isGroup && !evolutionRecipient.endsWith("@g.us")
-      ? `${String(evolutionRecipient).replace(/@.+$/, "").replace(/\D/g, "")}@g.us`
+      ? `${String(evolutionRecipient).replace(/@.+$/, "").replace(/[^0-9-]/g, "")}@g.us`
       : evolutionRecipient;
 
   // Verifica se a instância está conectada antes de tentar enviar.
