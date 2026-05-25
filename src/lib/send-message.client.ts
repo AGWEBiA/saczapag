@@ -154,14 +154,15 @@ export async function sendMessageClient(input: SendMessageInput) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuário não autenticado.");
 
-  const { data: conversation, error: conversationError } = await supabase
+  const { data: conversationData, error: conversationError } = await supabase
     .from("conversations")
     .select("id, contact:contacts(phone_number), instance:whatsapp_instances(evolution_instance_name)")
-    .eq("id", input.conversationId)
-    .single();
+    .eq("id", input.conversationId);
 
-  if (conversationError || !conversation) throw new Error("Conversa não encontrada.");
-
+  if (conversationError) throw new Error(conversationError.message);
+  if (!conversationData || conversationData.length === 0) throw new Error("Conversa não encontrada.");
+  
+  const conversation = conversationData[0];
   const phone = (conversation as any)?.contact?.phone_number;
   const instanceName = (conversation as any)?.instance?.evolution_instance_name;
   if (!phone) throw new Error("Telefone do contato não encontrado.");
