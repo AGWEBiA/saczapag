@@ -1,35 +1,21 @@
-Para viabilizar a comunicação fluida da sua agência via grupos e 1-on-1, o sistema precisa evoluir de uma ferramenta de chat simples para um CRM Colaborativo.
+I will implement the requested features to ensure the system is deeply integrated with WhatsApp and supports team collaboration through mentions and tasks.
 
-### Objetivos do Plano
-1. **Suporte Total a Grupos**: Permitir envio, recebimento e criação de conversas com grupos existentes.
-2. **Atendimento Colaborativo**: Facilitar para que qualquer membro do time "assuma" uma conversa e saiba quem está atendendo.
-3. **Comunicação Interna**: Garantir que as notas internas sejam usadas para alinhar o time sem que o cliente veja.
+### 1. Mentions & Notifications System
+- **Enhanced Mention Detection**: Update the notification handler to scan incoming WhatsApp messages for @mentions or keywords related to team members (using their full names or custom keywords).
+- **Notification Center**: Create a new UI component in the global header where team members can see their mentions and system alerts in real-time.
+- **Real-time Synchronization**: Ensure notifications are synced via Supabase Realtime so team members are alerted even if they aren't on the chat screen.
 
-### Etapas de Implementação
+### 2. Task Management Integration
+- **Contextual Tasks**: Ensure tasks created from messages are linked to the specific conversation and message, allowing team members to jump back to the context.
+- **Tasks Dashboard**: Update the main dashboard to include a "My Tasks" section, highlighting urgent actions derived from client conversations.
 
-#### 1. Correção do Motor de Envio (Backend)
-- Ajustar o servidor de envio para detectar automaticamente se o destinatário é um Grupo (@g.us).
-- Pular a validação de "número válido" para grupos, permitindo o envio imediato para JIDs de grupo.
-- Corrigir a limpeza de caracteres para não remover o sufixo de grupo.
+### 3. Mobile-First & Responsive UI
+- **Sticky Header**: Add a global navigation header that remains accessible on mobile, housing notifications and user profile.
+- **WhatsApp Visual Cues**: Enhance the message bubbles and conversation list with WhatsApp-style indicators (delivery status, group icons) to make the experience familiar.
+- **One-to-One and Groups**: Ensure the UI clearly distinguishes between 1-on-1 chats and group management, as per your preference to choose which groups are managed.
 
-#### 2. Gestão de Grupos no Sistema
-- **Sincronização**: Adicionar um botão "Sincronizar Grupos" que busca todos os grupos ativos na Evolution API e os cadastra como contatos no sistema.
-- **Identificação**: Atualizar o webhook para capturar o "Nome do Grupo" (Subject) em vez de apenas o ID alfanumérico.
-- **Nova Conversa**: Permitir que o time inicie conversas com grupos colando o ID do grupo (JID).
+### 4. Technical Infrastructure
+- Use the existing `notifications` and `tasks` database structures.
+- Ensure all team communication (internal notes) is clearly separated from client-facing WhatsApp messages.
 
-#### 3. Interface de CRM de Agência
-- **Botão "Assumir Conversa"**: Adicionar um botão de ação rápida no topo do chat para o agente se atribuir à conversa com um clique.
-- **Visualização de Atendente**: Mostrar claramente no cabeçalho qual colega está cuidando daquele cliente/grupo.
-- **Filtros Avançados**: Separar a lista de conversas entre "Individuais" e "Grupos" para facilitar a organização.
-- **Notas de Alinhamento**: Reforçar o uso de mensagens internas (amarelas) que já existem, mas garantindo que o time as veja em destaque.
-
-#### 4. Fluxo de Trabalho Recomendado
-- O time monitora a aba "Não Atribuídas".
-- Ao surgir um novo grupo ou contato, um agente clica em "Assumir".
-- Se precisar de ajuda, o agente usa a "Nota Interna" mencionando o problema para o supervisor ver no mesmo histórico.
-
-### Detalhes Técnicos
-- Alteração no `src/lib/send-message.server.ts` para tratar destinatários com sufixo `@g.us`.
-- Atualização do componente `NewConversationDialog.tsx` para aceitar IDs de grupo.
-- Novo Server Function para sincronizar grupos da Evolution API.
-- Adição de botões de atribuição rápida no `ChatInterface.tsx`.
+This plan focuses on making the tool the primary workspace for your team while keeping the client experience strictly within WhatsApp.
