@@ -282,7 +282,7 @@ serve(async (req) => {
               break;
             }
 
-            const { data: newConv } = await supabaseClient
+            const { data: newConvs } = await supabaseClient
               .from("conversations")
               .insert({ 
                 contact_id: contact.id, 
@@ -290,9 +290,8 @@ serve(async (req) => {
                 is_group: isGroup,
                 status: "aberta"
               })
-              .select("id")
-              .single();
-            conversation = newConv;
+              .select("id");
+            conversation = newConvs?.[0];
           }
 
           if (!conversation) break;
