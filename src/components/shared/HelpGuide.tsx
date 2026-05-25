@@ -232,7 +232,7 @@ export function HelpGuide() {
                 answer="Na tela de Chat, clique no ícone de 'Usuários' no topo da barra lateral e selecione os grupos que deseja trazer para o sistema."
               />
             </TabsContent>
-          </ScrollArea>
+          </div>
         </Tabs>
       </DialogContent>
     </Dialog>
