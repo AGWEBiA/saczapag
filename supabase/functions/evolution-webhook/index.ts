@@ -14,11 +14,6 @@ function normalizeConnectionStatus(value: unknown) {
   return null;
 }
 
-function asArray(value: unknown): any[] {
-  if (Array.isArray(value)) return value;
-  return value ? [value] : [];
-}
-
 function unwrapMessageData(data: any) {
   return data?.key && data?.message ? data : data?.messages?.[0] || data?.message || data;
 }
@@ -66,7 +61,7 @@ serve(async (req) => {
         .eq("evolution_instance_name", instanceName);
     }
 
-    if (evNorm === "messages.upsert") {
+    if (evNorm === "messages.upsert" || evNorm === "send.message") {
       const item = unwrapMessageData(data);
       const key = item?.key;
       const message = item?.message;
@@ -128,11 +123,13 @@ serve(async (req) => {
         conversation = nc;
       }
 
-      const { data: existing } = await supabase
-        .from("messages")
-        .select("id")
-        .eq("evolution_message_id", key.id)
-        .maybeSingle();
+      const { data: existing } = key.id
+        ? await supabase
+            .from("messages")
+            .select("id")
+            .eq("evolution_message_id", key.id)
+            .maybeSingle()
+        : { data: null };
 
       if (!existing) await supabase.from("messages").insert({
         conversation_id: conversation!.id,
