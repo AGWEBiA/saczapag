@@ -61,7 +61,7 @@ function jsonErrorMessage(prefix: string, response: Response, body: unknown) {
   return `${prefix} retornou ${response.status}${raw && raw !== "{}" ? `: ${raw}` : ""}`;
 }
 
-async function fetchJsonWithTimeout(url: string, init: RequestInit, ms = 30000) {
+async function fetchJsonWithTimeout(url: string, init: RequestInit, ms = 12000) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
   
@@ -149,7 +149,7 @@ async function resolveWhatsAppRecipient(
         headers: { "Content-Type": "application/json", apikey: config.apiKey },
         body: JSON.stringify({ numbers: [number] }),
       },
-      15000,
+      4000,
     );
 
     if (response.ok) {
@@ -161,6 +161,32 @@ async function resolveWhatsAppRecipient(
   }
 
   return number;
+}
+
+async function assertEvolutionInstanceOpen(config: EvolutionConfig, instanceName: string) {
+  const { response, body } = await fetchJsonWithTimeout(
+    `${config.apiUrl}/instance/connectionState/${encodeURIComponent(instanceName)}`,
+    {
+      method: "GET",
+      headers: { apikey: config.apiKey, "User-Agent": "Lovable-Agent/1.0" },
+    },
+    5000,
+  );
+
+  if (!response.ok) {
+    throw new Error(jsonErrorMessage("Evolution connectionState", response, body));
+  }
+
+  const state =
+    asMessage(asRecord(asRecord(body).instance).state) ||
+    asMessage(asRecord(body).state) ||
+    "unknown";
+
+  if (state !== "open") {
+    throw new Error(
+      `Instância "${instanceName}" não está conectada na Evolution (estado atual: ${state}).`,
+    );
+  }
 }
 
 async function sendText(
@@ -191,7 +217,7 @@ async function sendText(
         },
         body: JSON.stringify(body),
       },
-      45000, // Aumentado para 45s para lidar com lentidão extrema da Evolution/VPS
+      12000,
     );
 
   let { response, body } = await request(basePayload);
@@ -295,6 +321,10 @@ export async function sendMessageServer(
   if (!phone) throw new Error("Telefone do contato não encontrado.");
   if (!instanceName) throw new Error("Instância WhatsApp não encontrada para esta conversa.");
 
+  const config = await resolveEvolutionConfig(supabase);
+  await assertEvolutionInstanceOpen(config, instanceName);
+  const recipient = await resolveWhatsAppRecipient(config, instanceName, phone, isGroup);
+
   const queuedMetadata = { delivery_status: "queued", queued_at: new Date().toISOString() };
   const { data: messageData, error: messageError } = await supabase
     .from("messages")
@@ -326,9 +356,10 @@ export async function sendMessageServer(
         conversationId: input.conversationId,
         existingMessageId: message.id,
         content,
-        phone,
+        phone: recipient,
         senderName: input.senderName || "Agente",
         isGroup,
+        skipPreflight: true,
       },
     });
 
