@@ -274,11 +274,22 @@ export function InstanceList() {
       const result = await syncGroups(instanceId);
       return result;
     },
-    onSuccess: (data) => {
-      toast.success(`${(data as any).count} grupos sincronizados com sucesso!`);
+    onSuccess: (data: any) => {
+      const total = data?.count ?? 0;
+      const synced = data?.synced ?? total;
+      const errs: string[] = data?.errors ?? [];
+      if (errs.length > 0) {
+        toast.warning(`${synced}/${total} grupos sincronizados. ${errs.length} erro(s). Veja o console.`);
+        console.warn("[syncGroups] erros parciais:", errs);
+      } else {
+        toast.success(`${synced}/${total} grupos sincronizados com sucesso!`);
+      }
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },
-    onError: (e: any) => toast.error("Erro ao sincronizar grupos: " + e.message),
+    onError: (e: any) => {
+      console.error("[syncGroups] erro completo:", e);
+      toast.error("Erro ao sincronizar grupos: " + (e?.message || String(e)), { duration: 10000 });
+    },
   });
 
   if (isLoading) {
