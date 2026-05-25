@@ -257,14 +257,14 @@ serve(async (req) => {
           let contact = contacts?.[0];
 
           if (!contact) {
-            const { data: newContact } = await supabaseClient
+            const { data: newContacts } = await supabaseClient
               .from("contacts")
               .insert({ 
                 phone_number: remoteJid, 
                 name: isGroup ? (data.groupName || data.groupInfo?.subject || remoteJid) : pushName 
               })
-              .select("id")
-              .single();
+              .select("id");
+            contact = newContacts?.[0];
             contact = newContact;
           }
 
