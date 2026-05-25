@@ -207,9 +207,31 @@ async function assertEvolutionInstanceOpen(config: EvolutionConfig, instanceName
   }
 
   const state =
-    asMessage(asRecord(asRecord(body).instance).state) ||
-    asMessage(asRecord(body).state) ||
-    "unknown";
+    normalizeEvolutionState(
+      asMessage(asRecord(asRecord(body).instance).state) || asMessage(asRecord(body).state),
+    );
+
+  if (state !== "open") {
+    try {
+      const snapshot = await fetchJsonWithTimeout(
+        `${config.apiUrl}/instance/fetchInstances`,
+        {
+          method: "GET",
+          headers: { apikey: config.apiKey, "User-Agent": "Lovable-Agent/1.0" },
+        },
+        5000,
+      );
+      if (snapshot.response.ok) {
+        const list = Array.isArray(snapshot.body) ? snapshot.body : [snapshot.body];
+        const found = list
+          .map(readInstanceSnapshot)
+          .find((item) => item.instanceName === instanceName);
+        if (found?.state === "open") return;
+      }
+    } catch (error) {
+      console.warn("Falha ao confirmar estado via fetchInstances:", error);
+    }
+  }
 
   if (state !== "open") {
     throw new Error(
