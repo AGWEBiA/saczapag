@@ -139,11 +139,11 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
           queryClient.invalidateQueries({ queryKey: ["conversations"] });
 
           if (newMessage.conversation_id !== selectedId || document.visibilityState !== 'visible') {
-            const { data: conv } = await supabase
+            const { data: conversations } = await supabase
               .from('conversations')
               .select('contact:contacts(name)')
-              .eq('id', newMessage.conversation_id)
-              .single();
+              .eq('id', newMessage.conversation_id);
+            const conv = conversations?.[0];
 
             toast.info(`Nova mensagem de ${conv?.contact?.name || 'Cliente'}`, {
               description: newMessage.content,
