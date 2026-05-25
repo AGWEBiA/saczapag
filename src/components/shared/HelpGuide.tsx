@@ -7,7 +7,7 @@ import {
   DialogTrigger 
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   HelpCircle, 
@@ -70,8 +70,8 @@ export function HelpGuide() {
             </TabsList>
           </div>
 
-          <ScrollArea className="flex-1 p-6">
-            <TabsContent value="features" className="m-0 space-y-8 pb-8">
+          <div className="flex-1 overflow-y-auto px-6 py-4 scrollbar-thin scrollbar-thumb-primary/20 hover:scrollbar-thumb-primary/40 scrollbar-track-transparent">
+            <TabsContent value="features" className="m-0 space-y-8 pb-8 focus-visible:outline-none">
               <section>
                 <div className="flex items-center gap-2 mb-4">
                   <div className="p-2 rounded-lg bg-primary/10 text-primary">
@@ -157,7 +157,7 @@ export function HelpGuide() {
               </section>
             </TabsContent>
 
-            <TabsContent value="guide" className="m-0 space-y-8 pb-8">
+            <TabsContent value="guide" className="m-0 space-y-8 pb-8 focus-visible:outline-none">
               <div className="space-y-6">
                 <div className="p-4 bg-primary/5 rounded-2xl border border-primary/20">
                   <h3 className="font-bold flex items-center gap-2 mb-2">
@@ -214,7 +214,7 @@ export function HelpGuide() {
               </div>
             </TabsContent>
 
-            <TabsContent value="faq" className="m-0 space-y-6 pb-8">
+            <TabsContent value="faq" className="m-0 space-y-6 pb-8 focus-visible:outline-none">
               <FaqItem 
                 question="O cliente vê as notas internas?" 
                 answer="Não. Notas internas (amarelas) são exclusivas para os membros da equipe que utilizam este sistema. No WhatsApp do cliente, nada aparece."
@@ -232,7 +232,7 @@ export function HelpGuide() {
                 answer="Na tela de Chat, clique no ícone de 'Usuários' no topo da barra lateral e selecione os grupos que deseja trazer para o sistema."
               />
             </TabsContent>
-          </ScrollArea>
+          </div>
         </Tabs>
       </DialogContent>
     </Dialog>
