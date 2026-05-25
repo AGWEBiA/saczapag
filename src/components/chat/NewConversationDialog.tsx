@@ -86,7 +86,7 @@ export function NewConversationDialog({ onCreated }: NewConversationDialogProps)
         .maybeSingle();
 
       if (!conv) {
-        const { data: nc, error } = await supabase
+        const { data: ncs, error } = await supabase
           .from("conversations")
           .insert({
             contact_id: contact!.id,
@@ -94,10 +94,9 @@ export function NewConversationDialog({ onCreated }: NewConversationDialogProps)
             is_group: isGroup,
             status: "aberta",
           })
-          .select("id")
-          .single();
+          .select("id");
         if (error) throw error;
-        conv = nc;
+        conv = ncs?.[0];
       }
 
       return conv!.id;
