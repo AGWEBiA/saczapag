@@ -7,7 +7,8 @@ import { Send, Loader2, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { sendMessageClient as sendMessage } from "@/lib/send-message.client";
+import { useServerFn } from "@tanstack/react-start";
+import { sendMessage as sendMessageFn } from "@/lib/send-message.functions";
 import {
   Command,
   CommandEmpty,
@@ -40,6 +41,7 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
   const [isInternal, setIsInternal] = useState(false);
   const [openQuickReplies, setOpenQuickReplies] = useState(false);
   const queryClient = useQueryClient();
+  const sendMessage = useServerFn(sendMessageFn);
   
 
   const { data: profile } = useQuery({
@@ -91,9 +93,11 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
       }
 
       const data = await sendMessage({
-        conversationId,
-        content: finalContent,
-        senderName: senderName,
+        data: {
+          conversationId,
+          content: finalContent,
+          senderName: senderName,
+        },
       });
 
       if (!data) {
