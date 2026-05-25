@@ -149,32 +149,42 @@ async function sendText(config: EvolutionConfig, instanceName: string, number: s
   return ((body as any)?.key?.id || (body as any)?.message?.key?.id || (body as any)?.id) as string | undefined;
 }
 
-async function updateMessage(messageId: string, metadata: Json, evolutionMessageId?: string) {
-  const { data, error } = await supabaseAdmin
+async function updateMessage(
+  supabase: SupabaseClient,
+  originalMessage: MessageRow,
+  metadata: Json,
+  evolutionMessageId?: string,
+) {
+  const { data, error } = await supabase
     .from("messages")
     .update({
       metadata,
       ...(evolutionMessageId ? { evolution_message_id: evolutionMessageId } : {}),
     })
-    .eq("id", messageId)
-    .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata")
-    .single();
+    .eq("id", originalMessage.id)
+    .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata");
 
-  if (error) throw new Error(error.message);
-  return data;
+  if (error) console.warn("Erro ao atualizar mensagem:", error.message);
+
+  return (data?.[0] ?? {
+    ...originalMessage,
+    metadata,
+    ...(evolutionMessageId ? { evolution_message_id: evolutionMessageId } : {}),
+  }) as MessageRow;
 }
 
-export async function sendMessageServer(input: SendMessageInput, userId: string) {
+export async function sendMessageServer(input: SendMessageInput, userId: string, supabase: SupabaseClient) {
   const content = input.content.trim();
   if (!content) throw new Error("Mensagem vazia.");
 
-  const { data: conversation, error: conversationError } = await supabaseAdmin
+  const { data: conversationData, error: conversationError } = await supabase
     .from("conversations")
     .select("id, contact:contacts(phone_number), instance:whatsapp_instances(evolution_instance_name)")
-    .eq("id", input.conversationId)
-    .single();
+    .eq("id", input.conversationId);
 
-  if (conversationError || !conversation) throw new Error("Conversa não encontrada.");
+  if (conversationError) throw new Error(conversationError.message);
+  const conversation = conversationData?.[0];
+  if (!conversation) throw new Error("Conversa não encontrada.");
 
   const phone = (conversation as any)?.contact?.phone_number;
   const instanceName = (conversation as any)?.instance?.evolution_instance_name;
@@ -182,7 +192,7 @@ export async function sendMessageServer(input: SendMessageInput, userId: string)
   if (!instanceName) throw new Error("Instância WhatsApp não encontrada para esta conversa.");
 
   const queuedMetadata = { delivery_status: "queued", queued_at: new Date().toISOString() };
-  const { data: message, error: messageError } = await supabaseAdmin
+  const { data: messageData, error: messageError } = await supabase
     .from("messages")
     .insert({
       conversation_id: input.conversationId,
@@ -193,30 +203,32 @@ export async function sendMessageServer(input: SendMessageInput, userId: string)
       type: "whatsapp",
       metadata: queuedMetadata,
     })
-    .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata")
-    .single();
+    .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata");
 
-  if (messageError || !message) throw new Error(messageError?.message || "Falha ao criar mensagem.");
+  if (messageError) throw new Error(messageError.message);
+  const message = messageData?.[0] as MessageRow | undefined;
+  if (!message) throw new Error("Falha ao criar mensagem.");
 
-  await supabaseAdmin
+  await supabase
     .from("conversations")
     .update({ last_message_at: new Date().toISOString(), last_message_content: content })
     .eq("id", input.conversationId);
 
-  await updateMessage(message.id, { delivery_status: "sending", sending_at: new Date().toISOString() });
+  await updateMessage(supabase, message, { delivery_status: "sending", sending_at: new Date().toISOString() });
 
   try {
-    const config = await resolveEvolutionConfig();
+    const config = await resolveEvolutionConfig(supabase);
     await assertInstanceOpen(config, instanceName);
     const recipient = await resolveWhatsAppRecipient(config, instanceName, phone);
     const evolutionMessageId = await sendText(config, instanceName, recipient, content);
     return await updateMessage(
-      message.id,
+      supabase,
+      message,
       { delivery_status: "sent", sent_at: new Date().toISOString() },
       evolutionMessageId,
     );
   } catch (error: any) {
-    return await updateMessage(message.id, {
+    return await updateMessage(supabase, message, {
       delivery_status: "failed",
       failed_at: new Date().toISOString(),
       error: error?.message || String(error),
