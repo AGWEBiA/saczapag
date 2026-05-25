@@ -133,18 +133,18 @@ async function sendText(config: { apiUrl: string; apiKey: string }, instanceName
 }
 
 async function updateMessage(messageId: string, metadata: any, evolutionMessageId?: string) {
-  const { data, error } = await supabase
+  const { data: messageData, error: error } = await supabase
     .from("messages")
     .update({
       metadata,
       ...(evolutionMessageId ? { evolution_message_id: evolutionMessageId } : {}),
     })
     .eq("id", messageId)
-    .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata")
-    .single();
+    .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata");
 
   if (error) throw new Error(error.message);
-  return data;
+  if (!messageData || messageData.length === 0) throw new Error("Mensagem não encontrada após atualização.");
+  return messageData[0];
 }
 
 export async function sendMessageClient(input: SendMessageInput) {
@@ -154,21 +154,22 @@ export async function sendMessageClient(input: SendMessageInput) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuário não autenticado.");
 
-  const { data: conversation, error: conversationError } = await supabase
+  const { data: conversationData, error: conversationError } = await supabase
     .from("conversations")
     .select("id, contact:contacts(phone_number), instance:whatsapp_instances(evolution_instance_name)")
-    .eq("id", input.conversationId)
-    .single();
+    .eq("id", input.conversationId);
 
-  if (conversationError || !conversation) throw new Error("Conversa não encontrada.");
-
+  if (conversationError) throw new Error(conversationError.message);
+  if (!conversationData || conversationData.length === 0) throw new Error("Conversa não encontrada.");
+  
+  const conversation = conversationData[0];
   const phone = (conversation as any)?.contact?.phone_number;
   const instanceName = (conversation as any)?.instance?.evolution_instance_name;
   if (!phone) throw new Error("Telefone do contato não encontrado.");
   if (!instanceName) throw new Error("Instância WhatsApp não encontrada para esta conversa.");
 
   const queuedMetadata = { delivery_status: "queued", queued_at: new Date().toISOString() };
-  const { data: message, error: messageError } = await supabase
+  const { data: messageData, error: messageError } = await supabase
     .from("messages")
     .insert({
       conversation_id: input.conversationId,
@@ -179,10 +180,11 @@ export async function sendMessageClient(input: SendMessageInput) {
       type: "whatsapp",
       metadata: queuedMetadata,
     })
-    .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata")
-    .single();
+    .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata");
 
-  if (messageError || !message) throw new Error(messageError?.message || "Falha ao criar mensagem.");
+  if (messageError) throw new Error(messageError.message);
+  if (!messageData || messageData.length === 0) throw new Error("Falha ao criar mensagem.");
+  const message = messageData[0];
 
   await supabase
     .from("conversations")
