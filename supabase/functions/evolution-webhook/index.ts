@@ -153,38 +153,56 @@ serve(async (req) => {
         : { data: null };
 
       if (!existing) {
+        let reconciledExistingOutbound = false;
+
         if (direction === "outbound") {
-          const { error: reconcileError } = await supabase
+          const { data: pendingOutbound, error: pendingLookupError } = await supabase
             .from("messages")
-            .update({
-              evolution_message_id: keyId,
-              metadata: {
-                delivery_status: "sent",
-                sent_at: new Date().toISOString(),
-              },
-            })
+            .select("id")
             .eq("conversation_id", conversation!.id)
             .eq("direction", "outbound")
             .is("evolution_message_id", null)
             .order("created_at", { ascending: false })
-            .limit(1);
+            .limit(1)
+            .maybeSingle();
 
-          if (reconcileError) {
-            console.error("[evolution-webhook] failed to reconcile outbound message:", reconcileError.message);
+          if (pendingLookupError) {
+            console.error("[evolution-webhook] failed to lookup outbound message:", pendingLookupError.message);
+          }
+
+          if (pendingOutbound?.id) {
+            const { error: reconcileError } = await supabase
+              .from("messages")
+              .update({
+                evolution_message_id: keyId,
+                metadata: {
+                  delivery_status: "sent",
+                  sent_at: new Date().toISOString(),
+                },
+              })
+              .eq("id", pendingOutbound.id);
+
+            if (reconcileError) {
+              console.error("[evolution-webhook] failed to reconcile outbound message:", reconcileError.message);
+            } else {
+              reconciledExistingOutbound = true;
+            }
           }
         }
 
-        await supabase.from("messages").insert({
+        if (!reconciledExistingOutbound) {
+          await supabase.from("messages").insert({
           conversation_id: conversation!.id,
           direction,
           content,
           evolution_message_id: keyId,
           sender_name: pushName,
           type: "whatsapp",
-          metadata: direction === "outbound"
-            ? { delivery_status: "sent", sent_at: new Date().toISOString() }
-            : undefined,
-        });
+            metadata: direction === "outbound"
+              ? { delivery_status: "sent", sent_at: new Date().toISOString() }
+              : undefined,
+          });
+        }
       }
 
       await supabase.from("conversations").update({
