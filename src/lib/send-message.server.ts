@@ -148,7 +148,8 @@ async function assertInstanceOpen(config: EvolutionConfig, instanceName: string)
   if (!response.ok) throw new Error(jsonErrorMessage("Evolution connectionState", response, body));
 
   const bodyRecord = asRecord(body);
-  const state = asMessage(asRecord(bodyRecord.instance).state) ?? asMessage(bodyRecord.state) ?? "unknown";
+  const state =
+    asMessage(asRecord(bodyRecord.instance).state) ?? asMessage(bodyRecord.state) ?? "unknown";
   if (state !== "open") {
     throw new Error(
       `Instância "${instanceName}" não está conectada ao WhatsApp (estado: ${state}).`,
