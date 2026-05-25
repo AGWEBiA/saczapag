@@ -13,5 +13,5 @@ export const sendMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => sendMessageSchema.parse(input))
   .handler(async ({ data, context }) => {
-    return sendMessageServer(data, context.userId);
+    return sendMessageServer(data, context.userId, context.supabase);
   });
