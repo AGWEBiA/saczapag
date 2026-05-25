@@ -200,13 +200,22 @@ serve(async (req) => {
             .maybeSingle()
         : { data: null };
 
+      log("message-event", {
+        direction,
+        is_group: isGroup,
+        remote_jid: remoteJid,
+        evolution_message_id: keyId,
+        conversation_id: conversation!.id,
+        already_persisted: Boolean(existing),
+      });
+
       if (!existing) {
         let reconciledExistingOutbound = false;
 
         if (direction === "outbound") {
           const { data: pendingOutbound, error: pendingLookupError } = await supabase
             .from("messages")
-            .select("id")
+            .select("id, metadata")
             .eq("conversation_id", conversation!.id)
             .eq("direction", "outbound")
             .is("evolution_message_id", null)
@@ -215,31 +224,36 @@ serve(async (req) => {
             .maybeSingle();
 
           if (pendingLookupError) {
-            console.error(
-              "[evolution-webhook] failed to lookup outbound message:",
-              pendingLookupError.message,
-            );
+            log("reconcile-lookup-failed", { error: pendingLookupError.message });
           }
 
           if (pendingOutbound?.id) {
+            const prevMeta = (pendingOutbound.metadata as Record<string, unknown>) ?? {};
             const { error: reconcileError } = await supabase
               .from("messages")
               .update({
                 evolution_message_id: keyId,
                 metadata: {
+                  ...prevMeta,
                   delivery_status: "sent",
                   sent_at: new Date().toISOString(),
+                  webhook_request_id: requestId,
                 },
               })
               .eq("id", pendingOutbound.id);
 
             if (reconcileError) {
-              console.error(
-                "[evolution-webhook] failed to reconcile outbound message:",
-                reconcileError.message,
-              );
+              log("reconcile-failed", {
+                error: reconcileError.message,
+                message_id: pendingOutbound.id,
+              });
             } else {
               reconciledExistingOutbound = true;
+              log("reconciled", {
+                message_id: pendingOutbound.id,
+                evolution_message_id: keyId,
+                prev_request_id: (prevMeta as any)?.request_id ?? null,
+              });
             }
           }
         }
@@ -254,9 +268,14 @@ serve(async (req) => {
             type: "whatsapp",
             metadata:
               direction === "outbound"
-                ? { delivery_status: "sent", sent_at: new Date().toISOString() }
-                : undefined,
+                ? {
+                    delivery_status: "sent",
+                    sent_at: new Date().toISOString(),
+                    webhook_request_id: requestId,
+                  }
+                : { webhook_request_id: requestId },
           });
+          log("inserted", { direction, evolution_message_id: keyId });
         }
       }
 
@@ -270,12 +289,12 @@ serve(async (req) => {
         .eq("id", conversation!.id);
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
+    return new Response(JSON.stringify({ ok: true, request_id: requestId }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
-    console.error("[evolution-webhook] error:", e?.message);
-    return new Response(JSON.stringify({ ok: false, error: e?.message }), {
+    log("error", { error: e?.message || String(e) });
+    return new Response(JSON.stringify({ ok: false, error: e?.message, request_id: requestId }), {
       status: 200, // sempre 200 pra Evolution não ficar reenviando
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
