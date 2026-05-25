@@ -60,11 +60,13 @@ async function fetchJsonWithFullTimeout(url: string, init: RequestInit, ms = 150
   }
 }
 
-function runAfterResponse(task: Promise<unknown>) {
+function runAfterResponse(createTask: () => Promise<unknown>) {
   const runtime = globalThis as unknown as {
     EdgeRuntime?: { waitUntil?: (promise: Promise<unknown>) => void };
     waitUntil?: (promise: Promise<unknown>) => void;
   };
+
+  const task = Promise.resolve().then(createTask);
 
   if (typeof runtime.EdgeRuntime?.waitUntil === "function") {
     runtime.EdgeRuntime.waitUntil(task);
@@ -76,9 +78,11 @@ function runAfterResponse(task: Promise<unknown>) {
     return;
   }
 
-  task.catch((error: any) => {
-    console.error("[send-message] detached task failed:", error?.message || String(error));
-  });
+  setTimeout(() => {
+    task.catch((error: any) => {
+      console.error("[send-message] detached task failed:", error?.message || String(error));
+    });
+  }, 0);
 }
 
 function evolutionErrorMessage(prefix: string, response: Response, body: unknown) {
@@ -425,18 +429,18 @@ serve(async (req) => {
       })
       .eq("id", conversationId);
 
-    const backgroundTask = processWhatsAppSend({
-      supabase,
-      messageId: message.id,
-      instance: conversation.instance,
-      phone,
-      content,
-      isGroup: Boolean(conversation.is_group),
-    }).catch((error: any) => {
-      console.error("[send-message] background task failed:", error?.message || String(error));
-    });
-
-    runAfterResponse(backgroundTask);
+    runAfterResponse(() =>
+      processWhatsAppSend({
+        supabase,
+        messageId: message.id,
+        instance: conversation.instance,
+        phone,
+        content,
+        isGroup: Boolean(conversation.is_group),
+      }).catch((error: any) => {
+        console.error("[send-message] background task failed:", error?.message || String(error));
+      }),
+    );
 
     return jsonResponse({
       ...message,
