@@ -1,5 +1,6 @@
 import type { Json } from "@/integrations/supabase/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 type SendMessageInput = {
   conversationId: string;
@@ -23,6 +24,18 @@ type MessageRow = {
   metadata?: Json | null;
 };
 
+type UnknownRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): UnknownRecord {
+  return value && typeof value === "object" ? (value as UnknownRecord) : {};
+}
+
+function asMessage(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map((item) => asMessage(item) ?? String(item)).join("; ");
+  return undefined;
+}
+
 function cleanPhone(value: string) {
   const str = String(value || "");
   if (str.endsWith("@g.us")) return str;
@@ -30,14 +43,15 @@ function cleanPhone(value: string) {
 }
 
 function jsonErrorMessage(prefix: string, response: Response, body: unknown) {
-  const parsed = typeof body === "object" && body ? body as any : {};
+  const parsed = asRecord(body);
+  const responseBody = asRecord(parsed.response);
   const raw = typeof body === "string" ? body : JSON.stringify(body);
-  return parsed?.response?.message?.join?.("; ") ||
-    parsed?.response?.message ||
-    parsed?.message?.join?.("; ") ||
-    parsed?.message ||
-    parsed?.error ||
-    `${prefix} retornou ${response.status}${raw && raw !== "{}" ? `: ${raw}` : ""}`;
+  return (
+    asMessage(responseBody.message) ||
+    asMessage(parsed.message) ||
+    asMessage(parsed.error) ||
+    `${prefix} retornou ${response.status}${raw && raw !== "{}" ? `: ${raw}` : ""}`
+  );
 }
 
 async function fetchJsonWithTimeout(url: string, init: RequestInit, ms = 12000) {
@@ -55,9 +69,11 @@ async function fetchJsonWithTimeout(url: string, init: RequestInit, ms = 12000) 
       }
     }
     return { response, body };
-  } catch (error: any) {
-    if (error?.name === "AbortError") {
-      const timeoutError = new Error(`Evolution não confirmou o envio em ${Math.round(ms / 1000)}s`);
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === "AbortError") {
+      const timeoutError = new Error(
+        `Evolution não confirmou o envio em ${Math.round(ms / 1000)}s`,
+      );
       timeoutError.name = "TimeoutError";
       throw timeoutError;
     }
@@ -89,7 +105,11 @@ async function resolveEvolutionConfig(supabase: SupabaseClient): Promise<Evoluti
   };
 }
 
-async function resolveWhatsAppRecipient(config: EvolutionConfig, instanceName: string, phone: string) {
+async function resolveWhatsAppRecipient(
+  config: EvolutionConfig,
+  instanceName: string,
+  phone: string,
+) {
   if (phone.includes("@")) {
     return phone;
   }
@@ -109,8 +129,8 @@ async function resolveWhatsAppRecipient(config: EvolutionConfig, instanceName: s
     );
 
     if (response.ok) {
-      const checked = Array.isArray(body) ? body[0] : body as any;
-      if (checked?.exists !== false && checked?.number) return checked.number;
+      const checked = asRecord(Array.isArray(body) ? body[0] : body);
+      if (checked.exists !== false && typeof checked.number === "string") return checked.number;
     }
   } catch (error) {
     console.warn("Falha ao verificar número na Evolution, usando fallback:", error);
@@ -127,26 +147,52 @@ async function assertInstanceOpen(config: EvolutionConfig, instanceName: string)
   );
   if (!response.ok) throw new Error(jsonErrorMessage("Evolution connectionState", response, body));
 
-  const state = (body as any)?.instance?.state ?? (body as any)?.state ?? "unknown";
+  const bodyRecord = asRecord(body);
+  const state =
+    asMessage(asRecord(bodyRecord.instance).state) ?? asMessage(bodyRecord.state) ?? "unknown";
   if (state !== "open") {
-    throw new Error(`Instância "${instanceName}" não está conectada ao WhatsApp (estado: ${state}).`);
+    throw new Error(
+      `Instância "${instanceName}" não está conectada ao WhatsApp (estado: ${state}).`,
+    );
   }
 }
 
-async function sendText(config: EvolutionConfig, instanceName: string, number: string, text: string) {
-  const { response, body } = await fetchJsonWithTimeout(
-    `${config.apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: config.apiKey },
-      body: JSON.stringify({ number, text }),
-    },
-    12000,
-  );
+async function sendText(
+  config: EvolutionConfig,
+  instanceName: string,
+  number: string,
+  text: string,
+) {
+  const sendUrl = `${config.apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
+  const request = (body: Record<string, unknown>) =>
+    fetchJsonWithTimeout(
+      sendUrl,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: config.apiKey },
+        body: JSON.stringify(body),
+      },
+      12000,
+    );
+
+  let { response, body } = await request({ number, text });
+
+  if (!response.ok) {
+    const message = jsonErrorMessage("Evolution sendText", response, body);
+    const shouldRetryWithTextMessage =
+      response.status === 400 && /textMessage|required|text/i.test(message);
+    if (shouldRetryWithTextMessage) {
+      ({ response, body } = await request({ number, textMessage: { text } }));
+    }
+  }
 
   if (!response.ok) throw new Error(jsonErrorMessage("Evolution sendText", response, body));
 
-  return ((body as any)?.key?.id || (body as any)?.message?.key?.id || (body as any)?.id) as string | undefined;
+  const result = asRecord(body);
+  const directId = asMessage(result.id);
+  const keyId = asMessage(asRecord(result.key).id);
+  const messageKeyId = asMessage(asRecord(asRecord(result.message).key).id);
+  return keyId || messageKeyId || directId;
 }
 
 async function updateMessage(
@@ -155,43 +201,67 @@ async function updateMessage(
   metadata: Json,
   evolutionMessageId?: string,
 ) {
-  const { data, error } = await supabase
-    .from("messages")
-    .update({
-      metadata,
-      ...(evolutionMessageId ? { evolution_message_id: evolutionMessageId } : {}),
-    })
-    .eq("id", originalMessage.id)
-    .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata");
-
-  if (error) console.warn("Erro ao atualizar mensagem:", error.message);
-
-  return (data?.[0] ?? {
-    ...originalMessage,
+  const updatePayload = {
     metadata,
     ...(evolutionMessageId ? { evolution_message_id: evolutionMessageId } : {}),
-  }) as MessageRow;
+  };
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("messages")
+      .update(updatePayload)
+      .eq("id", originalMessage.id)
+      .select(
+        "id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata",
+      );
+
+    if (!error) {
+      return (data?.[0] ?? { ...originalMessage, ...updatePayload }) as MessageRow;
+    }
+  } catch (error) {
+    console.warn("Update com service role indisponível, tentando sessão do usuário:", error);
+  }
+
+  {
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from("messages")
+      .update(updatePayload)
+      .eq("id", originalMessage.id)
+      .select(
+        "id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata",
+      );
+
+    if (fallbackError) console.warn("Erro ao atualizar mensagem:", fallbackError.message);
+    return (fallbackData?.[0] ?? { ...originalMessage, ...updatePayload }) as MessageRow;
+  }
 }
 
-export async function sendMessageServer(input: SendMessageInput, userId: string, supabase: SupabaseClient) {
+export async function sendMessageServer(
+  input: SendMessageInput,
+  userId: string,
+  supabase: SupabaseClient,
+) {
   const content = input.content.trim();
   if (!content) throw new Error("Mensagem vazia.");
 
   const { data: conversationData, error: conversationError } = await supabase
     .from("conversations")
-    .select("id, contact:contacts(phone_number), instance:whatsapp_instances(evolution_instance_name)")
+    .select(
+      "id, contact:contacts(phone_number), instance:whatsapp_instances(evolution_instance_name)",
+    )
     .eq("id", input.conversationId);
 
   if (conversationError) throw new Error(conversationError.message);
   const conversation = conversationData?.[0];
   if (!conversation) throw new Error("Conversa não encontrada.");
 
-  const phone = (conversation as any)?.contact?.phone_number;
-  const instanceName = (conversation as any)?.instance?.evolution_instance_name;
+  const conversationRecord = asRecord(conversation);
+  const phone = asMessage(asRecord(conversationRecord.contact).phone_number);
+  const instanceName = asMessage(asRecord(conversationRecord.instance).evolution_instance_name);
   if (!phone) throw new Error("Telefone do contato não encontrado.");
   if (!instanceName) throw new Error("Instância WhatsApp não encontrada para esta conversa.");
 
-  const queuedMetadata = { delivery_status: "queued", queued_at: new Date().toISOString() };
+  const queuedMetadata = { delivery_status: "sending", sending_at: new Date().toISOString() };
   const { data: messageData, error: messageError } = await supabase
     .from("messages")
     .insert({
@@ -203,7 +273,9 @@ export async function sendMessageServer(input: SendMessageInput, userId: string,
       type: "whatsapp",
       metadata: queuedMetadata,
     })
-    .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata");
+    .select(
+      "id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata",
+    );
 
   if (messageError) throw new Error(messageError.message);
   const message = messageData?.[0] as MessageRow | undefined;
@@ -214,30 +286,23 @@ export async function sendMessageServer(input: SendMessageInput, userId: string,
     .update({ last_message_at: new Date().toISOString(), last_message_content: content })
     .eq("id", input.conversationId);
 
-  // Inicia o processo de envio em background para evitar timeout do servidor
-  (async () => {
-    try {
-      await updateMessage(supabase, message, { delivery_status: "sending", sending_at: new Date().toISOString() });
-      const config = await resolveEvolutionConfig(supabase);
-      await assertInstanceOpen(config, instanceName);
-      const recipient = await resolveWhatsAppRecipient(config, instanceName, phone);
-      const evolutionMessageId = await sendText(config, instanceName, recipient, content);
-      await updateMessage(
-        supabase,
-        message,
-        { delivery_status: "sent", sent_at: new Date().toISOString() },
-        evolutionMessageId,
-      );
-    } catch (error: any) {
-      console.error("Erro no envio em background:", error);
-      await updateMessage(supabase, message, {
-        delivery_status: "failed",
-        failed_at: new Date().toISOString(),
-        error: error?.message || String(error),
-      });
-    }
-  })();
-
-  // Retorna a mensagem inicial (pendente) imediatamente para a UI
-  return message;
+  try {
+    const config = await resolveEvolutionConfig(supabase);
+    await assertInstanceOpen(config, instanceName);
+    const recipient = await resolveWhatsAppRecipient(config, instanceName, phone);
+    const evolutionMessageId = await sendText(config, instanceName, recipient, content);
+    return await updateMessage(
+      supabase,
+      message,
+      { delivery_status: "sent", sent_at: new Date().toISOString() },
+      evolutionMessageId,
+    );
+  } catch (error: unknown) {
+    console.error("Erro no envio WhatsApp:", error);
+    return await updateMessage(supabase, message, {
+      delivery_status: "failed",
+      failed_at: new Date().toISOString(),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }

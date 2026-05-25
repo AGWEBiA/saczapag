@@ -42,7 +42,6 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
   const [openQuickReplies, setOpenQuickReplies] = useState(false);
   const queryClient = useQueryClient();
   const sendMessage = useServerFn(sendMessageFn);
-  
 
   const { data: profile } = useQuery({
     queryKey: ["current_profile"],
@@ -108,6 +107,13 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
     },
     onSuccess: (data) => {
       setContent("");
+      const deliveryStatus = data?.metadata?.delivery_status;
+      const deliveryError = typeof data?.metadata?.error === "string" ? data.metadata.error : null;
+      if (deliveryStatus === "failed") {
+        toast.error(
+          `Mensagem não enviada: ${deliveryError || "falha na confirmação do WhatsApp."}`,
+        );
+      }
       if (data?.id) {
         queryClient.setQueryData<CachedMessages>(["messages", conversationId], (old) => {
           if (!old) return old;
@@ -150,8 +156,8 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
           onClick={() => setIsInternal(!isInternal)}
           className={cn(
             "text-[10px] lg:text-xs font-bold uppercase tracking-widest px-4 h-8 rounded-full transition-all duration-300",
-            isInternal 
-              ? "bg-yellow-400 text-yellow-950 hover:bg-yellow-500 border-none shadow-lg shadow-yellow-500/20 ring-2 ring-yellow-400/50" 
+            isInternal
+              ? "bg-yellow-400 text-yellow-950 hover:bg-yellow-500 border-none shadow-lg shadow-yellow-500/20 ring-2 ring-yellow-400/50"
               : "hover:bg-primary/5 hover:text-primary hover:border-primary/20",
           )}
         >
@@ -197,7 +203,9 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
         <div className="flex-1 relative group">
           <Input
             placeholder={
-              isInternal ? "Digite uma nota apenas para a equipe... (cite com @)" : "Escreva sua mensagem aqui... (cite com @ para notificar o time)"
+              isInternal
+                ? "Digite uma nota apenas para a equipe... (cite com @)"
+                : "Escreva sua mensagem aqui... (cite com @ para notificar o time)"
             }
             value={content}
             onChange={(e) => setContent(e.target.value)}
@@ -214,9 +222,9 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
           disabled={!content.trim() || sendMutation.isPending}
           className={cn(
             "h-11 w-11 lg:h-12 lg:w-12 rounded-2xl lg:rounded-full shrink-0 shadow-lg transition-all duration-300 active:scale-95",
-            isInternal 
-              ? "bg-yellow-500 hover:bg-yellow-600 text-yellow-950 shadow-yellow-500/20" 
-              : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/20 hover:shadow-primary/30"
+            isInternal
+              ? "bg-yellow-500 hover:bg-yellow-600 text-yellow-950 shadow-yellow-500/20"
+              : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/20 hover:shadow-primary/30",
           )}
         >
           {sendMutation.isPending ? (
