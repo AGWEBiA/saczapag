@@ -46,12 +46,19 @@ function jsonErrorMessage(prefix: string, response: Response, body: unknown) {
   const parsed = asRecord(body);
   const responseBody = asRecord(parsed.response);
   const raw = typeof body === "string" ? body : JSON.stringify(body);
-  return (
-    asMessage(responseBody.message) ||
-    asMessage(parsed.message) ||
-    asMessage(parsed.error) ||
-    `${prefix} retornou ${response.status}${raw && raw !== "{}" ? `: ${raw}` : ""}`
-  );
+  
+  const extractMessage = () => {
+    if (asMessage(responseBody.message)) return asMessage(responseBody.message);
+    if (asMessage(parsed.message)) return asMessage(parsed.message);
+    if (asMessage(parsed.error)) return asMessage(parsed.error);
+    if (asMessage(parsed.status)) return asMessage(parsed.status);
+    return null;
+  };
+
+  const message = extractMessage();
+  if (message) return `${message} (${prefix})`;
+  
+  return `${prefix} retornou ${response.status}${raw && raw !== "{}" ? `: ${raw}` : ""}`;
 }
 
 async function fetchJsonWithTimeout(url: string, init: RequestInit, ms = 30000) {
@@ -156,24 +163,6 @@ async function resolveWhatsAppRecipient(
   return number;
 }
 
-async function assertInstanceOpen(config: EvolutionConfig, instanceName: string) {
-  const { response, body } = await fetchJsonWithTimeout(
-    `${config.apiUrl}/instance/connectionState/${encodeURIComponent(instanceName)}`,
-    { method: "GET", headers: { apikey: config.apiKey } },
-    15000,
-  );
-  if (!response.ok) throw new Error(jsonErrorMessage("Evolution connectionState", response, body));
-
-  const bodyRecord = asRecord(body);
-  const state =
-    asMessage(asRecord(bodyRecord.instance).state) ?? asMessage(bodyRecord.state) ?? "unknown";
-  if (state !== "open") {
-    throw new Error(
-      `Instância "${instanceName}" não está conectada ao WhatsApp (estado: ${state}).`,
-    );
-  }
-}
-
 async function sendText(
   config: EvolutionConfig,
   instanceName: string,
@@ -181,29 +170,53 @@ async function sendText(
   text: string,
 ) {
   const sendUrl = `${config.apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
+  
+  // Payload robusto para diferentes versões da Evolution API
+  const basePayload = {
+    number,
+    text,
+    delay: 0,
+    linkPreview: false,
+  };
+
   const request = (body: Record<string, unknown>) =>
     fetchJsonWithTimeout(
       sendUrl,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json", apikey: config.apiKey },
+        headers: { 
+          "Content-Type": "application/json", 
+          apikey: config.apiKey,
+          "User-Agent": "Lovable-Agent/1.0"
+        },
         body: JSON.stringify(body),
       },
-      35000,
+      45000, // Aumentado para 45s para lidar com lentidão extrema da Evolution/VPS
     );
 
-  let { response, body } = await request({ number, text });
+  let { response, body } = await request(basePayload);
 
   if (!response.ok) {
     const message = jsonErrorMessage("Evolution sendText", response, body);
+    
+    // Tenta formato alternativo (textMessage) se o erro sugerir necessidade
     const shouldRetryWithTextMessage =
       response.status === 400 && /textMessage|required|text/i.test(message);
+      
     if (shouldRetryWithTextMessage) {
-      ({ response, body } = await request({ number, textMessage: { text } }));
+      console.log("[Evolution] Retrying with textMessage format...");
+      ({ response, body } = await request({ 
+        number, 
+        textMessage: { text },
+        delay: 0
+      }));
     }
   }
 
-  if (!response.ok) throw new Error(jsonErrorMessage("Evolution sendText", response, body));
+  if (!response.ok) {
+    const errorMsg = jsonErrorMessage("Evolution sendText", response, body);
+    throw new Error(errorMsg);
+  }
 
   const result = asRecord(body);
   const directId = asMessage(result.id);
@@ -232,11 +245,14 @@ async function updateMessage(
         "id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata",
       );
 
-    if (!error) {
-      return (data?.[0] ?? { ...originalMessage, ...updatePayload }) as MessageRow;
+    if (!error && data?.[0]) {
+      return data[0] as MessageRow;
     }
-  } catch (error) {
-    console.warn("Update com service role indisponível, tentando sessão do usuário:", error);
+    
+    if (error) console.warn("[SupabaseAdmin] Erro no update:", error.message);
+  } catch (err) {
+    // Apenas loga e segue para o fallback se o supabaseAdmin falhar por falta de env vars
+    console.debug("[SupabaseAdmin] Service role indisponível, usando cliente do usuário.");
   }
 
   {
@@ -306,7 +322,8 @@ export async function sendMessageServer(
 
   try {
     const config = await resolveEvolutionConfig(supabase);
-    await assertInstanceOpen(config, instanceName);
+    // Removemos assertInstanceOpen para economizar tempo e latência, 
+    // confiando que o sendText reportará o erro se a conexão estiver caída.
     const recipient = await resolveWhatsAppRecipient(config, instanceName, phone, isGroup);
     const evolutionMessageId = await sendText(config, instanceName, recipient, content);
     return await updateMessage(
