@@ -573,7 +573,7 @@ serve(async (req) => {
 
     const { data: conversation, error: convError } = await supabase
       .from("conversations")
-      .select(`*, instance:whatsapp_instances(*)`)
+      .select(`*, instance:whatsapp_instances(*), contact:contacts(id, name, phone_number)`)
       .eq("id", conversationId)
       .single();
 
