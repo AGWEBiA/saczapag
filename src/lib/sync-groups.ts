@@ -61,19 +61,20 @@ export async function syncGroupsClient(instanceId: string) {
       const name = group.subject || jid;
 
       // Upsert contact
-      const { data: contact, error: contactError } = await supabase
+      const { data: contacts, error: contactError } = await supabase
         .from("contacts")
         .upsert({ 
           phone_number: jid, 
           name: name,
         }, { onConflict: "phone_number" })
-        .select("id")
-        .single();
+        .select("id");
 
       if (contactError) {
         console.error("Error upserting contact:", contactError);
         continue;
       }
+
+      const contact = contacts?.[0];
 
       if (contact) {
         // Check if conversation exists for this instance
