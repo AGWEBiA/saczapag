@@ -146,13 +146,7 @@ serve(async (req) => {
         if (!response.ok) {
           throw new Error(instances?.message || instances?.error || `Evolution API retornou ${response.status}`);
         }
-        result = (Array.isArray(instances) ? instances : [instances]).map((item: any) => ({
-          instanceName: item?.name || item?.instanceName || item?.instance?.instanceName,
-          state: item?.connectionStatus?.state || item?.instance?.state || item?.state || item?.status,
-          ownerJid: item?.ownerJid || item?.instance?.ownerJid || item?.instance?.owner,
-          profileName: item?.profileName || item?.instance?.profileName,
-          number: item?.number || item?.instance?.number,
-        }));
+        result = (Array.isArray(instances) ? instances : [instances]).map(mapEvolutionInstance);
         break;
       }
 
@@ -210,24 +204,8 @@ serve(async (req) => {
       }
 
       case "get-status": {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 8000);
-        try {
-          const response = await fetch(`${evolutionUrl}/instance/connectionState/${instanceName}`, {
-            method: "GET",
-            headers: { "apikey": EVOLUTION_API_KEY },
-            signal: ctrl.signal,
-          });
-          if (response.status === 404) {
-             result = { state: "disconnected", error: "Instance not found on Evolution" };
-          } else {
-             result = await response.json().catch(() => ({}));
-          }
-        } catch (e: any) {
-          result = { error: e?.name === "AbortError" ? "timeout(8s)" : (e?.message || String(e)), state: "unknown" };
-        } finally {
-          clearTimeout(t);
-        }
+        if (!instanceName) throw new Error("instanceName é obrigatório");
+        result = await getInstanceStatus(evolutionUrl, EVOLUTION_API_KEY, instanceName);
         break;
       }
 
