@@ -127,7 +127,10 @@ serve(async (req) => {
       throw new Error("Nenhuma configuração Evolution API encontrada.");
     }
 
-    const evolutionUrl = EVOLUTION_API_URL.endsWith("/") ? EVOLUTION_API_URL.slice(0, -1) : EVOLUTION_API_URL;
+    const configuredEvolutionUrl = EVOLUTION_API_URL.endsWith("/") ? EVOLUTION_API_URL.slice(0, -1) : EVOLUTION_API_URL;
+    const evolutionUrl = configuredEvolutionUrl.includes("srv1390176.hstgr.cloud:5261")
+      ? "https://evo4.agwebi.com.br"
+      : configuredEvolutionUrl;
     let result;
 
     switch (action) {
