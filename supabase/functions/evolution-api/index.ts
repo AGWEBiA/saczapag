@@ -94,10 +94,21 @@ serve(async (req) => {
 
       case "fetch-groups": {
         if (!instanceName) throw new Error("instanceName é obrigatório");
-        const response = await fetch(`${evolutionUrl}/chat/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=false`, {
+        
+        // Tentamos primeiro /group que é o padrão v2, se falhar tentamos /chat (v1/legado)
+        let response = await fetch(`${evolutionUrl}/group/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=false`, {
           method: "GET",
           headers: { "apikey": EVOLUTION_API_KEY },
         });
+
+        if (!response.ok) {
+          console.log(`Falha em /group (${response.status}), tentando /chat...`);
+          response = await fetch(`${evolutionUrl}/chat/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=false`, {
+            method: "GET",
+            headers: { "apikey": EVOLUTION_API_KEY },
+          });
+        }
+
         const groups = await response.json().catch(() => []);
         if (!response.ok) {
           throw new Error(groups?.message || groups?.error || `Evolution API retornou ${response.status}`);
