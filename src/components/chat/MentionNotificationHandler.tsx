@@ -14,9 +14,8 @@ export function MentionNotificationHandler() {
       const { data } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", user.id)
-        .single();
-      return data;
+        .eq("id", user.id);
+      return data?.[0] || null;
     },
     enabled: !!user,
   });

@@ -181,6 +181,7 @@ export async function sendMessageClient(input: SendMessageInput) {
   const conversation = conversationData[0];
   const phone = (conversation as any)?.contact?.phone_number;
   const instanceName = (conversation as any)?.instance?.evolution_instance_name;
+
   if (!phone) throw new Error("Telefone do contato não encontrado.");
   if (!instanceName) throw new Error("Instância WhatsApp não encontrada para esta conversa.");
 

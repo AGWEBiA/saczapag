@@ -96,6 +96,10 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
         senderName: senderName,
       });
 
+      if (!data) {
+        throw new Error("Erro desconhecido ao processar o envio da mensagem.");
+      }
+
       return data as CachedMessage;
     },
     onSuccess: (data) => {
