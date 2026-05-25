@@ -161,13 +161,21 @@ async function updateMessage(
     ...(evolutionMessageId ? { evolution_message_id: evolutionMessageId } : {}),
   };
 
-  const { data, error } = await supabaseAdmin
-    .from("messages")
-    .update(updatePayload)
-    .eq("id", originalMessage.id)
-    .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata");
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("messages")
+      .update(updatePayload)
+      .eq("id", originalMessage.id)
+      .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata");
 
-  if (error) {
+    if (!error) {
+      return (data?.[0] ?? { ...originalMessage, ...updatePayload }) as MessageRow;
+    }
+  } catch (error) {
+    console.warn("Update com service role indisponível, tentando sessão do usuário:", error);
+  }
+
+  {
     const { data: fallbackData, error: fallbackError } = await supabase
       .from("messages")
       .update(updatePayload)
@@ -177,11 +185,6 @@ async function updateMessage(
     if (fallbackError) console.warn("Erro ao atualizar mensagem:", fallbackError.message);
     return (fallbackData?.[0] ?? { ...originalMessage, ...updatePayload }) as MessageRow;
   }
-
-  return (data?.[0] ?? {
-    ...originalMessage,
-    ...updatePayload,
-  }) as MessageRow;
 }
 
 export async function sendMessageServer(input: SendMessageInput, userId: string, supabase: SupabaseClient) {
