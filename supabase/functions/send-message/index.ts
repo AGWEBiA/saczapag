@@ -9,6 +9,10 @@ const corsHeaders = {
 
 type SupabaseClientLike = any;
 
+const edgeRuntime = globalThis as unknown as {
+  EdgeRuntime?: { waitUntil?: (promise: Promise<unknown>) => void };
+};
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -152,7 +156,7 @@ async function postEvolutionText(
       },
       body: JSON.stringify(body),
     },
-    12000,
+    45000,
   );
 
   if (!response.ok) {
@@ -167,7 +171,16 @@ async function resolveWhatsAppRecipient(
   apiKey: string,
   instanceName: string,
   phone: string,
+  isGroup = false,
 ) {
+  if (phone.includes("@")) return phone;
+
+  if (isGroup) {
+    const groupId = String(phone).replace(/@.+$/, "").replace(/\D/g, "");
+    if (!groupId) throw new Error(`ID do grupo inválido para envio: ${phone}`);
+    return `${groupId}@g.us`;
+  }
+
   const cleanPhone = String(phone).replace(/@.+$/, "").replace(/\D/g, "");
   if (cleanPhone.length < 10) {
     throw new Error(`Telefone inválido para envio: ${phone}`);
@@ -203,10 +216,17 @@ async function sendViaEvolution(params: {
   instanceName: string;
   phone: string;
   content: string;
+  isGroup?: boolean;
 }) {
-  const { supabase, instanceName, phone, content } = params;
+  const { supabase, instanceName, phone, content, isGroup = false } = params;
   const { apiUrl, apiKey } = await resolveEvolutionConfig(supabase);
-  const evolutionRecipient = await resolveWhatsAppRecipient(apiUrl, apiKey, instanceName, phone);
+  const evolutionRecipient = await resolveWhatsAppRecipient(
+    apiUrl,
+    apiKey,
+    instanceName,
+    phone,
+    isGroup,
+  );
 
   // Verifica se a instância está conectada antes de tentar enviar.
   // Se não estiver "open", o sendText do Evolution trava aguardando o socket.
@@ -233,8 +253,9 @@ async function sendToWhatsApp(params: {
   instance: any;
   phone: string;
   content: string;
+  isGroup?: boolean;
 }) {
-  const { supabase, instance, phone, content } = params;
+  const { supabase, instance, phone, content, isGroup = false } = params;
 
   if (instance?.evolution_instance_name) {
     return await sendViaEvolution({
@@ -242,6 +263,7 @@ async function sendToWhatsApp(params: {
       instanceName: instance.evolution_instance_name,
       phone,
       content,
+      isGroup,
     });
   }
 
