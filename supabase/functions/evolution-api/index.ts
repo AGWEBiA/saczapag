@@ -206,6 +206,18 @@ serve(async (req) => {
       case "get-status": {
         if (!instanceName) throw new Error("instanceName é obrigatório");
         result = await getInstanceStatus(evolutionUrl, EVOLUTION_API_KEY, instanceName);
+        const liveState = (result as any)?.instance?.state || (result as any)?.state;
+        const status = liveState === "open" ? "connected" : liveState === "connecting" ? "connecting" : liveState === "disconnected" ? "disconnected" : null;
+        if (status) {
+          await supabaseClient
+            .from("whatsapp_instances")
+            .update({
+              status,
+              last_connected_at: status === "connected" ? new Date().toISOString() : null,
+              phone_number: (result as any)?.instance?.ownerJid || null,
+            })
+            .eq("evolution_instance_name", instanceName);
+        }
         break;
       }
 
