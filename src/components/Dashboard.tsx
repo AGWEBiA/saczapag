@@ -41,6 +41,8 @@ import {
 import { format, subDays, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/hooks/use-auth";
+import { cn } from "@/lib/utils";
+
 
 export function Dashboard() {
   const { user } = useAuth();
