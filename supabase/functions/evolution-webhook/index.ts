@@ -41,7 +41,8 @@ serve(async (req) => {
 
     if (evNorm === "connection.update") {
       const state = data?.state || data?.status || data?.instance?.state;
-      const status = normalizeConnectionStatus(state);
+      const ownerJid = data?.ownerJid || data?.instance?.ownerJid || data?.instance?.owner;
+      const status = ownerJid ? "connected" : normalizeConnectionStatus(state);
       if (!status) {
         return new Response(JSON.stringify({ ok: true, skipped: `unknown connection state: ${state}` }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
