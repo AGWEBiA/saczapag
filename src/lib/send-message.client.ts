@@ -169,7 +169,7 @@ export async function sendMessageClient(input: SendMessageInput) {
   if (!instanceName) throw new Error("Instância WhatsApp não encontrada para esta conversa.");
 
   const queuedMetadata = { delivery_status: "queued", queued_at: new Date().toISOString() };
-  const { data: message, error: messageError } = await supabase
+  const { data: messageData, error: messageError } = await supabase
     .from("messages")
     .insert({
       conversation_id: input.conversationId,
@@ -180,10 +180,11 @@ export async function sendMessageClient(input: SendMessageInput) {
       type: "whatsapp",
       metadata: queuedMetadata,
     })
-    .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata")
-    .single();
+    .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata");
 
-  if (messageError || !message) throw new Error(messageError?.message || "Falha ao criar mensagem.");
+  if (messageError) throw new Error(messageError.message);
+  if (!messageData || messageData.length === 0) throw new Error("Falha ao criar mensagem.");
+  const message = messageData[0];
 
   await supabase
     .from("conversations")
