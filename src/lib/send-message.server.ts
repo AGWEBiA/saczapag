@@ -295,7 +295,7 @@ export async function sendMessageServer(
   if (!phone) throw new Error("Telefone do contato não encontrado.");
   if (!instanceName) throw new Error("Instância WhatsApp não encontrada para esta conversa.");
 
-  const queuedMetadata = { delivery_status: "sending", sending_at: new Date().toISOString() };
+  const queuedMetadata = { delivery_status: "queued", queued_at: new Date().toISOString() };
   const { data: messageData, error: messageError } = await supabase
     .from("messages")
     .insert({
@@ -321,19 +321,22 @@ export async function sendMessageServer(
     .eq("id", input.conversationId);
 
   try {
-    const config = await resolveEvolutionConfig(supabase);
-    // Removemos assertInstanceOpen para economizar tempo e latência, 
-    // confiando que o sendText reportará o erro se a conexão estiver caída.
-    const recipient = await resolveWhatsAppRecipient(config, instanceName, phone, isGroup);
-    const evolutionMessageId = await sendText(config, instanceName, recipient, content);
-    return await updateMessage(
-      supabase,
-      message,
-      { delivery_status: "sent", sent_at: new Date().toISOString() },
-      evolutionMessageId,
-    );
+    const { error } = await supabase.functions.invoke("send-message", {
+      body: {
+        conversationId: input.conversationId,
+        existingMessageId: message.id,
+        content,
+        phone,
+        senderName: input.senderName || "Agente",
+        isGroup,
+      },
+    });
+
+    if (error) throw new Error(error.message || "Falha ao acionar envio pela Evolution.");
+
+    return message;
   } catch (error: unknown) {
-    console.error("Erro no envio WhatsApp:", error);
+    console.error("Erro ao enfileirar envio WhatsApp:", error);
     return await updateMessage(supabase, message, {
       delivery_status: "failed",
       failed_at: new Date().toISOString(),

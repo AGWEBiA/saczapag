@@ -9,6 +9,10 @@ const corsHeaders = {
 
 type SupabaseClientLike = any;
 
+const edgeRuntime = globalThis as unknown as {
+  EdgeRuntime?: { waitUntil?: (promise: Promise<unknown>) => void };
+};
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -152,7 +156,7 @@ async function postEvolutionText(
       },
       body: JSON.stringify(body),
     },
-    12000,
+    45000,
   );
 
   if (!response.ok) {
@@ -167,7 +171,16 @@ async function resolveWhatsAppRecipient(
   apiKey: string,
   instanceName: string,
   phone: string,
+  isGroup = false,
 ) {
+  if (phone.includes("@")) return phone;
+
+  if (isGroup) {
+    const groupId = String(phone).replace(/@.+$/, "").replace(/\D/g, "");
+    if (!groupId) throw new Error(`ID do grupo inválido para envio: ${phone}`);
+    return `${groupId}@g.us`;
+  }
+
   const cleanPhone = String(phone).replace(/@.+$/, "").replace(/\D/g, "");
   if (cleanPhone.length < 10) {
     throw new Error(`Telefone inválido para envio: ${phone}`);
@@ -203,10 +216,17 @@ async function sendViaEvolution(params: {
   instanceName: string;
   phone: string;
   content: string;
+  isGroup?: boolean;
 }) {
-  const { supabase, instanceName, phone, content } = params;
+  const { supabase, instanceName, phone, content, isGroup = false } = params;
   const { apiUrl, apiKey } = await resolveEvolutionConfig(supabase);
-  const evolutionRecipient = await resolveWhatsAppRecipient(apiUrl, apiKey, instanceName, phone);
+  const evolutionRecipient = await resolveWhatsAppRecipient(
+    apiUrl,
+    apiKey,
+    instanceName,
+    phone,
+    isGroup,
+  );
 
   // Verifica se a instância está conectada antes de tentar enviar.
   // Se não estiver "open", o sendText do Evolution trava aguardando o socket.
@@ -233,8 +253,9 @@ async function sendToWhatsApp(params: {
   instance: any;
   phone: string;
   content: string;
+  isGroup?: boolean;
 }) {
-  const { supabase, instance, phone, content } = params;
+  const { supabase, instance, phone, content, isGroup = false } = params;
 
   if (instance?.evolution_instance_name) {
     return await sendViaEvolution({
@@ -242,6 +263,7 @@ async function sendToWhatsApp(params: {
       instanceName: instance.evolution_instance_name,
       phone,
       content,
+      isGroup,
     });
   }
 
@@ -286,8 +308,9 @@ async function processWhatsAppSend(params: {
   instance: any;
   phone: string;
   content: string;
+  isGroup?: boolean;
 }) {
-  const { supabase, messageId, instance, phone, content } = params;
+  const { supabase, messageId, instance, phone, content, isGroup = false } = params;
 
   const sendingMetadata = {
     delivery_status: "sending",
@@ -301,6 +324,7 @@ async function processWhatsAppSend(params: {
       instance,
       phone,
       content,
+      isGroup,
     });
 
     const sentMetadata = {
@@ -333,7 +357,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const { conversationId, content, phone, senderName } = await req.json();
+    const { conversationId, content, phone, senderName, existingMessageId } = await req.json();
 
     if (!conversationId || !content || !phone) {
       throw new Error("Conversation, content and phone are required");
@@ -347,20 +371,32 @@ serve(async (req) => {
 
     if (convError || !conversation) throw new Error("Conversation not found");
 
-    const { data: message, error: dbError } = await supabase
-      .from("messages")
-      .insert({
-        conversation_id: conversationId,
-        direction: "outbound",
-        content: content,
-        sender_name: senderName,
-        metadata: {
-          delivery_status: "queued",
-          queued_at: new Date().toISOString(),
-        },
-      })
-      .select()
-      .single();
+    const queuedMetadata = {
+      delivery_status: "queued",
+      queued_at: new Date().toISOString(),
+    };
+
+    const messageQuery = existingMessageId
+      ? supabase
+          .from("messages")
+          .update({ metadata: queuedMetadata })
+          .eq("id", existingMessageId)
+          .eq("conversation_id", conversationId)
+          .select()
+          .single()
+      : supabase
+          .from("messages")
+          .insert({
+            conversation_id: conversationId,
+            direction: "outbound",
+            content: content,
+            sender_name: senderName,
+            metadata: queuedMetadata,
+          })
+          .select()
+          .single();
+
+    const { data: message, error: dbError } = await messageQuery;
 
     if (dbError) throw dbError;
 
@@ -372,18 +408,24 @@ serve(async (req) => {
       })
       .eq("id", conversationId);
 
-    const sendResult = await processWhatsAppSend({
+    const backgroundTask = processWhatsAppSend({
       supabase,
       messageId: message.id,
       instance: conversation.instance,
       phone,
       content,
+      isGroup: Boolean(conversation.is_group),
+    }).catch((error: any) => {
+      console.error("[send-message] background task failed:", error?.message || String(error));
     });
+
+    if (edgeRuntime.EdgeRuntime?.waitUntil) {
+      edgeRuntime.EdgeRuntime.waitUntil(backgroundTask);
+    }
 
     return jsonResponse({
       ...message,
-      evolution_message_id: sendResult.evolutionMessageId ?? message.evolution_message_id,
-      metadata: sendResult.metadata,
+      metadata: queuedMetadata,
     });
   } catch (error: any) {
     return jsonResponse({ error: error?.message || String(error) }, 400);
