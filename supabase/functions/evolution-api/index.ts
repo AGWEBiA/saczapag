@@ -32,6 +32,18 @@ function mapEvolutionInstance(item: any) {
   };
 }
 
+async function ensureGroupsEnabled(evolutionUrl: string, apiKey: string, instanceName: string) {
+  try {
+    await fetch(`${evolutionUrl}/settings/set/${encodeURIComponent(instanceName)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: apiKey },
+      body: JSON.stringify({ groupsIgnore: false, alwaysOnline: true, readMessages: false, readStatus: false }),
+    });
+  } catch (error) {
+    console.warn("Falha ao aplicar settings de grupos:", error);
+  }
+}
+
 async function fetchEvolutionJson(url: string, apiKey: string, ms = 8000) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
@@ -152,6 +164,7 @@ serve(async (req) => {
 
       case "fetch-groups": {
         if (!instanceName) throw new Error("instanceName é obrigatório");
+        await ensureGroupsEnabled(evolutionUrl, EVOLUTION_API_KEY, instanceName);
         
         // Tentamos primeiro /group que é o padrão v2, se falhar tentamos /chat (v1/legado)
         let response = await fetch(`${evolutionUrl}/group/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=false`, {
@@ -250,12 +263,17 @@ serve(async (req) => {
 
       case "set-webhook": {
         const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-webhook`;
-        const events = ["MESSAGES_UPSERT", "CONNECTION_UPDATE", "QRCODE_UPDATED"];
+        await ensureGroupsEnabled(evolutionUrl, EVOLUTION_API_KEY, instanceName);
+        const events = ["MESSAGES_UPSERT", "SEND_MESSAGE", "CONNECTION_UPDATE", "QRCODE_UPDATED"];
         const response = await fetch(`${evolutionUrl}/webhook/set/${instanceName}`, {
           method: "POST",
           headers: { "Content-Type": "application/json", apikey: EVOLUTION_API_KEY },
           body: JSON.stringify({
-            webhook: { enabled: true, url: webhookUrl, byEvents: false, base64: false, events },
+            enabled: true,
+            url: webhookUrl,
+            webhookByEvents: false,
+            webhookBase64: false,
+            events,
           }),
         });
         result = await response.json().catch(() => ({}));
@@ -263,7 +281,7 @@ serve(async (req) => {
           const r2 = await fetch(`${evolutionUrl}/webhook/set/${instanceName}`, {
             method: "POST",
             headers: { "Content-Type": "application/json", apikey: EVOLUTION_API_KEY },
-            body: JSON.stringify({ url: webhookUrl, enabled: true, events }),
+            body: JSON.stringify({ webhook: { enabled: true, url: webhookUrl, byEvents: false, base64: false, events } }),
           });
           result = await r2.json().catch(() => ({}));
         }
