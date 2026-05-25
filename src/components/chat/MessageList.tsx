@@ -213,6 +213,10 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
   const failed = isOutbound && deliveryStatus === "failed";
   const sending = isOutbound && (deliveryStatus === "queued" || deliveryStatus === "sending");
   const sent = isOutbound && (deliveryStatus === "sent" || !!msg.evolution_message_id);
+  const createdAt = msg.created_at ? new Date(msg.created_at) : null;
+  const messageTime = createdAt && !Number.isNaN(createdAt.getTime())
+    ? format(createdAt, "HH:mm", { locale: ptBR })
+    : "--:--";
 
   return (
     <div className="group/bubble flex flex-col items-start w-full">
@@ -258,7 +262,7 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
                 : "text-muted-foreground",
           )}
         >
-          {format(new Date(msg.created_at), "HH:mm", { locale: ptBR })}
+          {messageTime}
         </span>
         {isOutbound && (
           <span
