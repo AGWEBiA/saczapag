@@ -271,7 +271,7 @@ export function InstanceList() {
   });
   const syncGroupsMutation = useMutation({
     mutationFn: async (instanceId: string) => {
-      const result = await syncGroupsFn({ data: instanceId });
+      const result = await syncGroups(instanceId);
       return result;
     },
     onSuccess: (data) => {
