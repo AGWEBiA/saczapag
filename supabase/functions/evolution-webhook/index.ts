@@ -14,6 +14,15 @@ function normalizeConnectionStatus(value: unknown) {
   return null;
 }
 
+function asArray(value: unknown): any[] {
+  if (Array.isArray(value)) return value;
+  return value ? [value] : [];
+}
+
+function unwrapMessageData(data: any) {
+  return data?.key && data?.message ? data : data?.messages?.[0] || data?.message || data;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -58,20 +67,24 @@ serve(async (req) => {
     }
 
     if (evNorm === "messages.upsert") {
-      const key = data.key;
-      const message = data.message;
+      const item = unwrapMessageData(data);
+      const key = item?.key;
+      const message = item?.message;
       if (!message || !key) {
-        return new Response(JSON.stringify({ ok: true, skipped: "fromMe/empty" }), {
+        return new Response(JSON.stringify({ ok: true, skipped: "empty-message" }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       const remoteJid: string = key.remoteJid;
       const isGroup = remoteJid.endsWith("@g.us");
-      const pushName = key.fromMe ? "Você" : data.pushName || data.participant || "Contato";
+      const direction = key.fromMe ? "outbound" : "inbound";
+      const pushName = key.fromMe ? "Você" : item.pushName || item.participant || data.participant || "Contato";
       const content =
         message.conversation ||
         message.extendedTextMessage?.text ||
+        message.ephemeralMessage?.message?.conversation ||
+        message.ephemeralMessage?.message?.extendedTextMessage?.text ||
         message.imageMessage?.caption ||
         message.videoMessage?.caption ||
         "[Mídia]";
@@ -92,7 +105,7 @@ serve(async (req) => {
       if (!contact) {
         const { data: nc } = await supabase
           .from("contacts")
-          .insert({ phone_number: remoteJid, name: isGroup ? (data.groupName || data.groupInfo?.subject || remoteJid) : pushName })
+          .insert({ phone_number: remoteJid, name: isGroup ? (item.groupName || data.groupName || item.groupInfo?.subject || data.groupInfo?.subject || remoteJid) : pushName })
           .select("id").single();
         contact = nc;
       }
@@ -115,9 +128,15 @@ serve(async (req) => {
         conversation = nc;
       }
 
-      await supabase.from("messages").insert({
+      const { data: existing } = await supabase
+        .from("messages")
+        .select("id")
+        .eq("evolution_message_id", key.id)
+        .maybeSingle();
+
+      if (!existing) await supabase.from("messages").insert({
         conversation_id: conversation!.id,
-        direction: key.fromMe ? "outbound" : "inbound",
+        direction,
         content,
         evolution_message_id: key.id,
         sender_name: pushName,
@@ -127,7 +146,7 @@ serve(async (req) => {
       await supabase.from("conversations").update({
         last_message_at: new Date().toISOString(),
         last_message_content: content,
-        unread_count: 1,
+        unread_count: direction === "inbound" ? 1 : 0,
       }).eq("id", conversation!.id);
     }
 
