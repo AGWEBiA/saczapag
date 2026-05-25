@@ -54,11 +54,18 @@ function jsonErrorMessage(prefix: string, response: Response, body: unknown) {
   );
 }
 
-async function fetchJsonWithTimeout(url: string, init: RequestInit, ms = 12000) {
+async function fetchJsonWithTimeout(url: string, init: RequestInit, ms = 30000) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
+  
+  const debugUrl = url.split("?")[0];
+  console.log(`[Evolution] Requesting: ${debugUrl} (timeout: ${ms}ms)`);
+
   try {
+    const startTime = Date.now();
     const response = await fetch(url, { ...init, signal: ctrl.signal });
+    const duration = Date.now() - startTime;
+    
     const text = await response.text();
     let body: unknown = {};
     if (text) {
@@ -68,15 +75,18 @@ async function fetchJsonWithTimeout(url: string, init: RequestInit, ms = 12000) 
         body = text;
       }
     }
+    
+    console.log(`[Evolution] Response from ${debugUrl}: ${response.status} (${duration}ms)`);
     return { response, body };
   } catch (error: unknown) {
     if (error instanceof Error && error.name === "AbortError") {
       const timeoutError = new Error(
-        `Evolution não confirmou o envio em ${Math.round(ms / 1000)}s`,
+        `Evolution não confirmou a operação em ${Math.round(ms / 1000)}s (${debugUrl})`,
       );
       timeoutError.name = "TimeoutError";
       throw timeoutError;
     }
+    console.error(`[Evolution] Error in ${debugUrl}:`, error);
     throw error;
   } finally {
     clearTimeout(timer);
@@ -125,7 +135,7 @@ async function resolveWhatsAppRecipient(
         headers: { "Content-Type": "application/json", apikey: config.apiKey },
         body: JSON.stringify({ numbers: [number] }),
       },
-      8000,
+      15000,
     );
 
     if (response.ok) {
@@ -143,7 +153,7 @@ async function assertInstanceOpen(config: EvolutionConfig, instanceName: string)
   const { response, body } = await fetchJsonWithTimeout(
     `${config.apiUrl}/instance/connectionState/${encodeURIComponent(instanceName)}`,
     { method: "GET", headers: { apikey: config.apiKey } },
-    8000,
+    15000,
   );
   if (!response.ok) throw new Error(jsonErrorMessage("Evolution connectionState", response, body));
 
@@ -172,7 +182,7 @@ async function sendText(
         headers: { "Content-Type": "application/json", apikey: config.apiKey },
         body: JSON.stringify(body),
       },
-      12000,
+      35000,
     );
 
   let { response, body } = await request({ number, text });
