@@ -210,13 +210,18 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
   const deliveryStatus = msg.metadata?.delivery_status as string | undefined;
   const deliveryError = msg.metadata?.error as string | undefined;
   const isOutbound = msg.direction === "outbound" && !msg.is_internal;
-  const failed = isOutbound && deliveryStatus === "failed";
-  const sending = isOutbound && (deliveryStatus === "queued" || deliveryStatus === "sending");
-  const sent = isOutbound && (deliveryStatus === "sent" || !!msg.evolution_message_id);
   const createdAt = msg.created_at ? new Date(msg.created_at) : null;
+  const minutesSinceCreated = createdAt && !Number.isNaN(createdAt.getTime())
+    ? (Date.now() - createdAt.getTime()) / 60000
+    : 0;
+  const stalePending = isOutbound && !msg.evolution_message_id && (deliveryStatus === "queued" || deliveryStatus === "sending") && minutesSinceCreated > 2;
+  const failed = isOutbound && (deliveryStatus === "failed" || stalePending);
+  const sending = isOutbound && !failed && (deliveryStatus === "queued" || deliveryStatus === "sending");
+  const sent = isOutbound && (deliveryStatus === "sent" || !!msg.evolution_message_id);
   const messageTime = createdAt && !Number.isNaN(createdAt.getTime())
     ? format(createdAt, "HH:mm", { locale: ptBR })
     : "--:--";
+  const visibleDeliveryError = deliveryError || (stalePending ? "Envio não confirmado pelo WhatsApp. Verifique se a instância está conectada." : null);
 
   return (
     <div className="group/bubble flex flex-col items-start w-full">
@@ -271,7 +276,7 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
               failed && "text-red-200 opacity-100",
               !failed && "text-primary-foreground",
             )}
-            title={deliveryError}
+            title={visibleDeliveryError ?? undefined}
           >
             {failed ? (
               <>
@@ -289,8 +294,8 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
           </span>
         )}
       </div>
-      {failed && deliveryError && (
-        <span className="mt-2 text-[10px] leading-tight text-red-100 bg-red-900/20 p-2 rounded-lg font-medium border border-red-500/20">{deliveryError}</span>
+      {failed && visibleDeliveryError && (
+        <span className="mt-2 text-[10px] leading-tight text-red-100 bg-red-900/20 p-2 rounded-lg font-medium border border-red-500/20">{visibleDeliveryError}</span>
       )}
       </div>
     </div>
