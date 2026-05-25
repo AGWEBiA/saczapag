@@ -10,7 +10,13 @@ function normalizeConnectionStatus(value: unknown) {
   const state = String(value || "unknown").toLowerCase();
   if (state === "open" || state === "connected") return "connected";
   if (state.includes("connect") && !state.includes("dis")) return "connecting";
-  if (state === "close" || state === "closed" || state === "disconnected" || state.includes("logout")) return "disconnected";
+  if (
+    state === "close" ||
+    state === "closed" ||
+    state === "disconnected" ||
+    state.includes("logout")
+  )
+    return "disconnected";
   return null;
 }
 
@@ -23,11 +29,19 @@ function extractMessageKeyId(item: any) {
 }
 
 function extractRemoteJid(item: any, data: any) {
-  return item?.key?.remoteJid || item?.message?.key?.remoteJid || data?.key?.remoteJid || data?.remoteJid || null;
+  return (
+    item?.key?.remoteJid ||
+    item?.message?.key?.remoteJid ||
+    data?.key?.remoteJid ||
+    data?.remoteJid ||
+    null
+  );
 }
 
 function extractFromMe(item: any, data: any) {
-  return Boolean(item?.key?.fromMe ?? item?.message?.key?.fromMe ?? data?.key?.fromMe ?? data?.fromMe);
+  return Boolean(
+    item?.key?.fromMe ?? item?.message?.key?.fromMe ?? data?.key?.fromMe ?? data?.fromMe,
+  );
 }
 
 function extractContent(item: any, message: any) {
@@ -49,7 +63,7 @@ serve(async (req) => {
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   );
 
   try {
@@ -74,9 +88,12 @@ serve(async (req) => {
       const ownerJid = data?.ownerJid || data?.instance?.ownerJid || data?.instance?.owner;
       const status = ownerJid ? "connected" : normalizeConnectionStatus(state);
       if (!status) {
-        return new Response(JSON.stringify({ ok: true, skipped: `unknown connection state: ${state}` }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ ok: true, skipped: `unknown connection state: ${state}` }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
       }
       await supabase
         .from("whatsapp_instances")
@@ -102,7 +119,9 @@ serve(async (req) => {
 
       const isGroup = remoteJid.endsWith("@g.us");
       const direction = fromMe ? "outbound" : "inbound";
-      const pushName = fromMe ? "Você" : item.pushName || item.participant || data.participant || "Contato";
+      const pushName = fromMe
+        ? "Você"
+        : item.pushName || item.participant || data.participant || "Contato";
       const content = extractContent(item, message);
 
       const { data: instance } = await supabase
@@ -117,17 +136,31 @@ serve(async (req) => {
       }
 
       let { data: contact } = await supabase
-        .from("contacts").select("id").eq("phone_number", remoteJid).maybeSingle();
+        .from("contacts")
+        .select("id")
+        .eq("phone_number", remoteJid)
+        .maybeSingle();
       if (!contact) {
         const { data: nc } = await supabase
           .from("contacts")
-          .insert({ phone_number: remoteJid, name: isGroup ? (item.groupName || data.groupName || item.groupInfo?.subject || data.groupInfo?.subject || remoteJid) : pushName })
-          .select("id").single();
+          .insert({
+            phone_number: remoteJid,
+            name: isGroup
+              ? item.groupName ||
+                data.groupName ||
+                item.groupInfo?.subject ||
+                data.groupInfo?.subject ||
+                remoteJid
+              : pushName,
+          })
+          .select("id")
+          .single();
         contact = nc;
       }
 
       let { data: conversation } = await supabase
-        .from("conversations").select("id")
+        .from("conversations")
+        .select("id")
         .eq("contact_id", contact!.id)
         .eq("instance_id", instance.id)
         .maybeSingle();
@@ -140,7 +173,8 @@ serve(async (req) => {
             is_group: isGroup,
             status: "aberta",
           })
-          .select("id").single();
+          .select("id")
+          .single();
         conversation = nc;
       }
 
@@ -167,7 +201,10 @@ serve(async (req) => {
             .maybeSingle();
 
           if (pendingLookupError) {
-            console.error("[evolution-webhook] failed to lookup outbound message:", pendingLookupError.message);
+            console.error(
+              "[evolution-webhook] failed to lookup outbound message:",
+              pendingLookupError.message,
+            );
           }
 
           if (pendingOutbound?.id) {
@@ -183,7 +220,10 @@ serve(async (req) => {
               .eq("id", pendingOutbound.id);
 
             if (reconcileError) {
-              console.error("[evolution-webhook] failed to reconcile outbound message:", reconcileError.message);
+              console.error(
+                "[evolution-webhook] failed to reconcile outbound message:",
+                reconcileError.message,
+              );
             } else {
               reconciledExistingOutbound = true;
             }
@@ -192,24 +232,28 @@ serve(async (req) => {
 
         if (!reconciledExistingOutbound) {
           await supabase.from("messages").insert({
-          conversation_id: conversation!.id,
-          direction,
-          content,
-          evolution_message_id: keyId,
-          sender_name: pushName,
-          type: "whatsapp",
-            metadata: direction === "outbound"
-              ? { delivery_status: "sent", sent_at: new Date().toISOString() }
-              : undefined,
+            conversation_id: conversation!.id,
+            direction,
+            content,
+            evolution_message_id: keyId,
+            sender_name: pushName,
+            type: "whatsapp",
+            metadata:
+              direction === "outbound"
+                ? { delivery_status: "sent", sent_at: new Date().toISOString() }
+                : undefined,
           });
         }
       }
 
-      await supabase.from("conversations").update({
-        last_message_at: new Date().toISOString(),
-        last_message_content: content,
-        unread_count: direction === "inbound" ? 1 : 0,
-      }).eq("id", conversation!.id);
+      await supabase
+        .from("conversations")
+        .update({
+          last_message_at: new Date().toISOString(),
+          last_message_content: content,
+          unread_count: direction === "inbound" ? 1 : 0,
+        })
+        .eq("id", conversation!.id);
     }
 
     return new Response(JSON.stringify({ ok: true }), {
