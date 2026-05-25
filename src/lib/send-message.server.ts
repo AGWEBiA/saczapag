@@ -413,7 +413,7 @@ async function queueMessageViaEdgeFunction(payload: {
       },
       body: JSON.stringify(payload),
     },
-    15000,
+    70000,
   );
 
   if (!response.ok) {
