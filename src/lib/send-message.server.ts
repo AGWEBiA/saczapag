@@ -378,6 +378,56 @@ async function updateMessage(
   }
 }
 
+async function queueMessageViaEdgeFunction(payload: {
+  conversationId: string;
+  content: string;
+  phone: string;
+  senderName?: string;
+  senderUserId: string;
+}) {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_PUBLISHABLE_KEY ||
+    process.env.SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !serviceKey) {
+    throw new Error("Configuração do Supabase indisponível para enfileirar o envio.");
+  }
+
+  const endpoint = `${supabaseUrl.replace(/\/$/, "")}/functions/v1/send-message`;
+  console.log("[sendMessageServer] Enfileirando envio via Edge Function", {
+    conversationId: payload.conversationId,
+    endpoint,
+    phone: payload.phone,
+  });
+
+  const { response, body } = await fetchJsonWithTimeout(
+    endpoint,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify(payload),
+    },
+    15000,
+  );
+
+  if (!response.ok) {
+    throw new Error(jsonErrorMessage("Edge Function send-message", response, body));
+  }
+
+  const queuedMessage = asRecord(body);
+  if (!asMessage(queuedMessage.id)) {
+    throw new Error("A Edge Function send-message não retornou a mensagem enfileirada.");
+  }
+
+  return body as MessageRow;
+}
+
 export async function sendMessageServer(
   input: SendMessageInput,
   userId: string,
@@ -388,9 +438,7 @@ export async function sendMessageServer(
 
   const { data: conversationData, error: conversationError } = await supabase
     .from("conversations")
-    .select(
-      "id, is_group, contact:contacts(phone_number), instance:whatsapp_instances(evolution_instance_name)",
-    )
+    .select("id, is_group, contact:contacts(phone_number)")
     .eq("id", input.conversationId);
 
   if (conversationError) throw new Error(conversationError.message);
@@ -399,70 +447,13 @@ export async function sendMessageServer(
 
   const conversationRecord = asRecord(conversation);
   const phone = asMessage(asRecord(conversationRecord.contact).phone_number);
-  const instanceName = asMessage(asRecord(conversationRecord.instance).evolution_instance_name);
-  const isGroup = !!conversationRecord.is_group;
   if (!phone) throw new Error("Telefone do contato não encontrado.");
-  if (!instanceName) throw new Error("Instância WhatsApp não encontrada para esta conversa.");
 
-  const config = await resolveEvolutionConfig(supabase);
-  await assertEvolutionInstanceOpen(config, instanceName);
-  const recipient = await resolveWhatsAppRecipient(config, instanceName, phone, isGroup);
-  if (isGroup && recipient.endsWith("@g.us")) {
-    await ensureEvolutionGroupReady(config, instanceName, recipient);
-  }
-
-  const queuedMetadata = { delivery_status: "queued", queued_at: new Date().toISOString() };
-  const { data: messageData, error: messageError } = await supabase
-    .from("messages")
-    .insert({
-      conversation_id: input.conversationId,
-      direction: "outbound",
-      content,
-      sender_user_id: userId,
-      sender_name: input.senderName || "Agente",
-      type: "whatsapp",
-      metadata: queuedMetadata,
-    })
-    .select(
-      "id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata",
-    );
-
-  if (messageError) throw new Error(messageError.message);
-  const message = messageData?.[0] as MessageRow | undefined;
-  if (!message) throw new Error("Falha ao criar mensagem.");
-
-  await supabase
-    .from("conversations")
-    .update({ last_message_at: new Date().toISOString(), last_message_content: content })
-    .eq("id", input.conversationId);
-
-  try {
-    const evolutionMessageId = await sendText(config, instanceName, recipient, content, isGroup);
-    return await updateMessage(
-      supabase,
-      message,
-      { delivery_status: "sent", sent_at: new Date().toISOString() },
-      evolutionMessageId,
-    );
-  } catch (error: unknown) {
-    const errMsg = error instanceof Error ? error.message : String(error);
-    const isTimeout = error instanceof Error && error.name === "TimeoutError";
-    console.error("Erro ao enviar WhatsApp pela Evolution:", errMsg);
-
-    // Timeout HTTP da Evolution geralmente significa que a mensagem foi enviada
-    // mas o socket demorou pra responder. O webhook SEND_MESSAGE confirma depois.
-    if (isTimeout) {
-      return await updateMessage(supabase, message, {
-        delivery_status: "pending",
-        pending_at: new Date().toISOString(),
-        note: "Evolution não respondeu a tempo; aguardando confirmação via webhook.",
-      });
-    }
-
-    return await updateMessage(supabase, message, {
-      delivery_status: "failed",
-      failed_at: new Date().toISOString(),
-      error: errMsg,
-    });
-  }
+  return queueMessageViaEdgeFunction({
+    conversationId: input.conversationId,
+    content,
+    phone,
+    senderName: input.senderName || "Agente",
+    senderUserId: userId,
+  });
 }
