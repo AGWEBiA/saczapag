@@ -214,7 +214,7 @@ export function HelpGuide() {
               </div>
             </TabsContent>
 
-            <TabsContent value="faq" className="m-0 space-y-6 pb-8">
+            <TabsContent value="faq" className="m-0 space-y-6 pb-8 focus-visible:outline-none">
               <FaqItem 
                 question="O cliente vê as notas internas?" 
                 answer="Não. Notas internas (amarelas) são exclusivas para os membros da equipe que utilizam este sistema. No WhatsApp do cliente, nada aparece."
