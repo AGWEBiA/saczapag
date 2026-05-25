@@ -625,10 +625,14 @@ serve(async (req) => {
       instanceName: conversation.instance?.evolution_instance_name ?? null,
     });
 
-    const sendResult = await processWhatsAppSend({
+      const sendResult = await processWhatsAppSend({
       supabase,
       messageId: message.id,
-      instance: conversation.instance,
+        instance: {
+          ...conversation.instance,
+          contactId: conversation.contact_id,
+          contactName: conversation.contact?.name ?? null,
+        },
       phone,
       content,
       isGroup: Boolean(conversation.is_group),
