@@ -462,6 +462,8 @@ async function sendToWhatsApp(params: {
       content,
       isGroup,
       skipPreflight: false,
+      contactId: instance.contactId,
+      contactName: instance.contactName,
     });
   }
 
