@@ -232,6 +232,36 @@ async function resolveWhatsAppRecipient(
   return String(checked?.number || cleanPhone).replace(/\D/g, "");
 }
 
+async function ensureEvolutionGroupReady(
+  apiUrl: string,
+  apiKey: string,
+  instanceName: string,
+  groupJid: string,
+) {
+  const headers = { "Content-Type": "application/json", apikey: apiKey };
+  await fetchJsonWithFullTimeout(
+    `${apiUrl}/settings/set/${encodeURIComponent(instanceName)}`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ groupsIgnore: false }),
+    },
+    5000,
+  ).catch((error) => {
+    console.warn("[send-message] could not force groupsIgnore=false:", error?.message || String(error));
+  });
+
+  for (const url of [
+    `${apiUrl}/group/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=false`,
+    `${apiUrl}/chat/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=false`,
+  ]) {
+    const result = await fetchJsonWithFullTimeout(url, { method: "GET", headers }, 8000).catch(() => null);
+    if (!result?.response.ok) continue;
+    const groups = Array.isArray(result.body) ? result.body : [result.body];
+    if (groups.some((group: any) => group?.id === groupJid || group?.remoteJid === groupJid)) return;
+  }
+}
+
 async function sendViaEvolution(params: {
   supabase: SupabaseClientLike;
   instanceName: string;
@@ -246,6 +276,10 @@ async function sendViaEvolution(params: {
     ? phone
     : await resolveWhatsAppRecipient(apiUrl, apiKey, instanceName, phone, isGroup);
 
+  const normalizedGroupRecipient = isGroup && !evolutionRecipient.endsWith("@g.us")
+    ? `${String(evolutionRecipient).replace(/@.+$/, "").replace(/\D/g, "")}@g.us`
+    : evolutionRecipient;
+
   // Verifica se a instância está conectada antes de tentar enviar.
   // Se não estiver "open", o sendText do Evolution trava aguardando o socket.
   if (!skipPreflight) {
@@ -259,16 +293,18 @@ async function sendViaEvolution(params: {
   }
 
   const sendUrl = `${apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
-  const groupNumber = evolutionRecipient.endsWith("@g.us")
-    ? evolutionRecipient.replace(/@g\.us$/, "")
-    : evolutionRecipient;
+  if (isGroup) await ensureEvolutionGroupReady(apiUrl, apiKey, instanceName, normalizedGroupRecipient);
+
+  const groupNumber = normalizedGroupRecipient.endsWith("@g.us")
+    ? normalizedGroupRecipient.replace(/@g\.us$/, "")
+    : normalizedGroupRecipient;
   const candidateNumbers = isGroup
-    ? Array.from(new Set([groupNumber, evolutionRecipient]))
-    : [evolutionRecipient];
-  const payloads = candidateNumbers.flatMap((candidate) => [
-    { number: candidate, text: content, delay: 0, linkPreview: false },
-    { number: candidate, textMessage: { text: content }, delay: 0, linkPreview: false },
-  ]);
+    ? Array.from(new Set([normalizedGroupRecipient, groupNumber]))
+    : [normalizedGroupRecipient];
+  const payloads = candidateNumbers.flatMap((candidate) => {
+    const base = { number: candidate, text: content, delay: 0, linkPreview: false };
+    return [base, { ...base, textMessage: { text: content } }];
+  });
 
   let result: any = null;
   let lastError: unknown = null;
