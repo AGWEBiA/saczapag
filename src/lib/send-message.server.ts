@@ -411,22 +411,6 @@ export async function sendMessageServer(
       { delivery_status: "sent", sent_at: new Date().toISOString() },
       evolutionMessageId,
     );
-
-    /* const { error } = await supabase.functions.invoke("send-message", {
-      body: {
-        conversationId: input.conversationId,
-        existingMessageId: message.id,
-        content,
-        phone: recipient,
-        senderName: input.senderName || "Agente",
-        isGroup,
-        skipPreflight: true,
-      },
-    });
-
-    if (error) throw new Error(error.message || "Falha ao acionar envio pela Evolution.");
-
-    return message; */
   } catch (error: unknown) {
     console.error("Erro ao enviar WhatsApp pela Evolution:", error);
     return await updateMessage(supabase, message, {
