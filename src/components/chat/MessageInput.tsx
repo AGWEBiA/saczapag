@@ -108,6 +108,11 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
     },
     onSuccess: (data) => {
       setContent("");
+      const deliveryStatus = data?.metadata?.delivery_status;
+      const deliveryError = typeof data?.metadata?.error === "string" ? data.metadata.error : null;
+      if (deliveryStatus === "failed") {
+        toast.error(`Mensagem não enviada: ${deliveryError || "falha na confirmação do WhatsApp."}`);
+      }
       if (data?.id) {
         queryClient.setQueryData<CachedMessages>(["messages", conversationId], (old) => {
           if (!old) return old;
