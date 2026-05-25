@@ -263,7 +263,7 @@ async function sendViaEvolution(params: {
     ? evolutionRecipient.replace(/@g\.us$/, "")
     : evolutionRecipient;
   const candidateNumbers = isGroup
-    ? Array.from(new Set([groupNumber, evolutionRecipient]))
+    ? Array.from(new Set([evolutionRecipient, groupNumber]))
     : [evolutionRecipient];
   const payloads = candidateNumbers.flatMap((candidate) => [
     { number: candidate, text: content, delay: 0, linkPreview: false },
