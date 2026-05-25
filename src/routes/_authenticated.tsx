@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Users2, Activity, Bell, Search } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { HelpGuide } from "@/components/shared/HelpGuide";
 import { Input } from "@/components/ui/input";
 import { MentionNotificationHandler } from "@/components/chat/MentionNotificationHandler";
 
@@ -115,6 +116,7 @@ function AuthenticatedLayout() {
           </div>
           
           <div className="flex items-center gap-2 lg:gap-4">
+            <HelpGuide />
             <NotificationCenter />
             
             <div className="h-8 w-[1px] bg-border mx-2" />

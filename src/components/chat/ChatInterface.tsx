@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { ChatSidebar } from "./ChatSidebar";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
-import { MessageSquare, User, Phone, Calendar, FileText, Info, HelpCircle, Tag, X, Plus, ChevronLeft, Menu } from "lucide-react";
+import { MessageSquare, User, Phone, Calendar, FileText, Info, HelpCircle, Tag, X, Plus, ChevronLeft, Menu, BookOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
@@ -255,7 +255,10 @@ export function ChatInterface() {
                     </DialogTrigger>
                     <DialogContent className="max-w-2xl">
                       <DialogHeader>
-                        <DialogTitle>Guia de Atendimento AG SAC</DialogTitle>
+                        <DialogTitle className="flex items-center gap-2">
+                          <BookOpen className="h-5 w-5 text-primary" />
+                          Manual de Atendimento AG SAC
+                        </DialogTitle>
                         <DialogDescription>
                           Aprenda a utilizar as principais ferramentas do sistema.
                         </DialogDescription>
