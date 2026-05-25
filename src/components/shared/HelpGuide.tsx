@@ -157,7 +157,7 @@ export function HelpGuide() {
               </section>
             </TabsContent>
 
-            <TabsContent value="guide" className="m-0 space-y-8 pb-8">
+            <TabsContent value="guide" className="m-0 space-y-8 pb-8 focus-visible:outline-none">
               <div className="space-y-6">
                 <div className="p-4 bg-primary/5 rounded-2xl border border-primary/20">
                   <h3 className="font-bold flex items-center gap-2 mb-2">
