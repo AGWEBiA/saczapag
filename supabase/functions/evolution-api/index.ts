@@ -161,10 +161,10 @@ serve(async (req) => {
       }
 
       case "debug-instances": {
-        const response = await fetch(`${evolutionUrl}/instance/fetchInstances`, {
+        const response = await fetchWithTimeout(`${evolutionUrl}/instance/fetchInstances`, {
           method: "GET",
           headers: { "apikey": EVOLUTION_API_KEY },
-        });
+        }, 8000);
         const instances = await response.json().catch(() => []);
         if (!response.ok) {
           throw new Error(instances?.message || instances?.error || `Evolution API retornou ${response.status}`);
@@ -177,18 +177,17 @@ serve(async (req) => {
         if (!instanceName) throw new Error("instanceName é obrigatório");
         await ensureGroupsEnabled(evolutionUrl, EVOLUTION_API_KEY, instanceName);
         
-        // Tentamos primeiro /group que é o padrão v2, se falhar tentamos /chat (v1/legado)
-        let response = await fetch(`${evolutionUrl}/group/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=false`, {
+        let response = await fetchWithTimeout(`${evolutionUrl}/group/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=false`, {
           method: "GET",
           headers: { "apikey": EVOLUTION_API_KEY },
-        });
+        }, 20000);
 
         if (!response.ok) {
           console.log(`Falha em /group (${response.status}), tentando /chat...`);
-          response = await fetch(`${evolutionUrl}/chat/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=false`, {
+          response = await fetchWithTimeout(`${evolutionUrl}/chat/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=false`, {
             method: "GET",
             headers: { "apikey": EVOLUTION_API_KEY },
-          });
+          }, 20000);
         }
 
         const groups = await response.json().catch(() => []);
@@ -200,7 +199,7 @@ serve(async (req) => {
       }
 
       case "create-instance": {
-        const response = await fetch(`${evolutionUrl}/instance/create`, {
+        const response = await fetchWithTimeout(`${evolutionUrl}/instance/create`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "apikey": EVOLUTION_API_KEY },
           body: JSON.stringify({
@@ -209,7 +208,7 @@ serve(async (req) => {
             qrcode: payload?.qrcode ?? false,
             integration: payload?.integration || "WHATSAPP-BAILEYS",
           }),
-        });
+        }, 15000);
         result = await response.json();
         break;
       }
@@ -218,10 +217,10 @@ serve(async (req) => {
         const connectUrl = new URL(`${evolutionUrl}/instance/connect/${instanceName}`);
         const phoneNumber = String(payload?.number || "").replace(/\D/g, "");
         if (phoneNumber) connectUrl.searchParams.set("number", phoneNumber);
-        const response = await fetch(connectUrl.toString(), {
+        const response = await fetchWithTimeout(connectUrl.toString(), {
           method: "GET",
           headers: { "apikey": EVOLUTION_API_KEY },
-        });
+        }, 15000);
         result = await response.json();
         if (!response.ok) throw new Error(result?.message || result?.error || `Evolution API retornou ${response.status}`);
         break;
@@ -246,28 +245,28 @@ serve(async (req) => {
       }
 
       case "logout-instance": {
-        const response = await fetch(`${evolutionUrl}/instance/logout/${instanceName}`, {
+        const response = await fetchWithTimeout(`${evolutionUrl}/instance/logout/${instanceName}`, {
           method: "DELETE",
           headers: { "apikey": EVOLUTION_API_KEY },
-        });
+        }, 10000);
         result = await response.json();
         break;
       }
 
       case "restart-instance": {
-        const response = await fetch(`${evolutionUrl}/instance/restart/${instanceName}`, {
+        const response = await fetchWithTimeout(`${evolutionUrl}/instance/restart/${instanceName}`, {
           method: "POST",
           headers: { "apikey": EVOLUTION_API_KEY },
-        });
+        }, 10000);
         result = await response.json();
         break;
       }
 
       case "delete-instance": {
-        const response = await fetch(`${evolutionUrl}/instance/delete/${instanceName}`, {
+        const response = await fetchWithTimeout(`${evolutionUrl}/instance/delete/${instanceName}`, {
           method: "DELETE",
           headers: { "apikey": EVOLUTION_API_KEY },
-        });
+        }, 10000);
         result = await response.json();
         break;
       }
@@ -276,7 +275,7 @@ serve(async (req) => {
         const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-webhook`;
         await ensureGroupsEnabled(evolutionUrl, EVOLUTION_API_KEY, instanceName);
         const events = ["MESSAGES_UPSERT", "SEND_MESSAGE", "CONNECTION_UPDATE", "QRCODE_UPDATED"];
-        const response = await fetch(`${evolutionUrl}/webhook/set/${instanceName}`, {
+        const response = await fetchWithTimeout(`${evolutionUrl}/webhook/set/${instanceName}`, {
           method: "POST",
           headers: { "Content-Type": "application/json", apikey: EVOLUTION_API_KEY },
           body: JSON.stringify({
@@ -286,19 +285,20 @@ serve(async (req) => {
             webhookBase64: false,
             events,
           }),
-        });
+        }, 10000);
         result = await response.json().catch(() => ({}));
         if (!response.ok) {
-          const r2 = await fetch(`${evolutionUrl}/webhook/set/${instanceName}`, {
+          const r2 = await fetchWithTimeout(`${evolutionUrl}/webhook/set/${instanceName}`, {
             method: "POST",
             headers: { "Content-Type": "application/json", apikey: EVOLUTION_API_KEY },
             body: JSON.stringify({ webhook: { enabled: true, url: webhookUrl, byEvents: false, base64: false, events } }),
-          });
+          }, 10000);
           result = await r2.json().catch(() => ({}));
         }
         result.webhookUrl = webhookUrl;
         break;
       }
+
 
       case "webhook": {
         const { event, data } = payload;
