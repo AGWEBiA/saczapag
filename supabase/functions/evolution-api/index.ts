@@ -265,7 +265,6 @@ serve(async (req) => {
               })
               .select("id");
             contact = newContacts?.[0];
-            contact = newContact;
           }
 
           if (!contact) break;
