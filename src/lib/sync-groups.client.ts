@@ -9,7 +9,11 @@ export async function syncGroupsClient(instanceId: string) {
       .eq("id", instanceId)
       .single();
 
-    if (instanceError || !instance) throw new Error("Instância não encontrada");
+    if (instanceError) {
+      console.error("Erro ao buscar instância:", instanceError);
+      throw new Error(`Erro ao buscar instância: ${instanceError.message}`);
+    }
+    if (!instance) throw new Error("Instância não encontrada no banco de dados");
 
     const config = instance.evolution_config;
     const apiUrl = (config as any)?.api_url;
