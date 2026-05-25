@@ -445,11 +445,24 @@ export async function sendMessageServer(
       evolutionMessageId,
     );
   } catch (error: unknown) {
-    console.error("Erro ao enviar WhatsApp pela Evolution:", error);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const isTimeout = error instanceof Error && error.name === "TimeoutError";
+    console.error("Erro ao enviar WhatsApp pela Evolution:", errMsg);
+
+    // Timeout HTTP da Evolution geralmente significa que a mensagem foi enviada
+    // mas o socket demorou pra responder. O webhook SEND_MESSAGE confirma depois.
+    if (isTimeout) {
+      return await updateMessage(supabase, message, {
+        delivery_status: "pending",
+        pending_at: new Date().toISOString(),
+        note: "Evolution não respondeu a tempo; aguardando confirmação via webhook.",
+      });
+    }
+
     return await updateMessage(supabase, message, {
       delivery_status: "failed",
       failed_at: new Date().toISOString(),
-      error: error instanceof Error ? error.message : String(error),
+      error: errMsg,
     });
   }
 }
