@@ -204,6 +204,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
 }
 
 import * as React from "react";
+import { CreateTaskDialog } from "./CreateTaskDialog";
 
 const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolean }) => {
   const deliveryStatus = msg.metadata?.delivery_status as string | undefined;
@@ -214,16 +215,23 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
   const sent = isOutbound && (deliveryStatus === "sent" || !!msg.evolution_message_id);
 
   return (
-    <div
-      className={cn(
-        "flex flex-col max-w-[85%] lg:max-w-[70%] rounded-2xl p-3 lg:p-4 shadow-sm transition-all animate-in fade-in zoom-in-95 duration-300",
-        msg.is_internal
-          ? "bg-yellow-50/80 border-yellow-200/50 self-center max-w-[95%] w-full border text-yellow-900 backdrop-blur-sm mb-4"
-          : msg.direction === "outbound"
-            ? "bg-primary text-primary-foreground self-end rounded-tr-none shadow-primary/20"
-            : "bg-card self-start rounded-tl-none border-border/50 border shadow-black/5",
-      )}
-    >
+    <div className="group/bubble flex flex-col items-start w-full">
+      <div
+        className={cn(
+          "flex flex-col max-w-[85%] lg:max-w-[70%] rounded-2xl p-3 lg:p-4 shadow-sm transition-all animate-in fade-in zoom-in-95 duration-300 relative",
+          msg.is_internal
+            ? "bg-yellow-50/80 border-yellow-200/50 self-center max-w-[95%] w-full border text-yellow-900 backdrop-blur-sm mb-4"
+            : msg.direction === "outbound"
+              ? "bg-primary text-primary-foreground self-end rounded-tr-none shadow-primary/20"
+              : "bg-card self-start rounded-tl-none border-border/50 border shadow-black/5",
+        )}
+      >
+        <div className="absolute top-2 right-2 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
+           <CreateTaskDialog 
+             messageId={msg.id} 
+             initialContent={msg.content || ""} 
+           />
+        </div>
       {msg.is_internal && (
         <div className="flex items-center gap-1.5 mb-2 border-b border-yellow-200/50 pb-1">
           <Info className="h-3 w-3 text-yellow-600" />
@@ -280,6 +288,7 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
       {failed && deliveryError && (
         <span className="mt-2 text-[10px] leading-tight text-red-100 bg-red-900/20 p-2 rounded-lg font-medium border border-red-500/20">{deliveryError}</span>
       )}
+      </div>
     </div>
   );
 });
