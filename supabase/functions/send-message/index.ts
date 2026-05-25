@@ -417,6 +417,16 @@ async function sendViaEvolution(params: {
       ? `${String(evolutionRecipient).replace(/@.+$/, "").replace(/[^0-9-]/g, "")}@g.us`
       : evolutionRecipient;
 
+  console.log("[send-message] resolved recipient", {
+    instanceName,
+    isGroup,
+    requestedPhone: phone,
+    evolutionRecipient,
+    normalizedGroupRecipient,
+    contactId,
+    contactName,
+  });
+
   // Verifica se a instância está conectada antes de tentar enviar.
   // Se não estiver "open", o sendText do Evolution trava aguardando o socket.
   if (!skipPreflight) {
@@ -438,6 +448,13 @@ async function sendViaEvolution(params: {
   };
 
   const result = (await postEvolutionText(sendUrl, apiKey, payload, 45000)) as any;
+
+  console.log("[send-message] evolution accepted payload", {
+    instanceName,
+    isGroup,
+    number: normalizedGroupRecipient,
+    messageId: result?.key?.id || result?.message?.key?.id || result?.id || null,
+  });
 
   return (result?.key?.id || result?.message?.key?.id || result?.id) as string | undefined;
 }
