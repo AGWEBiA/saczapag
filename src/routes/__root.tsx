@@ -92,6 +92,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       { name: "twitter:card", content: "summary" },
       { name: "twitter:title", content: "AG SAC - WhatsApp" },
       { name: "twitter:description", content: "Sistema de Atendimento AG SAC" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
       { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/39db5246-149c-4ede-bb30-a0440ca05766/id-preview-9f2ba60e--1dcd918c-35e8-4d0e-ac9e-3024ebd69060.lovable.app-1779048751573.png" },
       { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/39db5246-149c-4ede-bb30-a0440ca05766/id-preview-9f2ba60e--1dcd918c-35e8-4d0e-ac9e-3024ebd69060.lovable.app-1779048751573.png" },
     ],
@@ -103,14 +105,6 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       {
         rel: "manifest",
         href: "/manifest.json",
-      },
-      {
-        name: "apple-mobile-web-app-capable",
-        content: "yes",
-      },
-      {
-        name: "apple-mobile-web-app-status-bar-style",
-        content: "default",
       },
     ],
   }),
