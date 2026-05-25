@@ -119,10 +119,17 @@ async function resolveWhatsAppRecipient(
   config: EvolutionConfig,
   instanceName: string,
   phone: string,
+  isGroup: boolean,
 ) {
   if (phone.includes("@")) {
     return phone;
   }
+
+  if (isGroup) {
+    // Se for grupo e não tem @, provavelmente é o JID sem o sufixo
+    return phone.endsWith("@g.us") ? phone : `${phone}@g.us`;
+  }
+
 
   const number = cleanPhone(phone);
   if (number.length < 8) throw new Error(`Telefone inválido para envio: ${phone}`);
@@ -257,7 +264,7 @@ export async function sendMessageServer(
   const { data: conversationData, error: conversationError } = await supabase
     .from("conversations")
     .select(
-      "id, contact:contacts(phone_number), instance:whatsapp_instances(evolution_instance_name)",
+      "id, is_group, contact:contacts(phone_number), instance:whatsapp_instances(evolution_instance_name)",
     )
     .eq("id", input.conversationId);
 
@@ -268,6 +275,7 @@ export async function sendMessageServer(
   const conversationRecord = asRecord(conversation);
   const phone = asMessage(asRecord(conversationRecord.contact).phone_number);
   const instanceName = asMessage(asRecord(conversationRecord.instance).evolution_instance_name);
+  const isGroup = !!conversationRecord.is_group;
   if (!phone) throw new Error("Telefone do contato não encontrado.");
   if (!instanceName) throw new Error("Instância WhatsApp não encontrada para esta conversa.");
 
@@ -299,7 +307,7 @@ export async function sendMessageServer(
   try {
     const config = await resolveEvolutionConfig(supabase);
     await assertInstanceOpen(config, instanceName);
-    const recipient = await resolveWhatsAppRecipient(config, instanceName, phone);
+    const recipient = await resolveWhatsAppRecipient(config, instanceName, phone, isGroup);
     const evolutionMessageId = await sendText(config, instanceName, recipient, content);
     return await updateMessage(
       supabase,
