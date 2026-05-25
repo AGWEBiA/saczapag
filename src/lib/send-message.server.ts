@@ -192,6 +192,57 @@ async function resolveWhatsAppRecipient(
   return number;
 }
 
+async function ensureEvolutionGroupReady(
+  config: EvolutionConfig,
+  instanceName: string,
+  groupJid: string,
+) {
+  const headers = {
+    "Content-Type": "application/json",
+    apikey: config.apiKey,
+    "User-Agent": "Lovable-Agent/1.0",
+  };
+
+  try {
+    await fetchJsonWithTimeout(
+      `${config.apiUrl}/settings/set/${encodeURIComponent(instanceName)}`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ groupsIgnore: false }),
+      },
+      5000,
+    );
+  } catch (error) {
+    console.warn("[Evolution] Não foi possível forçar groupsIgnore=false:", error);
+  }
+
+  const groupEndpoints = [
+    `${config.apiUrl}/group/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=false`,
+    `${config.apiUrl}/chat/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=false`,
+  ];
+
+  for (const url of groupEndpoints) {
+    try {
+      const { response, body } = await fetchJsonWithTimeout(
+        url,
+        { method: "GET", headers },
+        8000,
+      );
+      if (!response.ok) continue;
+
+      const groups = Array.isArray(body) ? body : [body];
+      const exists = groups.some((group) => {
+        const record = asRecord(group);
+        return asMessage(record.id) === groupJid || asMessage(record.remoteJid) === groupJid;
+      });
+      if (exists) return;
+    } catch (error) {
+      console.warn("[Evolution] Falha ao aquecer/listar grupos:", error);
+    }
+  }
+}
+
 async function assertEvolutionInstanceOpen(config: EvolutionConfig, instanceName: string) {
   const { response, body } = await fetchJsonWithTimeout(
     `${config.apiUrl}/instance/connectionState/${encodeURIComponent(instanceName)}`,
@@ -266,12 +317,12 @@ async function sendText(
 
   const groupNumber = number.endsWith("@g.us") ? number.replace(/@g\.us$/, "") : number;
   const candidateNumbers = isGroup
-    ? Array.from(new Set([groupNumber, number]))
+    ? Array.from(new Set([number, groupNumber]))
     : [number];
-  const payloads = candidateNumbers.flatMap((candidate) => [
-    { number: candidate, text, delay: 0, linkPreview: false },
-    { number: candidate, textMessage: { text }, delay: 0, linkPreview: false },
-  ]);
+  const payloads = candidateNumbers.flatMap((candidate) => {
+    const base = { number: candidate, text, delay: 0, linkPreview: false };
+    return [base, { ...base, textMessage: { text } }];
+  });
 
   let lastResponse: Response | null = null;
   let lastBody: unknown = null;
@@ -392,6 +443,9 @@ export async function sendMessageServer(
   const config = await resolveEvolutionConfig(supabase);
   await assertEvolutionInstanceOpen(config, instanceName);
   const recipient = await resolveWhatsAppRecipient(config, instanceName, phone, isGroup);
+  if (isGroup && recipient.endsWith("@g.us")) {
+    await ensureEvolutionGroupReady(config, instanceName, recipient);
+  }
 
   const queuedMetadata = { delivery_status: "queued", queued_at: new Date().toISOString() };
   const { data: messageData, error: messageError } = await supabase
