@@ -1,34 +1,50 @@
-import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export async function syncGroupsServer(instanceId: string) {
   try {
-    // 1. Get instance config
-    const { data: instance } = await supabaseAdmin
+    // 1. Get instance
+    const { data: instance, error: instanceError } = await supabaseAdmin
       .from("whatsapp_instances")
-      .select("*, evolution_config:evolution_configs(*)")
+      .select("id, evolution_instance_name")
       .eq("id", instanceId)
       .single();
 
-    if (!instance) throw new Error("Instância não encontrada");
+    if (instanceError || !instance) {
+      console.error("Erro ao buscar instância (server):", instanceError);
+      throw new Error("Instância não encontrada no banco (server)");
+    }
 
-    const config = instance.evolution_config;
-    const apiUrl = (config as any)?.api_url;
-    const apiKey = (config as any)?.api_key;
+    // 2. Get evolution config
+    const { data: configs, error: configsError } = await supabaseAdmin
+      .from("evolution_configs")
+      .select("*")
+      .eq("is_active", true)
+      .order("is_primary", { ascending: false })
+      .order("priority", { ascending: true });
+
+    if (configsError || !configs?.length) {
+      throw new Error("Nenhuma configuração Evolution API ativa encontrada (server).");
+    }
+
+    const chosen = configs[0];
+    const apiUrl = chosen.api_url;
+    const apiKey = chosen.api_key;
     const instanceName = instance.evolution_instance_name;
 
-    if (!apiUrl || !apiKey || !instanceName) throw new Error("Configuração incompleta");
+    if (!apiUrl || !apiKey || !instanceName) throw new Error("Configuração incompleta (server)");
 
-    // 2. Fetch groups from Evolution
-    const response = await fetch(`${apiUrl}/group/fetchAllGroups/${instanceName}?getParticipants=false`, {
+    const evolutionUrl = apiUrl.endsWith("/") ? apiUrl.slice(0, -1) : apiUrl;
+
+    // 3. Fetch groups from Evolution
+    const response = await fetch(`${evolutionUrl}/group/fetchAllGroups/${instanceName}?getParticipants=false`, {
       headers: { apikey: apiKey }
     });
 
-    if (!response.ok) throw new Error("Falha ao buscar grupos na Evolution API");
+    if (!response.ok) throw new Error(`Falha ao buscar grupos na Evolution API (${response.status})`);
     
     const groups = await response.json();
 
-    // 3. Upsert groups into contacts and conversations
+    // 4. Upsert groups into contacts and conversations
     for (const group of groups) {
       const jid = group.id;
       const name = group.subject || jid;
@@ -67,7 +83,7 @@ export async function syncGroupsServer(instanceId: string) {
 
     return { success: true, count: groups.length };
   } catch (error: any) {
-    console.error("Error syncing groups:", error);
+    console.error("Error syncing groups (server):", error);
     throw new Error(error.message);
   }
 }

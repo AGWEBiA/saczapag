@@ -46,7 +46,7 @@ export function InstanceList() {
   const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
   const [pairingPhone, setPairingPhone] = useState("");
   const [pairingCode, setPairingCode] = useState<{ name: string; code: string } | null>(null);
-  const syncGroupsFn = useServerFn(syncGroups);
+  
 
   const { data: instances, isLoading, refetch } = useQuery({
     ...instancesQueryOptions,
