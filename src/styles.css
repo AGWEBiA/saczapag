@@ -141,7 +141,8 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
-}
+
+
   
   /* Melhorias na barra de rolagem */
   ::-webkit-scrollbar {
