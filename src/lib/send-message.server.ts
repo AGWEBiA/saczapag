@@ -266,7 +266,7 @@ async function sendText(
 
   const groupNumber = number.endsWith("@g.us") ? number.replace(/@g\.us$/, "") : number;
   const candidateNumbers = isGroup
-    ? Array.from(new Set([number, groupNumber]))
+    ? Array.from(new Set([groupNumber, number]))
     : [number];
   const payloads = candidateNumbers.flatMap((candidate) => [
     { number: candidate, text, delay: 0, linkPreview: false },
@@ -275,11 +275,24 @@ async function sendText(
 
   let lastResponse: Response | null = null;
   let lastBody: unknown = null;
+  let lastError: unknown = null;
 
   for (const payload of payloads) {
-    const { response, body } = await request(payload);
+    let response: Response;
+    let body: unknown;
+    try {
+      ({ response, body } = await request(payload));
+    } catch (error) {
+      lastError = error;
+      console.warn(
+        "[Evolution] sendText payload failed:",
+        error instanceof Error ? error.message : String(error),
+      );
+      continue;
+    }
     lastResponse = response;
     lastBody = body;
+    lastError = null;
 
     if (response.ok) {
       const result = asRecord(body);
@@ -300,6 +313,8 @@ async function sendText(
   throw new Error(
     lastResponse
       ? jsonErrorMessage("Evolution sendText", lastResponse, lastBody)
+      : lastError instanceof Error
+      ? lastError.message
       : "Evolution sendText não retornou resposta.",
   );
 }
