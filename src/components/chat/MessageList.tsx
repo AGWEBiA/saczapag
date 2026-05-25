@@ -288,6 +288,7 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
       {failed && deliveryError && (
         <span className="mt-2 text-[10px] leading-tight text-red-100 bg-red-900/20 p-2 rounded-lg font-medium border border-red-500/20">{deliveryError}</span>
       )}
+      </div>
     </div>
   );
 });
