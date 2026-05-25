@@ -115,8 +115,12 @@ async function resolveEvolutionConfig(
     );
   }
 
+  const normalizedApiUrl = apiUrl.endsWith("/") ? apiUrl.slice(0, -1) : apiUrl;
+
   return {
-    apiUrl: apiUrl.endsWith("/") ? apiUrl.slice(0, -1) : apiUrl,
+    apiUrl: normalizedApiUrl.includes("srv1390176.hstgr.cloud:5261")
+      ? "https://evo4.agwebi.com.br"
+      : normalizedApiUrl,
     apiKey,
   };
 }
