@@ -135,15 +135,22 @@ async function assertInstanceOpen(config: EvolutionConfig, instanceName: string)
 }
 
 async function sendText(config: EvolutionConfig, instanceName: string, number: string, text: string) {
-  const { response, body } = await fetchJsonWithTimeout(
-    `${config.apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: config.apiKey },
-      body: JSON.stringify({ number, text }),
-    },
+  const sendUrl = `${config.apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
+  const request = (body: Record<string, unknown>) => fetchJsonWithTimeout(
+    sendUrl,
+    { method: "POST", headers: { "Content-Type": "application/json", apikey: config.apiKey }, body: JSON.stringify(body) },
     12000,
   );
+
+  let { response, body } = await request({ number, text });
+
+  if (!response.ok) {
+    const message = jsonErrorMessage("Evolution sendText", response, body);
+    const shouldRetryWithTextMessage = response.status === 400 && /textMessage|required|text/i.test(message);
+    if (shouldRetryWithTextMessage) {
+      ({ response, body } = await request({ number, textMessage: { text } }));
+    }
+  }
 
   if (!response.ok) throw new Error(jsonErrorMessage("Evolution sendText", response, body));
 
