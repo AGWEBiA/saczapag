@@ -1,5 +1,6 @@
 import type { Json } from "@/integrations/supabase/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 type SendMessageInput = {
   conversationId: string;
@@ -155,21 +156,31 @@ async function updateMessage(
   metadata: Json,
   evolutionMessageId?: string,
 ) {
-  const { data, error } = await supabase
+  const updatePayload = {
+    metadata,
+    ...(evolutionMessageId ? { evolution_message_id: evolutionMessageId } : {}),
+  };
+
+  const { data, error } = await supabaseAdmin
     .from("messages")
-    .update({
-      metadata,
-      ...(evolutionMessageId ? { evolution_message_id: evolutionMessageId } : {}),
-    })
+    .update(updatePayload)
     .eq("id", originalMessage.id)
     .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata");
 
-  if (error) console.warn("Erro ao atualizar mensagem:", error.message);
+  if (error) {
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from("messages")
+      .update(updatePayload)
+      .eq("id", originalMessage.id)
+      .select("id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata");
+
+    if (fallbackError) console.warn("Erro ao atualizar mensagem:", fallbackError.message);
+    return (fallbackData?.[0] ?? { ...originalMessage, ...updatePayload }) as MessageRow;
+  }
 
   return (data?.[0] ?? {
     ...originalMessage,
-    metadata,
-    ...(evolutionMessageId ? { evolution_message_id: evolutionMessageId } : {}),
+    ...updatePayload,
   }) as MessageRow;
 }
 
@@ -191,7 +202,7 @@ export async function sendMessageServer(input: SendMessageInput, userId: string,
   if (!phone) throw new Error("Telefone do contato não encontrado.");
   if (!instanceName) throw new Error("Instância WhatsApp não encontrada para esta conversa.");
 
-  const queuedMetadata = { delivery_status: "queued", queued_at: new Date().toISOString() };
+  const queuedMetadata = { delivery_status: "sending", sending_at: new Date().toISOString() };
   const { data: messageData, error: messageError } = await supabase
     .from("messages")
     .insert({
@@ -214,30 +225,23 @@ export async function sendMessageServer(input: SendMessageInput, userId: string,
     .update({ last_message_at: new Date().toISOString(), last_message_content: content })
     .eq("id", input.conversationId);
 
-  // Inicia o processo de envio em background para evitar timeout do servidor
-  (async () => {
-    try {
-      await updateMessage(supabase, message, { delivery_status: "sending", sending_at: new Date().toISOString() });
-      const config = await resolveEvolutionConfig(supabase);
-      await assertInstanceOpen(config, instanceName);
-      const recipient = await resolveWhatsAppRecipient(config, instanceName, phone);
-      const evolutionMessageId = await sendText(config, instanceName, recipient, content);
-      await updateMessage(
-        supabase,
-        message,
-        { delivery_status: "sent", sent_at: new Date().toISOString() },
-        evolutionMessageId,
-      );
-    } catch (error: any) {
-      console.error("Erro no envio em background:", error);
-      await updateMessage(supabase, message, {
-        delivery_status: "failed",
-        failed_at: new Date().toISOString(),
-        error: error?.message || String(error),
-      });
-    }
-  })();
-
-  // Retorna a mensagem inicial (pendente) imediatamente para a UI
-  return message;
+  try {
+    const config = await resolveEvolutionConfig(supabase);
+    await assertInstanceOpen(config, instanceName);
+    const recipient = await resolveWhatsAppRecipient(config, instanceName, phone);
+    const evolutionMessageId = await sendText(config, instanceName, recipient, content);
+    return await updateMessage(
+      supabase,
+      message,
+      { delivery_status: "sent", sent_at: new Date().toISOString() },
+      evolutionMessageId,
+    );
+  } catch (error: any) {
+    console.error("Erro no envio WhatsApp:", error);
+    return await updateMessage(supabase, message, {
+      delivery_status: "failed",
+      failed_at: new Date().toISOString(),
+      error: error?.message || String(error),
+    });
+  }
 }
