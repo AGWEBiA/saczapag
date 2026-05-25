@@ -51,7 +51,6 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
       if (!user) return null;
       const { data } = await supabase.from("profiles").select("*").eq("id", user.id);
       return data?.[0] || null;
-      return data;
     },
   });
 
