@@ -70,8 +70,8 @@ export function HelpGuide() {
             </TabsList>
           </div>
 
-          <ScrollArea className="flex-1 p-6">
-            <TabsContent value="features" className="m-0 space-y-8 pb-8">
+          <ScrollArea className="flex-1 h-full px-6 py-4">
+            <TabsContent value="features" className="m-0 space-y-8 pb-8 focus-visible:outline-none">
               <section>
                 <div className="flex items-center gap-2 mb-4">
                   <div className="p-2 rounded-lg bg-primary/10 text-primary">
