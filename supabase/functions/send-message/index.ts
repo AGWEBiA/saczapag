@@ -146,6 +146,24 @@ async function markMessage(
   }
 }
 
+function readEvolutionState(item: any) {
+  const raw = item?.connectionStatus?.state || item?.connectionStatus || item?.instance?.state || item?.state || item?.status;
+  const state = String(raw || "unknown").toLowerCase();
+  if (state === "open" || state === "connected") return "open";
+  if (state.includes("connect")) return state.includes("dis") ? "disconnected" : "connecting";
+  if (state.includes("close") || state.includes("logout")) return "disconnected";
+  return state;
+}
+
+function mapEvolutionInstance(item: any) {
+  const ownerJid = item?.ownerJid || item?.instance?.ownerJid || item?.instance?.owner;
+  return {
+    instanceName: item?.name || item?.instanceName || item?.instance?.instanceName || item?.instance?.name,
+    state: ownerJid ? "open" : readEvolutionState(item),
+    ownerJid,
+  };
+}
+
 async function checkInstanceConnected(
   apiUrl: string,
   apiKey: string,
@@ -158,8 +176,25 @@ async function checkInstanceConnected(
       8000,
     );
     const body = await res.json().catch(() => ({}));
-    const state = body?.instance?.state ?? body?.state ?? "unknown";
-    return { ok: state === "open", state };
+    const directState = readEvolutionState(body);
+    if (directState === "open") return { ok: true, state: "open" };
+
+    const snapshotRes = await fetchWithTimeout(
+      `${apiUrl}/instance/fetchInstances`,
+      { method: "GET", headers: { apikey: apiKey } },
+      8000,
+    ).catch(() => null);
+
+    const snapshotBody = snapshotRes ? await snapshotRes.json().catch(() => []) : [];
+    const found = (Array.isArray(snapshotBody) ? snapshotBody : [snapshotBody])
+      .map(mapEvolutionInstance)
+      .find((item: any) => item.instanceName === instanceName);
+
+    if (found?.state === "open") {
+      return { ok: true, state: "open" };
+    }
+
+    return { ok: false, state: found?.state || directState };
   } catch (e: any) {
     return { ok: false, state: `check_failed:${e?.message || e}` };
   }
@@ -321,13 +356,19 @@ async function sendToWhatsApp(params: {
   const { supabase, instance, phone, content, isGroup = false } = params;
 
   if (instance?.evolution_instance_name) {
+    console.log("[send-message] sending via Evolution", {
+      instanceName: instance.evolution_instance_name,
+      phone,
+      isGroup,
+    });
+
     return await sendViaEvolution({
       supabase,
       instanceName: instance.evolution_instance_name,
       phone,
       content,
       isGroup,
-      skipPreflight: true,
+      skipPreflight: false,
     });
   }
 
