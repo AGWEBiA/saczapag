@@ -6,6 +6,70 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function readEvolutionInstanceName(item: any) {
+  return item?.name || item?.instanceName || item?.instance?.instanceName || item?.instance?.name;
+}
+
+function readEvolutionState(item: any) {
+  const raw = item?.connectionStatus?.state || item?.connectionStatus || item?.instance?.state || item?.state || item?.status;
+  const state = String(raw || "unknown").toLowerCase();
+  if (state === "open" || state === "connected") return "open";
+  if (state.includes("connect")) return state.includes("dis") ? "disconnected" : "connecting";
+  if (state.includes("close") || state.includes("logout")) return "disconnected";
+  return state;
+}
+
+function mapEvolutionInstance(item: any) {
+  const ownerJid = item?.ownerJid || item?.instance?.ownerJid || item?.instance?.owner;
+  const state = readEvolutionState(item);
+  return {
+    instanceName: readEvolutionInstanceName(item),
+    state: ownerJid ? "open" : state,
+    rawState: state,
+    ownerJid,
+    profileName: item?.profileName || item?.instance?.profileName,
+    number: item?.number || item?.instance?.number,
+  };
+}
+
+async function fetchEvolutionJson(url: string, apiKey: string, ms = 8000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { apikey: apiKey, "User-Agent": "SAC-Zap/1.0" },
+      signal: ctrl.signal,
+    });
+    const body = await response.json().catch(() => ({}));
+    return { response, body };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function getInstanceStatus(evolutionUrl: string, apiKey: string, instanceName: string) {
+  const encoded = encodeURIComponent(instanceName);
+  const { response, body } = await fetchEvolutionJson(`${evolutionUrl}/instance/connectionState/${encoded}`, apiKey, 5000).catch((e) => ({
+    response: null,
+    body: { error: e?.name === "AbortError" ? "timeout(5s)" : e?.message || String(e) },
+  }));
+
+  const connectionState = readEvolutionState(body);
+  if (connectionState === "open") return { instance: { instanceName, state: "open", rawState: connectionState }, source: "connectionState" };
+
+  const snapshot = await fetchEvolutionJson(`${evolutionUrl}/instance/fetchInstances`, apiKey, 8000).catch(() => null);
+  if (snapshot?.response?.ok) {
+    const list = Array.isArray(snapshot.body) ? snapshot.body : [snapshot.body];
+    const found = list.map(mapEvolutionInstance).find((item) => item.instanceName === instanceName);
+    if (found?.state === "open") return { instance: found, source: "fetchInstances" };
+    if (found) return { instance: { ...found, state: connectionState === "unknown" ? found.state : connectionState }, source: "connectionState+fetchInstances" };
+  }
+
+  if (response?.status === 404) return { state: "disconnected", error: "Instance not found on Evolution", source: "connectionState" };
+  return { instance: { instanceName, state: connectionState, rawState: connectionState }, error: (body as any)?.error, source: "connectionState" };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
