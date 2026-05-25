@@ -24,6 +24,18 @@ type MessageRow = {
   metadata?: Json | null;
 };
 
+type UnknownRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): UnknownRecord {
+  return value && typeof value === "object" ? (value as UnknownRecord) : {};
+}
+
+function asMessage(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map((item) => asMessage(item) ?? String(item)).join("; ");
+  return undefined;
+}
+
 function cleanPhone(value: string) {
   const str = String(value || "");
   if (str.endsWith("@g.us")) return str;
@@ -31,14 +43,13 @@ function cleanPhone(value: string) {
 }
 
 function jsonErrorMessage(prefix: string, response: Response, body: unknown) {
-  const parsed = typeof body === "object" && body ? (body as any) : {};
+  const parsed = asRecord(body);
+  const responseBody = asRecord(parsed.response);
   const raw = typeof body === "string" ? body : JSON.stringify(body);
   return (
-    parsed?.response?.message?.join?.("; ") ||
-    parsed?.response?.message ||
-    parsed?.message?.join?.("; ") ||
-    parsed?.message ||
-    parsed?.error ||
+    asMessage(responseBody.message) ||
+    asMessage(parsed.message) ||
+    asMessage(parsed.error) ||
     `${prefix} retornou ${response.status}${raw && raw !== "{}" ? `: ${raw}` : ""}`
   );
 }
@@ -58,8 +69,8 @@ async function fetchJsonWithTimeout(url: string, init: RequestInit, ms = 12000) 
       }
     }
     return { response, body };
-  } catch (error: any) {
-    if (error?.name === "AbortError") {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === "AbortError") {
       const timeoutError = new Error(
         `Evolution não confirmou o envio em ${Math.round(ms / 1000)}s`,
       );
@@ -118,8 +129,8 @@ async function resolveWhatsAppRecipient(
     );
 
     if (response.ok) {
-      const checked = Array.isArray(body) ? body[0] : (body as any);
-      if (checked?.exists !== false && checked?.number) return checked.number;
+      const checked = asRecord(Array.isArray(body) ? body[0] : body);
+      if (checked.exists !== false && typeof checked.number === "string") return checked.number;
     }
   } catch (error) {
     console.warn("Falha ao verificar número na Evolution, usando fallback:", error);
@@ -136,7 +147,8 @@ async function assertInstanceOpen(config: EvolutionConfig, instanceName: string)
   );
   if (!response.ok) throw new Error(jsonErrorMessage("Evolution connectionState", response, body));
 
-  const state = (body as any)?.instance?.state ?? (body as any)?.state ?? "unknown";
+  const bodyRecord = asRecord(body);
+  const state = asMessage(asRecord(bodyRecord.instance).state) ?? asMessage(bodyRecord.state) ?? "unknown";
   if (state !== "open") {
     throw new Error(
       `Instância "${instanceName}" não está conectada ao WhatsApp (estado: ${state}).`,
@@ -175,9 +187,11 @@ async function sendText(
 
   if (!response.ok) throw new Error(jsonErrorMessage("Evolution sendText", response, body));
 
-  return ((body as any)?.key?.id || (body as any)?.message?.key?.id || (body as any)?.id) as
-    | string
-    | undefined;
+  const result = asRecord(body);
+  const directId = asMessage(result.id);
+  const keyId = asMessage(asRecord(result.key).id);
+  const messageKeyId = asMessage(asRecord(asRecord(result.message).key).id);
+  return keyId || messageKeyId || directId;
 }
 
 async function updateMessage(
@@ -240,8 +254,9 @@ export async function sendMessageServer(
   const conversation = conversationData?.[0];
   if (!conversation) throw new Error("Conversa não encontrada.");
 
-  const phone = (conversation as any)?.contact?.phone_number;
-  const instanceName = (conversation as any)?.instance?.evolution_instance_name;
+  const conversationRecord = asRecord(conversation);
+  const phone = asMessage(asRecord(conversationRecord.contact).phone_number);
+  const instanceName = asMessage(asRecord(conversationRecord.instance).evolution_instance_name);
   if (!phone) throw new Error("Telefone do contato não encontrado.");
   if (!instanceName) throw new Error("Instância WhatsApp não encontrada para esta conversa.");
 
@@ -281,12 +296,12 @@ export async function sendMessageServer(
       { delivery_status: "sent", sent_at: new Date().toISOString() },
       evolutionMessageId,
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Erro no envio WhatsApp:", error);
     return await updateMessage(supabase, message, {
       delivery_status: "failed",
       failed_at: new Date().toISOString(),
-      error: error?.message || String(error),
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 }
