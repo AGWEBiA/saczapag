@@ -3,16 +3,17 @@ import { supabase } from "@/integrations/supabase/client";
 export async function syncGroupsClient(instanceId: string) {
   try {
     // 1. Get instance
-    const { data: instance, error: instanceError } = await supabase
+    const { data: instances, error: instanceError } = await supabase
       .from("whatsapp_instances")
       .select("id, evolution_instance_name")
-      .eq("id", instanceId)
-      .single();
+      .eq("id", instanceId);
 
     if (instanceError) {
       console.error("Erro ao buscar instância:", instanceError);
       throw new Error(`Erro ao buscar instância: ${instanceError.message}`);
     }
+    
+    const instance = instances?.[0];
     if (!instance) throw new Error("Instância não encontrada no banco de dados");
 
     // 2. Get evolution config (same logic as Edge Function)
@@ -60,19 +61,20 @@ export async function syncGroupsClient(instanceId: string) {
       const name = group.subject || jid;
 
       // Upsert contact
-      const { data: contact, error: contactError } = await supabase
+      const { data: contacts, error: contactError } = await supabase
         .from("contacts")
         .upsert({ 
           phone_number: jid, 
           name: name,
         }, { onConflict: "phone_number" })
-        .select("id")
-        .single();
+        .select("id");
 
       if (contactError) {
         console.error("Error upserting contact:", contactError);
         continue;
       }
+
+      const contact = contacts?.[0];
 
       if (contact) {
         // Check if conversation exists for this instance

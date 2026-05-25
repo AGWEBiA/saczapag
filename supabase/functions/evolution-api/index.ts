@@ -242,30 +242,29 @@ serve(async (req) => {
           const pushName = data.pushName || "Contato";
           const content = message.conversation || message.extendedTextMessage?.text || message.imageMessage?.caption || "Mensagem de mídia";
 
-          const { data: instance } = await supabaseClient
+          const { data: instances } = await supabaseClient
             .from("whatsapp_instances")
             .select("id")
-            .eq("evolution_instance_name", iName)
-            .single();
+            .eq("evolution_instance_name", iName);
+          const instance = instances?.[0];
 
           if (!instance) break;
 
-          let { data: contact } = await supabaseClient
+          let { data: contacts } = await supabaseClient
             .from("contacts")
             .select("id")
-            .eq("phone_number", remoteJid)
-            .single();
+            .eq("phone_number", remoteJid);
+          let contact = contacts?.[0];
 
           if (!contact) {
-            const { data: newContact } = await supabaseClient
+            const { data: newContacts } = await supabaseClient
               .from("contacts")
               .insert({ 
                 phone_number: remoteJid, 
                 name: isGroup ? (data.groupName || data.groupInfo?.subject || remoteJid) : pushName 
               })
-              .select("id")
-              .single();
-            contact = newContact;
+              .select("id");
+            contact = newContacts?.[0];
           }
 
           if (!contact) break;
@@ -283,7 +282,7 @@ serve(async (req) => {
               break;
             }
 
-            const { data: newConv } = await supabaseClient
+            const { data: newConvs } = await supabaseClient
               .from("conversations")
               .insert({ 
                 contact_id: contact.id, 
@@ -291,9 +290,8 @@ serve(async (req) => {
                 is_group: isGroup,
                 status: "aberta"
               })
-              .select("id")
-              .single();
-            conversation = newConv;
+              .select("id");
+            conversation = newConvs?.[0];
           }
 
           if (!conversation) break;

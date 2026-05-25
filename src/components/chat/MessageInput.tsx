@@ -49,8 +49,8 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return null;
-      const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-      return data;
+      const { data } = await supabase.from("profiles").select("*").eq("id", user.id);
+      return data?.[0] || null;
     },
   });
 

@@ -43,10 +43,10 @@ export function ChatInterface() {
       const { data, error } = await supabase
         .from("conversations")
         .select("*, contact:contacts(*)")
-        .eq("id", selectedConversationId)
-        .single();
+        .eq("id", selectedConversationId);
+      
       if (error) throw error;
-      return data;
+      return data?.[0] || null;
     },
     enabled: !!selectedConversationId,
   });
