@@ -308,8 +308,9 @@ async function processWhatsAppSend(params: {
   instance: any;
   phone: string;
   content: string;
+  isGroup?: boolean;
 }) {
-  const { supabase, messageId, instance, phone, content } = params;
+  const { supabase, messageId, instance, phone, content, isGroup = false } = params;
 
   const sendingMetadata = {
     delivery_status: "sending",
@@ -323,6 +324,7 @@ async function processWhatsAppSend(params: {
       instance,
       phone,
       content,
+      isGroup,
     });
 
     const sentMetadata = {
@@ -355,7 +357,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const { conversationId, content, phone, senderName } = await req.json();
+    const { conversationId, content, phone, senderName, existingMessageId } = await req.json();
 
     if (!conversationId || !content || !phone) {
       throw new Error("Conversation, content and phone are required");
@@ -369,20 +371,32 @@ serve(async (req) => {
 
     if (convError || !conversation) throw new Error("Conversation not found");
 
-    const { data: message, error: dbError } = await supabase
-      .from("messages")
-      .insert({
-        conversation_id: conversationId,
-        direction: "outbound",
-        content: content,
-        sender_name: senderName,
-        metadata: {
-          delivery_status: "queued",
-          queued_at: new Date().toISOString(),
-        },
-      })
-      .select()
-      .single();
+    const queuedMetadata = {
+      delivery_status: "queued",
+      queued_at: new Date().toISOString(),
+    };
+
+    const messageQuery = existingMessageId
+      ? supabase
+          .from("messages")
+          .update({ metadata: queuedMetadata })
+          .eq("id", existingMessageId)
+          .eq("conversation_id", conversationId)
+          .select()
+          .single()
+      : supabase
+          .from("messages")
+          .insert({
+            conversation_id: conversationId,
+            direction: "outbound",
+            content: content,
+            sender_name: senderName,
+            metadata: queuedMetadata,
+          })
+          .select()
+          .single();
+
+    const { data: message, error: dbError } = await messageQuery;
 
     if (dbError) throw dbError;
 
@@ -394,18 +408,24 @@ serve(async (req) => {
       })
       .eq("id", conversationId);
 
-    const sendResult = await processWhatsAppSend({
+    const backgroundTask = processWhatsAppSend({
       supabase,
       messageId: message.id,
       instance: conversation.instance,
       phone,
       content,
+      isGroup: Boolean(conversation.is_group),
+    }).catch((error: any) => {
+      console.error("[send-message] background task failed:", error?.message || String(error));
     });
+
+    if (edgeRuntime.EdgeRuntime?.waitUntil) {
+      edgeRuntime.EdgeRuntime.waitUntil(backgroundTask);
+    }
 
     return jsonResponse({
       ...message,
-      evolution_message_id: sendResult.evolutionMessageId ?? message.evolution_message_id,
-      metadata: sendResult.metadata,
+      metadata: queuedMetadata,
     });
   } catch (error: any) {
     return jsonResponse({ error: error?.message || String(error) }, 400);
