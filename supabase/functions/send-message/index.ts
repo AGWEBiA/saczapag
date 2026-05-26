@@ -433,16 +433,19 @@ async function sendViaEvolution(params: {
     linkPreview: false,
   };
 
-  const result = (await postEvolutionText(sendUrl, apiKey, payload, 30000)) as any;
+  const result = (await postEvolutionText(sendUrl, apiKey, payload, 35000)) as any;
+
+  const finalEvolutionMessageId = result?.key?.id || result?.message?.key?.id || result?.id || null;
 
   console.log("[send-message] evolution accepted payload", {
     instanceName,
     isGroup,
-    number: normalizedGroupRecipient,
-    messageId: result?.key?.id || result?.message?.key?.id || result?.id || null,
+    number: normalizedRecipient,
+    evolutionMessageId: finalEvolutionMessageId,
+    duration: Date.now() - startTime,
   });
 
-  return (result?.key?.id || result?.message?.key?.id || result?.id) as string | undefined;
+  return finalEvolutionMessageId as string | undefined;
 }
 
 async function sendToWhatsApp(params: {
