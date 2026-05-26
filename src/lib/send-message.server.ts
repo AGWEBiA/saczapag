@@ -52,11 +52,20 @@ async function queueMessageViaEdgeFunction(payload: {
   senderName?: string;
   senderUserId: string;
 }) {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+  const supabaseUrl =
+    process.env.SUPABASE_URL ||
+    process.env.VITE_SUPABASE_URL ||
+    (import.meta as any).env?.VITE_SUPABASE_URL;
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_PUBLISHABLE_KEY ||
+    process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY;
 
   if (!supabaseUrl || !serviceKey) {
-    throw new Error("Configuração do Supabase indisponível.");
+    throw new Error(
+      `Configuração do Supabase indisponível. url=${Boolean(supabaseUrl)} key=${Boolean(serviceKey)}`,
+    );
   }
 
   const endpoint = `${supabaseUrl.replace(/\/$/, "")}/functions/v1/send-message`;
