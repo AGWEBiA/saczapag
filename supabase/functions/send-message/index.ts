@@ -9,8 +9,13 @@ const corsHeaders = {
 type SupabaseClientLike = any;
 
 function jsonResponse(body: unknown, status = 200) {
+  const headers = { ...corsHeaders, "Content-Type": "application/json" };
+  // Log critical errors that might cause upstream timeouts
+  if (status >= 400) {
+    console.error(`[send-message] returning error ${status}:`, JSON.stringify(body));
+  }
   return new Response(JSON.stringify(body), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers,
     status,
   });
 }
@@ -447,7 +452,7 @@ async function sendViaEvolution(params: {
     linkPreview: false,
   };
 
-  const result = (await postEvolutionText(sendUrl, apiKey, payload, 45000)) as any;
+  const result = (await postEvolutionText(sendUrl, apiKey, payload, 30000)) as any;
 
   console.log("[send-message] evolution accepted payload", {
     instanceName,
