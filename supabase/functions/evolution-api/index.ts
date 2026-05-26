@@ -135,7 +135,7 @@ serve(async (req) => {
       throw new Error("Nenhuma configuração Evolution API encontrada.");
     }
 
-    const evolutionUrl = configuredEvolutionUrl.endsWith("/") ? configuredEvolutionUrl.slice(0, -1) : configuredEvolutionUrl;
+    const evolutionUrl = EVOLUTION_API_URL.endsWith("/") ? EVOLUTION_API_URL.slice(0, -1) : EVOLUTION_API_URL;
     let result;
 
     switch (action) {
