@@ -376,6 +376,7 @@ async function sendViaEvolution(params: {
   contactId?: string;
   contactName?: string | null;
 }) {
+  const startTime = Date.now();
   const {
     supabase,
     instanceName,
