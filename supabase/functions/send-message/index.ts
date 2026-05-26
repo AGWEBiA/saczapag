@@ -98,9 +98,7 @@ async function resolveEvolutionConfig(supabase: SupabaseClientLike) {
   const normalizedApiUrl = apiUrl.endsWith("/") ? apiUrl.slice(0, -1) : apiUrl;
 
   return {
-    apiUrl: normalizedApiUrl.includes("srv1390176.hstgr.cloud:5261")
-      ? "https://evo4.agwebi.com.br"
-      : normalizedApiUrl,
+    apiUrl: normalizedApiUrl,
     apiKey,
   };
 }
@@ -329,57 +327,43 @@ async function resolveEvolutionGroupRecipient(params: {
   contactName?: string | null;
 }) {
   const { supabase, apiUrl, apiKey, instanceName, requestedJid, contactId, contactName } = params;
-  const normalizedRequested = requestedJid.endsWith("@g.us")
-    ? requestedJid
-    : `${String(requestedJid).replace(/@.+$/, "").replace(/[^0-9-]/g, "")}@g.us`;
-
-  await ensureEvolutionGroupReady(apiUrl, apiKey, instanceName, normalizedRequested);
-  const groups = await fetchEvolutionGroups(apiUrl, apiKey, instanceName);
-
-  const exactMatch = groups.find(
-    (group: any) => group?.id === normalizedRequested || group?.remoteJid === normalizedRequested,
-  );
-  if (exactMatch) {
-    console.log("[send-message] group matched by jid", {
-      instanceName,
-      requestedJid: normalizedRequested,
-    });
-    return normalizedRequested;
+  
+  // Fast Path: Se já parece um JID, retorna direto. 
+  // O sendText da Evolution falhará se o JID estiver errado, e capturaremos o erro lá.
+  if (requestedJid.endsWith("@g.us")) {
+    return requestedJid;
   }
 
+  const normalizedRequested = `${String(requestedJid).replace(/@.+$/, "").replace(/[^0-9-]/g, "")}@g.us`;
+
+  // Tenta listar grupos apenas se não tivermos o JID completo ou se precisarmos confirmar.
+  // Como o objetivo é velocidade, vamos evitar fetchAllGroups se possível.
+  // Em vez disso, vamos tentar o envio com o normalizedRequested primeiro.
+  // Mas para manter compatibilidade com a busca por nome:
+  
   const normalizedName = normalizeGroupName(contactName);
-  if (normalizedName) {
-    const nameMatches = groups.filter(
-      (group: any) => normalizeGroupName(group?.subject || group?.name) === normalizedName,
-    );
+  if (!normalizedName) return normalizedRequested;
 
-    if (nameMatches.length === 1) {
-      const matchedJid = nameMatches[0]?.id || nameMatches[0]?.remoteJid;
-      console.log("[send-message] group jid healed by name", {
-        instanceName,
-        requestedJid: normalizedRequested,
-        matchedJid,
-        contactName,
-      });
+  const groups = await fetchEvolutionGroups(apiUrl, apiKey, instanceName);
+  const nameMatches = groups.filter(
+    (group: any) => normalizeGroupName(group?.subject || group?.name) === normalizedName,
+  );
 
-      if (contactId && matchedJid) {
-        await supabase
-          .from("contacts")
-          .update({
-            phone_number: matchedJid,
-            name: nameMatches[0]?.subject || contactName || matchedJid,
-          })
-          .eq("id", contactId);
-      }
-
-      if (matchedJid) return matchedJid;
+  if (nameMatches.length === 1) {
+    const matchedJid = nameMatches[0]?.id || nameMatches[0]?.remoteJid;
+    if (contactId && matchedJid && matchedJid !== requestedJid) {
+      await supabase
+        .from("contacts")
+        .update({
+          phone_number: matchedJid,
+          name: nameMatches[0]?.subject || contactName || matchedJid,
+        })
+        .eq("id", contactId);
     }
+    if (matchedJid) return matchedJid;
   }
 
-  throw new Error(
-    `Grupo não encontrado na instância "${instanceName}". JID atual salvo: ${normalizedRequested}. ` +
-      `A Evolution retornou ${groups.length} grupo(s) e nenhum bateu com esse identificador.`,
-  );
+  return normalizedRequested;
 }
 
 async function sendViaEvolution(params: {
@@ -403,50 +387,47 @@ async function sendViaEvolution(params: {
     contactName,
   } = params;
   const { apiUrl, apiKey } = await resolveEvolutionConfig(supabase);
-  const evolutionRecipient = isGroup
-    ? await resolveEvolutionGroupRecipient({
-        supabase,
-        apiUrl,
-        apiKey,
-        instanceName,
-        requestedJid: phone,
-        contactId,
-        contactName,
-      })
-    : skipPreflight
-      ? phone
-      : await resolveWhatsAppRecipient(apiUrl, apiKey, instanceName, phone, isGroup);
 
-  const normalizedGroupRecipient =
-    isGroup && !evolutionRecipient.endsWith("@g.us")
+  // Executamos a resolução do destinatário e a verificação de conexão em paralelo para ganhar tempo.
+  const [evolutionRecipient, connectionStatus] = await Promise.all([
+    isGroup
+      ? resolveEvolutionGroupRecipient({
+          supabase,
+          apiUrl,
+          apiKey,
+          instanceName,
+          requestedJid: phone,
+          contactId,
+          contactName,
+        })
+      : skipPreflight
+        ? phone
+        : resolveWhatsAppRecipient(apiUrl, apiKey, instanceName, phone, isGroup),
+    skipPreflight ? Promise.resolve({ ok: true, state: "open" }) : checkInstanceConnected(apiUrl, apiKey, instanceName)
+  ]);
+
+  if (!connectionStatus.ok) {
+    throw new Error(
+      `Instância "${instanceName}" não está conectada (estado: ${connectionStatus.state}). ` +
+        `Reconecte o WhatsApp em Configurações > Instâncias.`
+    );
+  }
+
+  const normalizedRecipient = isGroup && !evolutionRecipient.endsWith("@g.us")
       ? `${String(evolutionRecipient).replace(/@.+$/, "").replace(/[^0-9-]/g, "")}@g.us`
       : evolutionRecipient;
 
-  console.log("[send-message] resolved recipient", {
+  console.log("[send-message] resolved recipient and connection", {
     instanceName,
     isGroup,
-    requestedPhone: phone,
     evolutionRecipient,
-    normalizedGroupRecipient,
-    contactId,
-    contactName,
+    normalizedRecipient,
+    connectionState: connectionStatus.state
   });
-
-  // Verifica se a instância está conectada antes de tentar enviar.
-  // Se não estiver "open", o sendText do Evolution trava aguardando o socket.
-  if (!skipPreflight) {
-    const conn = await checkInstanceConnected(apiUrl, apiKey, instanceName);
-    if (!conn.ok) {
-      throw new Error(
-        `Instância "${instanceName}" não está conectada ao WhatsApp (estado: ${conn.state}). ` +
-          `Abra Instâncias e escaneie o QR Code novamente.`,
-      );
-    }
-  }
 
   const sendUrl = `${apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
   const payload = {
-    number: normalizedGroupRecipient,
+    number: normalizedRecipient,
     text: content,
     delay: 0,
     linkPreview: false,
