@@ -137,8 +137,21 @@ serve(async (req) => {
         ? pathParts[idx + 1]
         : null;
 
-    const body = await req.json();
-    log("received", { event: body.event, instance: body.instance, path_instance_id: pathInstanceId });
+    let body = {};
+    if (req.method !== "GET" && req.headers.get("content-type")?.includes("application/json")) {
+      try {
+        body = await req.json();
+      } catch (e) {
+        log("json-parse-error", { error: e.message });
+      }
+    }
+    log("received", { 
+      method: req.method,
+      path: url.pathname,
+      event: (body as any).event, 
+      instance: (body as any).instance, 
+      path_instance_id: pathInstanceId 
+    });
 
     // Evolution v2 sends { event, instance, data, ... } at the top level.
     const event: string = body.event || body.type || "";
