@@ -65,6 +65,32 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
   });
 
   const sendMutation = useMutation({
+    onMutate: async (vars: { text: string; internal: boolean; senderName: string }) => {
+      await queryClient.cancelQueries({ queryKey: ["messages", conversationId] });
+      const previous = queryClient.getQueryData<CachedMessages>(["messages", conversationId]);
+      const optimistic: CachedMessage = {
+        id: `optimistic-${Date.now()}`,
+        content: vars.text,
+        created_at: new Date().toISOString(),
+        direction: "outbound",
+        sender_name: vars.senderName,
+        is_internal: vars.internal,
+        evolution_message_id: null,
+        metadata: { delivery_status: "pending", optimistic: true },
+      };
+      queryClient.setQueryData<CachedMessages>(["messages", conversationId], (old) => {
+        if (!old) {
+          return {
+            pages: [[optimistic]],
+            pageParams: [null],
+          } as CachedMessages;
+        }
+        const pages = [...old.pages];
+        pages[0] = [optimistic, ...(pages[0] ?? [])];
+        return { ...old, pages };
+      });
+      return { previous, optimisticId: optimistic.id };
+    },
     mutationFn: async () => {
       const {
         data: { user },
