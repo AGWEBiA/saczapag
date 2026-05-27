@@ -242,29 +242,29 @@ serve(async (req) => {
       }
 
       case "logout-instance": {
-        const response = await fetchWithTimeout(`${evolutionUrl}/instance/logout/${instanceName}`, {
+        const response = await fetchWithTimeout(`${evolutionUrl}/instance/logout/${encodeURIComponent(instanceName)}`, {
           method: "DELETE",
           headers: { "apikey": EVOLUTION_API_KEY },
-        }, 10000);
-        result = await response.json();
+        }, 30000);
+        result = await response.json().catch(() => ({}));
         break;
       }
 
       case "restart-instance": {
-        const response = await fetchWithTimeout(`${evolutionUrl}/instance/restart/${instanceName}`, {
+        const response = await fetchWithTimeout(`${evolutionUrl}/instance/restart/${encodeURIComponent(instanceName)}`, {
           method: "POST",
           headers: { "apikey": EVOLUTION_API_KEY },
-        }, 10000);
-        result = await response.json();
+        }, 30000);
+        result = await response.json().catch(() => ({}));
         break;
       }
 
       case "delete-instance": {
-        const response = await fetchWithTimeout(`${evolutionUrl}/instance/delete/${instanceName}`, {
+        const response = await fetchWithTimeout(`${evolutionUrl}/instance/delete/${encodeURIComponent(instanceName)}`, {
           method: "DELETE",
           headers: { "apikey": EVOLUTION_API_KEY },
-        }, 10000);
-        result = await response.json();
+        }, 30000);
+        result = await response.json().catch(() => ({}));
         break;
       }
 
