@@ -17,8 +17,53 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
+    // === Verificação de admin (anti-escalonamento de privilégios) ===
+    const authHeader = req.headers.get("Authorization") || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+    if (!token) {
+      return new Response(JSON.stringify({ error: "Não autenticado" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+    const { data: userData, error: userErr } = await supabaseClient.auth.getUser(token);
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Token inválido" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+    const callerId = userData.user.id;
+    const { data: adminRow } = await supabaseClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", callerId)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!adminRow) {
+      return new Response(JSON.stringify({ error: "Acesso negado: somente admins" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 403,
+      });
+    }
+
     const body = await req.json();
     const { action = "create", id, email, password, fullName, whatsapp, position, role, status } = body;
+
+    // Impede admin de deletar/resetar a própria conta por engano via API
+    if ((action === "delete" || action === "reset-password") && id) {
+      const { data: targetProfile } = await supabaseClient
+        .from("profiles")
+        .select("user_id")
+        .eq("id", id)
+        .maybeSingle();
+      if (targetProfile?.user_id === callerId) {
+        return new Response(
+          JSON.stringify({ error: "Você não pode executar esta ação na própria conta" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+    }
 
     if (action === "sync-roles") {
       // Sincroniza user_roles a partir de profiles.role para todos os usuários existentes
