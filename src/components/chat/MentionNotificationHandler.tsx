@@ -24,7 +24,7 @@ export function MentionNotificationHandler() {
     if (!user || !profile) return;
 
     const channel = supabase
-      .channel("mentions-notifications")
+      .channel(`mentions-notifications-${user.id}-${Math.random().toString(36).slice(2, 8)}`)
       .on(
         "postgres_changes",
         {
