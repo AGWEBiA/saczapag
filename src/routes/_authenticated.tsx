@@ -8,6 +8,8 @@ import { NotificationCenter } from "@/components/notifications/NotificationCente
 import { HelpGuide } from "@/components/shared/HelpGuide";
 import { Input } from "@/components/ui/input";
 import { MentionNotificationHandler } from "@/components/chat/MentionNotificationHandler";
+import agwebiIcon from "@/assets/agwebi-icon.png";
+
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {

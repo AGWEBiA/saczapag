@@ -3,6 +3,8 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 import { toast } from "sonner";
+import agwebiLogo from "@/assets/agwebi-logo.png";
+
 
 export const Route = createFileRoute("/login")({
   validateSearch: (search) => z.object({
