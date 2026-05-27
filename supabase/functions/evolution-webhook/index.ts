@@ -7,11 +7,26 @@ const corsHeaders = {
 };
 
 function normalizeBrPhone(raw: string): string {
+  // Remove tudo que não for dígito e o sufixo @...
   const digits = String(raw).replace(/@.+$/, "").replace(/\D/g, "");
-  // Número brasileiro com 12 dígitos (55 + DDD 2 + 8 locais): falta o 9
+  
+  // Se for número brasileiro com 10 ou 11 dígitos (sem o 55)
+  if (digits.length === 10 || digits.length === 11) {
+    if (!digits.startsWith("55")) {
+      // DDD 11-28 costumam ter o 9, outros podem não ter. 
+      // Para simplificar, se tiver 10 dígitos (DDD + 8), adicionamos o 9.
+      if (digits.length === 10) {
+        return "55" + digits.slice(0, 2) + "9" + digits.slice(2);
+      }
+      return "55" + digits;
+    }
+  }
+
+  // Se já tiver 55 + 10 dígitos (falta o 9)
   if (/^55\d{10}$/.test(digits)) {
     return digits.slice(0, 4) + "9" + digits.slice(4);
   }
+  
   return digits;
 }
 
@@ -226,22 +241,34 @@ serve(async (req) => {
         .select("id")
         .eq("contact_id", contact!.id)
         .eq("instance_id", instance.id)
-        .neq("status", "resolvida") // Only find active conversations
+        .neq("status", "resolvida")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+
       if (!conversation) {
-        const { data: nc } = await supabase
+        log("creating-conversation", { contact_id: contact!.id, instance_id: instance.id, is_group: isGroup });
+        const { data: nc, error: convError } = await supabase
           .from("conversations")
           .insert({
             contact_id: contact!.id,
             instance_id: instance.id,
             is_group: isGroup,
             status: "aberta",
+            unread_count: direction === "inbound" ? 1 : 0,
+            last_message_at: new Date().toISOString(),
+            last_message_content: content,
           })
           .select("id")
           .single();
+
+        if (convError) {
+          log("error-creating-conversation", { error: convError.message });
+          throw convError;
+        }
         conversation = nc;
+      } else {
+        log("found-existing-conversation", { conversation_id: conversation.id });
       }
 
       const { data: existing } = keyId
