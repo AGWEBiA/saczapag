@@ -137,15 +137,64 @@ serve(async (req) => {
         ? pathParts[idx + 1]
         : null;
 
-    const body = await req.json();
-    log("received", { event: body.event, instance: body.instance, path_instance_id: pathInstanceId });
+    // Endpoint manual para disparar a limpeza de duplicatas via POST /evolution-webhook/cleanup
+    if (url.pathname.endsWith("/cleanup")) {
+      log("cleanup-triggered");
+      
+      const { data: conversations } = await supabase
+        .from("conversations")
+        .select("id, contact_id, instance_id, status")
+        .neq("status", "resolvida")
+        .order("created_at", { ascending: true });
+
+      if (conversations) {
+        const seen = new Map<string, string>();
+        const toDelete: string[] = [];
+
+        for (const conv of conversations) {
+          const key = `${conv.contact_id}:${conv.instance_id}`;
+          if (seen.has(key)) {
+            const primaryId = seen.get(key)!;
+            // Mover mensagens
+            await supabase.from("messages").update({ conversation_id: primaryId }).eq("conversation_id", conv.id);
+            toDelete.push(conv.id);
+          } else {
+            seen.set(key, conv.id);
+          }
+        }
+
+        if (toDelete.length > 0) {
+          await supabase.from("conversations").delete().in("id", toDelete);
+        }
+        
+        return new Response(JSON.stringify({ ok: true, merged: toDelete.length }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    let body = {};
+    if (req.method !== "GET" && req.headers.get("content-type")?.includes("application/json")) {
+      try {
+        body = await req.json();
+      } catch (e) {
+        log("json-parse-error", { error: e.message });
+      }
+    }
+    log("received", { 
+      method: req.method,
+      path: url.pathname,
+      event: (body as any).event, 
+      instance: (body as any).instance, 
+      path_instance_id: pathInstanceId 
+    });
 
     // Evolution v2 sends { event, instance, data, ... } at the top level.
-    const event: string = body.event || body.type || "";
-    const instanceName: string = body.instance || body.instanceName || body.data?.instance || "";
-    const data = body.data ?? body;
+    const event: string = (body as any).event || (body as any).type || "";
+    const instanceName: string = (body as any).instance || (body as any).instanceName || (body as any).data?.instance || "";
+    const data = (body as any).data ?? body;
 
-    if (!event || !instanceName) {
+    if (!url.pathname.endsWith("/cleanup") && (!event || !instanceName)) {
       return new Response(JSON.stringify({ ok: true, skipped: "missing event/instance" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -368,13 +417,49 @@ serve(async (req) => {
         .eq("id", conversation!.id);
     }
 
+    // Endpoint manual para disparar a limpeza de duplicatas via POST /evolution-webhook/cleanup
+    if (url.pathname.endsWith("/cleanup") && req.method === "POST") {
+      log("cleanup-triggered");
+      
+      const { data: conversations } = await supabase
+        .from("conversations")
+        .select("id, contact_id, instance_id, status")
+        .neq("status", "resolvida")
+        .order("created_at", { ascending: true });
+
+      if (conversations) {
+        const seen = new Map<string, string>();
+        const toDelete: string[] = [];
+
+        for (const conv of conversations) {
+          const key = `${conv.contact_id}:${conv.instance_id}`;
+          if (seen.has(key)) {
+            const primaryId = seen.get(key)!;
+            // Mover mensagens
+            await supabase.from("messages").update({ conversation_id: primaryId }).eq("conversation_id", conv.id);
+            toDelete.push(conv.id);
+          } else {
+            seen.set(key, conv.id);
+          }
+        }
+
+        if (toDelete.length > 0) {
+          await supabase.from("conversations").delete().in("id", toDelete);
+        }
+        
+        return new Response(JSON.stringify({ ok: true, merged: toDelete.length }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     return new Response(JSON.stringify({ ok: true, request_id: requestId }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
     log("error", { error: e?.message || String(e) });
     return new Response(JSON.stringify({ ok: false, error: e?.message, request_id: requestId }), {
-      status: 200, // sempre 200 pra Evolution não ficar reenviando
+      status: 200, 
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
