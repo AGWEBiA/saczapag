@@ -8,6 +8,8 @@ import { NotificationCenter } from "@/components/notifications/NotificationCente
 import { HelpGuide } from "@/components/shared/HelpGuide";
 import { Input } from "@/components/ui/input";
 import { MentionNotificationHandler } from "@/components/chat/MentionNotificationHandler";
+import agwebiIcon from "@/assets/agwebi-icon.png";
+
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
@@ -64,13 +66,14 @@ function AuthenticatedLayout() {
       {/* Sidebar */}
       <aside className="w-20 lg:w-64 border-r bg-card flex flex-col transition-all duration-300 z-30">
         <div className="p-4 lg:p-6 border-b flex flex-col items-center lg:items-start overflow-hidden">
-          <div className="font-bold text-xl tracking-tighter text-primary flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/20 shrink-0">
-              AG
-            </div>
-            <span className="hidden lg:inline animate-in fade-in slide-in-from-left-2">SAC</span>
+          <div className="flex items-center gap-2.5">
+            <img src={agwebiIcon} alt="AG WEBi" className="w-9 h-9 object-contain shrink-0" />
+            <span className="hidden lg:inline font-bold text-lg tracking-tight text-foreground animate-in fade-in slide-in-from-left-2">
+              AG <span className="text-primary">WEBi</span>
+            </span>
           </div>
         </div>
+
 
         <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto">
           {navItems.map((item) => (
