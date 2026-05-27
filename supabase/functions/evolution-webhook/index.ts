@@ -6,6 +6,21 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function normalizeBrPhone(raw: string): string {
+  const digits = String(raw).replace(/@.+$/, "").replace(/\D/g, "");
+  // Número brasileiro com 12 dígitos (55 + DDD 2 + 8 locais): falta o 9
+  if (/^55\d{10}$/.test(digits)) {
+    return digits.slice(0, 4) + "9" + digits.slice(4);
+  }
+  return digits;
+}
+
+function normalizeJid(jid: string): string {
+  if (jid.endsWith("@g.us")) return jid; // grupos não mudam
+  const normalized = normalizeBrPhone(jid);
+  return normalized + "@s.whatsapp.net";
+}
+
 function normalizeConnectionStatus(value: unknown) {
   const state = String(value || "unknown").toLowerCase();
   if (state === "open" || state === "connected") return "connected";
@@ -158,6 +173,7 @@ serve(async (req) => {
       }
 
       const isGroup = remoteJid.endsWith("@g.us");
+      const normalizedJid = normalizeJid(remoteJid);
       const direction = fromMe ? "outbound" : "inbound";
       const pushName = fromMe
         ? "Você"
@@ -185,13 +201,13 @@ serve(async (req) => {
       let { data: contact } = await supabase
         .from("contacts")
         .select("id")
-        .eq("phone_number", remoteJid)
+        .eq("phone_number", normalizedJid)
         .maybeSingle();
       if (!contact) {
         const { data: nc } = await supabase
           .from("contacts")
           .insert({
-            phone_number: remoteJid,
+            phone_number: normalizedJid,
             name: isGroup
               ? item.groupName ||
                 data.groupName ||

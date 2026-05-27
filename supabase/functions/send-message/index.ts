@@ -215,7 +215,10 @@ async function resolveWhatsAppRecipient(
   phone: string,
   isGroup = false,
 ) {
-  if (phone.includes("@")) return phone;
+  if (phone.includes("@")) {
+    const suffix = phone.endsWith("@g.us") ? "@g.us" : "@s.whatsapp.net";
+    return normalizeBrPhone(phone) + suffix;
+  }
 
   if (isGroup) {
     const groupId = String(phone)
@@ -290,6 +293,15 @@ async function ensureEvolutionGroupReady(
     if (groups.some((group: any) => group?.id === groupJid || group?.remoteJid === groupJid))
       return;
   }
+}
+
+function normalizeBrPhone(raw: string): string {
+  const digits = String(raw).replace(/@.+$/, "").replace(/\D/g, "");
+  // Número brasileiro com 12 dígitos (55 + DDD 2 + 8 locais): falta o 9
+  if (/^55\d{10}$/.test(digits)) {
+    return digits.slice(0, 4) + "9" + digits.slice(4);
+  }
+  return digits;
 }
 
 function normalizeGroupName(value: unknown) {
