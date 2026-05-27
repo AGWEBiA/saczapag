@@ -190,11 +190,11 @@ serve(async (req) => {
     });
 
     // Evolution v2 sends { event, instance, data, ... } at the top level.
-    const event: string = body.event || body.type || "";
-    const instanceName: string = body.instance || body.instanceName || body.data?.instance || "";
-    const data = body.data ?? body;
+    const event: string = (body as any).event || (body as any).type || "";
+    const instanceName: string = (body as any).instance || (body as any).instanceName || (body as any).data?.instance || "";
+    const data = (body as any).data ?? body;
 
-    if (!event || !instanceName) {
+    if (!url.pathname.endsWith("/cleanup") && (!event || !instanceName)) {
       return new Response(JSON.stringify({ ok: true, skipped: "missing event/instance" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
