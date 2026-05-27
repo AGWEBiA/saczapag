@@ -226,6 +226,9 @@ serve(async (req) => {
         .select("id")
         .eq("contact_id", contact!.id)
         .eq("instance_id", instance.id)
+        .neq("status", "resolvida") // Only find active conversations
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
       if (!conversation) {
         const { data: nc } = await supabase
