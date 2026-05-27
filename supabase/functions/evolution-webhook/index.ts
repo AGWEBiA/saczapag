@@ -174,6 +174,13 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      if (pathInstanceId && pathInstanceId !== instance.id) {
+        log("instance-mismatch", { path_instance_id: pathInstanceId, db_instance_id: instance.id });
+        return new Response(JSON.stringify({ ok: false, error: "instance id mismatch" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
       let { data: contact } = await supabase
         .from("contacts")
