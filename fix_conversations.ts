@@ -1,14 +1,22 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+import { createClient } from "@supabase/supabase-js";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  console.error("Missing environment variables. Make sure VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.");
+  process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 async function run() {
   console.log("Iniciando agrupamento de conversas duplicadas...");
 
-  // Buscar todas as conversas não resolvidas
   const { data: conversations, error } = await supabase
     .from("conversations")
     .select("id, contact_id, instance_id, status, created_at")
@@ -20,18 +28,16 @@ async function run() {
     return;
   }
 
-  // Mapa para identificar duplicatas: contact_id:instance_id
-  const seen = new Map<string, string>(); // key -> primary_conversation_id
-  const toDelete: string[] = [];
+  const seen = new Map(); 
+  const toDelete = [];
 
   for (const conv of conversations) {
     const key = `${conv.contact_id}:${conv.instance_id}`;
     
     if (seen.has(key)) {
-      const primaryId = seen.get(key)!;
-      console.log(`Duplicata encontrada: ${conv.id} -> Mover para ${primaryId}`);
+      const primaryId = seen.get(key);
+      console.log(`Duplicata encontrada: ${conv.id} -> Mover mensagens para ${primaryId}`);
       
-      // Mover mensagens da duplicata para a conversa principal
       const { error: moveError } = await supabase
         .from("messages")
         .update({ conversation_id: primaryId })
@@ -50,13 +56,17 @@ async function run() {
 
   if (toDelete.length > 0) {
     console.log(`Deletando ${toDelete.length} conversas duplicadas vazias...`);
-    const { error: delError } = await supabase
-      .from("conversations")
-      .delete()
-      .in("id", toDelete);
-    
-    if (delError) {
-      console.error("Erro ao deletar conversas:", delError);
+    // Delete in chunks to avoid URL size limits if many
+    for (let i = 0; i < toDelete.length; i += 50) {
+      const chunk = toDelete.slice(i, i + 50);
+      const { error: delError } = await supabase
+        .from("conversations")
+        .delete()
+        .in("id", chunk);
+      
+      if (delError) {
+        console.error("Erro ao deletar conversas:", delError);
+      }
     }
   }
 
