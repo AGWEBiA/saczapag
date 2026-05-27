@@ -236,14 +236,14 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
 
   return (
     <div className="group/bubble flex flex-col items-start w-full">
-      <div
+        <div
         className={cn(
-          "flex flex-col max-w-[85%] lg:max-w-[70%] rounded-2xl p-3 lg:p-4 shadow-sm transition-all animate-in fade-in zoom-in-95 duration-300 relative",
+          "flex flex-col max-w-[85%] lg:max-w-[75%] rounded-3xl p-4 lg:p-5 shadow-sm transition-all animate-in fade-in slide-in-from-bottom-2 duration-500 relative",
           msg.is_internal
-            ? "bg-yellow-50/80 border-yellow-200/50 self-center max-w-[95%] w-full border text-yellow-900 backdrop-blur-sm mb-4"
+            ? "bg-yellow-50/90 border-yellow-200/50 self-center max-w-[95%] w-full border text-yellow-900 backdrop-blur-md mb-6 shadow-lg shadow-yellow-500/5"
             : msg.direction === "outbound"
-              ? "bg-primary text-primary-foreground self-end rounded-tr-none shadow-primary/20"
-              : "bg-card self-start rounded-tl-none border-border/50 border shadow-black/5",
+              ? "bg-primary text-primary-foreground self-end rounded-tr-none shadow-lg shadow-primary/20 ring-1 ring-white/10"
+              : "bg-card self-start rounded-tl-none border-border/40 border shadow-xl shadow-black/5 ring-1 ring-black/5",
         )}
       >
         <div className="absolute top-2 right-2 opacity-0 group-hover/bubble:opacity-100 transition-opacity">

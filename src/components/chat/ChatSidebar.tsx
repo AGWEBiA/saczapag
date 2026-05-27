@@ -163,8 +163,8 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
   }, [queryClient, selectedId, onSelect]);
 
   return (
-    <div className="flex flex-col h-full bg-card/40 overflow-hidden">
-      <div className="p-3 lg:p-4 border-b space-y-4">
+    <div className="flex flex-col h-full bg-transparent overflow-hidden">
+      <div className="p-4 lg:p-6 space-y-5">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold tracking-tight">Inbox</h2>
           <div className="flex items-center gap-1 justify-end">
