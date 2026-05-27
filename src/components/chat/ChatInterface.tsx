@@ -181,9 +181,9 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="flex h-[100dvh] lg:h-full overflow-hidden bg-background lg:shadow-2xl lg:rounded-2xl lg:border lg:m-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="flex h-[100dvh] lg:h-full overflow-hidden bg-background lg:shadow-[0_20px_50px_rgba(0,0,0,0.1)] lg:rounded-3xl lg:border lg:m-4 animate-in fade-in slide-in-from-bottom-4 duration-1000 ease-out">
       <div className={cn(
-        "w-full lg:w-80 flex-shrink-0 border-r bg-card/50 backdrop-blur-xl transition-all duration-300",
+        "w-full lg:w-80 xl:w-96 flex-shrink-0 border-r bg-card/40 backdrop-blur-2xl transition-all duration-500 ease-in-out",
         mobileView === "chat" && "hidden lg:flex"
       )}>
         <ChatSidebar 
