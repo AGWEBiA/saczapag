@@ -74,12 +74,13 @@ function LoginComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-8 rounded-xl border bg-card p-8 shadow-sm">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold tracking-tight">AG SAC</h1>
+        <div className="text-center flex flex-col items-center">
+          <img src={agwebiLogo} alt="AG WEBi" className="h-24 w-auto object-contain mb-4" />
           <p className="text-sm text-muted-foreground mt-2">
             {isSignUp ? "Crie sua conta para começar" : "Entre com suas credenciais"}
           </p>
         </div>
+
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
