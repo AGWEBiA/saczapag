@@ -61,6 +61,23 @@ function extractContent(item: any, message: any) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // === Verificação de token compartilhado da Evolution ===
+  const expectedSecret = Deno.env.get("EVOLUTION_WEBHOOK_SECRET");
+  if (expectedSecret) {
+    const provided =
+      req.headers.get("apikey") ||
+      req.headers.get("x-webhook-secret") ||
+      (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+    if (provided !== expectedSecret) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  } else {
+    console.warn("EVOLUTION_WEBHOOK_SECRET não configurado — webhook aberto");
+  }
+
   const requestId =
     globalThis.crypto?.randomUUID?.() ??
     `wh_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;

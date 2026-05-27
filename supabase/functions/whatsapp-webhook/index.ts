@@ -32,7 +32,30 @@ serve(async (req) => {
 
   if (req.method === "POST") {
     try {
-      const body = await req.json();
+      // === Verificação de assinatura HMAC do Meta/WhatsApp ===
+      const appSecret = Deno.env.get("WHATSAPP_APP_SECRET");
+      const rawBody = await req.text();
+      if (appSecret) {
+        const signatureHeader = req.headers.get("x-hub-signature-256") || "";
+        const provided = signatureHeader.replace(/^sha256=/, "").trim();
+        const key = await crypto.subtle.importKey(
+          "raw",
+          new TextEncoder().encode(appSecret),
+          { name: "HMAC", hash: "SHA-256" },
+          false,
+          ["sign"],
+        );
+        const sigBuf = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(rawBody));
+        const expected = Array.from(new Uint8Array(sigBuf))
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+        if (provided.length !== expected.length || provided.toLowerCase() !== expected) {
+          return new Response("Invalid signature", { status: 401, headers: corsHeaders });
+        }
+      } else {
+        console.warn("WHATSAPP_APP_SECRET não configurado — assinatura não verificada");
+      }
+      const body = JSON.parse(rawBody);
       const entry = body.entry?.[0];
       const changes = entry?.changes?.[0];
       const value = changes?.value;
