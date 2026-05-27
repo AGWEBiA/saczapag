@@ -64,12 +64,15 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
     },
   });
 
+  type SendVars = { text: string; internal: boolean; senderName: string; jobTitle: string; userId: string };
+
   const sendMutation = useMutation({
-    onMutate: async (vars: { text: string; internal: boolean; senderName: string }) => {
+    onMutate: async (vars: SendVars) => {
       await queryClient.cancelQueries({ queryKey: ["messages", conversationId] });
       const previous = queryClient.getQueryData<CachedMessages>(["messages", conversationId]);
+      const optimisticId = `optimistic-${Date.now()}`;
       const optimistic: CachedMessage = {
-        id: `optimistic-${Date.now()}`,
+        id: optimisticId,
         content: vars.text,
         created_at: new Date().toISOString(),
         direction: "outbound",
@@ -80,96 +83,90 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
       };
       queryClient.setQueryData<CachedMessages>(["messages", conversationId], (old) => {
         if (!old) {
-          return {
-            pages: [[optimistic]],
-            pageParams: [null],
-          } as CachedMessages;
+          return { pages: [[optimistic]], pageParams: [null] } as CachedMessages;
         }
         const pages = [...old.pages];
         pages[0] = [optimistic, ...(pages[0] ?? [])];
         return { ...old, pages };
       });
-      return { previous, optimisticId: optimistic.id };
+      return { previous, optimisticId };
     },
-    mutationFn: async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
-
-      const senderName = profile?.full_name || user.email?.split("@")[0] || "Agente";
-      const jobTitle = profile?.role || "Atendimento";
-      const signature = `[${senderName} - ${jobTitle}]: `;
-      const finalContent = isGroup ? `${signature}${content.trim()}` : content.trim();
-
-      if (isInternal) {
+    mutationFn: async (vars: SendVars) => {
+      if (vars.internal) {
         const { error } = await supabase.from("messages").insert({
           conversation_id: conversationId,
           direction: "outbound",
-          content: content.trim(),
+          content: vars.text,
           is_internal: true,
-          sender_user_id: user.id,
-          sender_name: senderName,
+          sender_user_id: vars.userId,
+          sender_name: vars.senderName,
           type: "internal",
         });
-
         if (error) throw error;
         return null;
       }
+
+      const signature = `[${vars.senderName} - ${vars.jobTitle}]: `;
+      const finalContent = isGroup ? `${signature}${vars.text}` : vars.text;
 
       const data = await sendMessage({
         data: {
           conversationId,
           content: finalContent,
-          senderName: senderName,
+          senderName: vars.senderName,
         },
       });
 
-      if (!data) {
-        throw new Error("Erro desconhecido ao processar o envio da mensagem.");
-      }
-
+      if (!data) throw new Error("Erro desconhecido ao processar o envio da mensagem.");
       return data as CachedMessage;
     },
-    onSuccess: (data) => {
-      setContent("");
+    onSuccess: (data, _vars, ctx) => {
       const deliveryStatus = data?.metadata?.delivery_status;
       const deliveryError = typeof data?.metadata?.error === "string" ? data.metadata.error : null;
       if (deliveryStatus === "failed") {
-        toast.error(
-          `Mensagem não enviada: ${deliveryError || "falha na confirmação do WhatsApp."}`,
-        );
+        toast.error(`Mensagem não enviada: ${deliveryError || "falha na confirmação do WhatsApp."}`);
       }
       if (data?.id) {
         queryClient.setQueryData<CachedMessages>(["messages", conversationId], (old) => {
           if (!old) return old;
           const returnedMessage = data as CachedMessage;
-          let found = false;
+          let replaced = false;
           const pages = old.pages.map((page) =>
             page.map((message) => {
-              if (message.id !== returnedMessage.id) return message;
-              found = true;
-              return returnedMessage;
+              if (message.id === ctx?.optimisticId || message.id === returnedMessage.id) {
+                replaced = true;
+                return returnedMessage;
+              }
+              return message;
             }),
           );
-          if (!found) {
-            pages[0] = [returnedMessage, ...(pages[0] ?? [])];
-          }
+          if (!replaced) pages[0] = [returnedMessage, ...(pages[0] ?? [])];
           return { ...old, pages };
         });
       }
-      queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },
-    onError: (error) => {
+    onError: (error, _vars, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(["messages", conversationId], ctx.previous);
+      }
       toast.error("Erro ao enviar: " + error.message);
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim() || sendMutation.isPending) return;
-    sendMutation.mutate();
+    const text = content.trim();
+    if (!text || sendMutation.isPending) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Usuário não autenticado");
+      return;
+    }
+    const senderName = profile?.full_name || user.email?.split("@")[0] || "Agente";
+    const jobTitle = profile?.role || "Atendimento";
+    setContent("");
+    sendMutation.mutate({ text, internal: isInternal, senderName, jobTitle, userId: user.id });
   };
 
   return (
