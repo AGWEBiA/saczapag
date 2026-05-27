@@ -147,7 +147,7 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
   };
 
   return (
-    <div className="p-3 lg:p-6 border-t bg-card/50 backdrop-blur-xl space-y-3">
+    <div className="p-4 lg:p-8 border-t bg-card/60 backdrop-blur-2xl space-y-4">
       <div className="flex flex-wrap gap-2 items-center">
         <Button
           type="button"
