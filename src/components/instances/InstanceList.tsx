@@ -608,7 +608,7 @@ function WebhookTester() {
     try {
       const { data: instances } = await supabase
         .from("whatsapp_instances")
-        .select("evolution_instance_name")
+        .select("id, evolution_instance_name, webhook_url")
         .limit(1);
 
       if (!instances?.length) {
@@ -616,13 +616,16 @@ function WebhookTester() {
         return;
       }
 
-      const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evolution-webhook`;
+      const inst = instances[0];
+      const webhookUrl =
+        inst.webhook_url ||
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evolution-webhook/${inst.id}`;
       const res = await fetch(webhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           event: "messages.upsert",
-          instance: instances[0].evolution_instance_name,
+          instance: inst.evolution_instance_name,
           data: {
             key: {
               remoteJid: `${phone}@s.whatsapp.net`,

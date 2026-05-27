@@ -98,8 +98,17 @@ serve(async (req) => {
   );
 
   try {
+    // ID da instância vindo do path: /functions/v1/evolution-webhook/<instanceId>
+    const url = new URL(req.url);
+    const pathParts = url.pathname.split("/").filter(Boolean);
+    const idx = pathParts.indexOf("evolution-webhook");
+    const pathInstanceId =
+      idx >= 0 && pathParts[idx + 1] && /^[0-9a-f-]{36}$/i.test(pathParts[idx + 1])
+        ? pathParts[idx + 1]
+        : null;
+
     const body = await req.json();
-    log("received", { event: body.event, instance: body.instance });
+    log("received", { event: body.event, instance: body.instance, path_instance_id: pathInstanceId });
 
     // Evolution v2 sends { event, instance, data, ... } at the top level.
     const event: string = body.event || body.type || "";
@@ -162,6 +171,13 @@ serve(async (req) => {
         .single();
       if (!instance) {
         return new Response(JSON.stringify({ ok: false, error: "instance not found" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (pathInstanceId && pathInstanceId !== instance.id) {
+        log("instance-mismatch", { path_instance_id: pathInstanceId, db_instance_id: instance.id });
+        return new Response(JSON.stringify({ ok: false, error: "instance id mismatch" }), {
+          status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

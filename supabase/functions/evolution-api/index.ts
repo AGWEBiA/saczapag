@@ -269,7 +269,21 @@ serve(async (req) => {
       }
 
       case "set-webhook": {
-        const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-webhook`;
+        // Inclui o ID interno da instância (equivalente à "empresa" neste sistema)
+        // no path do webhook, para que a URL salva já esteja no padrão correto.
+        const { data: instRow } = await supabaseClient
+          .from("whatsapp_instances")
+          .select("id")
+          .eq("evolution_instance_name", instanceName)
+          .maybeSingle();
+        if (!instRow?.id) {
+          return new Response(
+            JSON.stringify({ error: `Instância "${instanceName}" não encontrada no banco.` }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-webhook/${instRow.id}`;
+
         await ensureGroupsEnabled(evolutionUrl, EVOLUTION_API_KEY, instanceName);
         const events = ["MESSAGES_UPSERT", "SEND_MESSAGE", "CONNECTION_UPDATE", "QRCODE_UPDATED"];
         const response = await fetchWithTimeout(`${evolutionUrl}/webhook/set/${instanceName}`, {
@@ -292,6 +306,13 @@ serve(async (req) => {
           }, 10000);
           result = await r2.json().catch(() => ({}));
         }
+
+        // Persiste a URL no registro da instância para exibir corretamente na UI.
+        await supabaseClient
+          .from("whatsapp_instances")
+          .update({ webhook_url: webhookUrl })
+          .eq("id", instRow.id);
+
         result.webhookUrl = webhookUrl;
         break;
       }
