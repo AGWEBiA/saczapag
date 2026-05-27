@@ -368,13 +368,49 @@ serve(async (req) => {
         .eq("id", conversation!.id);
     }
 
+    // Endpoint manual para disparar a limpeza de duplicatas via POST /evolution-webhook/cleanup
+    if (url.pathname.endsWith("/cleanup") && req.method === "POST") {
+      log("cleanup-triggered");
+      
+      const { data: conversations } = await supabase
+        .from("conversations")
+        .select("id, contact_id, instance_id, status")
+        .neq("status", "resolvida")
+        .order("created_at", { ascending: true });
+
+      if (conversations) {
+        const seen = new Map<string, string>();
+        const toDelete: string[] = [];
+
+        for (const conv of conversations) {
+          const key = `${conv.contact_id}:${conv.instance_id}`;
+          if (seen.has(key)) {
+            const primaryId = seen.get(key)!;
+            // Mover mensagens
+            await supabase.from("messages").update({ conversation_id: primaryId }).eq("conversation_id", conv.id);
+            toDelete.push(conv.id);
+          } else {
+            seen.set(key, conv.id);
+          }
+        }
+
+        if (toDelete.length > 0) {
+          await supabase.from("conversations").delete().in("id", toDelete);
+        }
+        
+        return new Response(JSON.stringify({ ok: true, merged: toDelete.length }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     return new Response(JSON.stringify({ ok: true, request_id: requestId }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
     log("error", { error: e?.message || String(e) });
     return new Response(JSON.stringify({ ok: false, error: e?.message, request_id: requestId }), {
-      status: 200, // sempre 200 pra Evolution não ficar reenviando
+      status: 200, 
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
