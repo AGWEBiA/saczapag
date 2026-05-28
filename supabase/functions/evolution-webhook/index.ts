@@ -111,6 +111,34 @@ serve(async (req) => {
   const requestId =
     globalThis.crypto?.randomUUID?.() ??
     `wh_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  );
+
+  const logAudit = async (params: {
+    instance_id?: string;
+    event_type: string;
+    decision: string;
+    details: any;
+    external_id?: string;
+    inconsistency_found?: boolean;
+  }) => {
+    try {
+      await supabase.from("webhook_audits").insert({
+        instance_id: params.instance_id,
+        event_type: params.event_type,
+        decision: params.decision,
+        details: params.details,
+        external_id: params.external_id,
+        inconsistency_found: params.inconsistency_found,
+      });
+    } catch (e) {
+      console.error("Failed to log audit", e);
+    }
+  };
+
   const log = (event: string, extra: Record<string, unknown> = {}) =>
     console.log(
       JSON.stringify({
@@ -122,11 +150,6 @@ serve(async (req) => {
       }),
     );
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-  );
-
   try {
     // ID da instância vindo do path: /functions/v1/evolution-webhook/<instanceId>
     const url = new URL(req.url);
@@ -136,6 +159,15 @@ serve(async (req) => {
       idx >= 0 && pathParts[idx + 1] && /^[0-9a-f-]{36}$/i.test(pathParts[idx + 1])
         ? pathParts[idx + 1]
         : null;
+
+    let body = {};
+    if (req.method !== "GET" && req.headers.get("content-type")?.includes("application/json")) {
+      try {
+        body = await req.json();
+      } catch (e) {
+        log("json-parse-error", { error: e.message });
+      }
+    }
 
     // Endpoint manual para disparar a limpeza de duplicatas via POST /evolution-webhook/cleanup
     if (url.pathname.endsWith("/cleanup")) {
@@ -173,14 +205,6 @@ serve(async (req) => {
       }
     }
 
-    let body = {};
-    if (req.method !== "GET" && req.headers.get("content-type")?.includes("application/json")) {
-      try {
-        body = await req.json();
-      } catch (e) {
-        log("json-parse-error", { error: e.message });
-      }
-    }
     log("received", { 
       method: req.method,
       path: url.pathname,
@@ -194,7 +218,7 @@ serve(async (req) => {
     const instanceName: string = (body as any).instance || (body as any).instanceName || (body as any).data?.instance || "";
     const data = (body as any).data ?? body;
 
-    if (!url.pathname.endsWith("/cleanup") && (!event || !instanceName)) {
+    if (!event || !instanceName) {
       return new Response(JSON.stringify({ ok: true, skipped: "missing event/instance" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -206,21 +230,29 @@ serve(async (req) => {
       const state = data?.state || data?.status || data?.instance?.state;
       const ownerJid = data?.ownerJid || data?.instance?.ownerJid || data?.instance?.owner;
       const status = ownerJid ? "connected" : normalizeConnectionStatus(state);
-      if (!status) {
-        return new Response(
-          JSON.stringify({ ok: true, skipped: `unknown connection state: ${state}` }),
-          {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
-      }
-      await supabase
+      
+      const { data: instance } = await supabase
         .from("whatsapp_instances")
-        .update({
-          status,
-          last_connected_at: status === "connected" ? new Date().toISOString() : null,
-        })
-        .eq("evolution_instance_name", instanceName);
+        .select("id")
+        .eq("evolution_instance_name", instanceName)
+        .single();
+
+      if (status && instance) {
+        await supabase
+          .from("whatsapp_instances")
+          .update({
+            status,
+            last_connected_at: status === "connected" ? new Date().toISOString() : null,
+          })
+          .eq("evolution_instance_name", instanceName);
+
+        await logAudit({
+          instance_id: instance.id,
+          event_type: "connection.update",
+          decision: `status_updated_to_${status}`,
+          details: { state, ownerJid },
+        });
+      }
     }
 
     if (evNorm === "messages.upsert" || evNorm === "send.message") {
@@ -236,6 +268,22 @@ serve(async (req) => {
         });
       }
 
+      // Check for duplicate message by evolution_message_id early
+      if (keyId) {
+        const { data: existingMsg } = await supabase
+          .from("messages")
+          .select("id, conversation_id")
+          .eq("evolution_message_id", keyId)
+          .maybeSingle();
+
+        if (existingMsg) {
+          log("duplicate-skipped", { keyId });
+          return new Response(JSON.stringify({ ok: true, skipped: "duplicate" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
       const isGroup = remoteJid.endsWith("@g.us");
       const normalizedJid = normalizeJid(remoteJid);
       const direction = fromMe ? "outbound" : "inbound";
@@ -249,25 +297,24 @@ serve(async (req) => {
         .select("id")
         .eq("evolution_instance_name", instanceName)
         .single();
+
       if (!instance) {
         return new Response(JSON.stringify({ ok: false, error: "instance not found" }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (pathInstanceId && pathInstanceId !== instance.id) {
-        log("instance-mismatch", { path_instance_id: pathInstanceId, db_instance_id: instance.id });
-        return new Response(JSON.stringify({ ok: false, error: "instance id mismatch" }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+
+      let decision = "";
+      let inconsistencyFound = false;
 
       let { data: contact } = await supabase
         .from("contacts")
         .select("id")
         .eq("phone_number", normalizedJid)
         .maybeSingle();
+
       if (!contact) {
+        decision = "create_contact";
         const { data: nc } = await supabase
           .from("contacts")
           .insert({
@@ -283,11 +330,13 @@ serve(async (req) => {
           .select("id")
           .single();
         contact = nc;
+      } else {
+        decision = "existing_contact";
       }
 
       let { data: conversation } = await supabase
         .from("conversations")
-        .select("id")
+        .select("id, is_group")
         .eq("contact_id", contact!.id)
         .eq("instance_id", instance.id)
         .neq("status", "resolvida")
@@ -296,7 +345,7 @@ serve(async (req) => {
         .maybeSingle();
 
       if (!conversation) {
-        log("creating-conversation", { contact_id: contact!.id, instance_id: instance.id, is_group: isGroup });
+        decision += "_create_conversation";
         const { data: nc, error: convError } = await supabase
           .from("conversations")
           .insert({
@@ -308,103 +357,93 @@ serve(async (req) => {
             last_message_at: new Date().toISOString(),
             last_message_content: content,
           })
-          .select("id")
+          .select("id, is_group")
           .single();
 
-        if (convError) {
-          log("error-creating-conversation", { error: convError.message });
-          throw convError;
-        }
+        if (convError) throw convError;
         conversation = nc;
       } else {
-        log("found-existing-conversation", { conversation_id: conversation.id });
+        decision += "_existing_conversation";
+        // Validation: confirm that the conversation matches the group status of the JID
+        if (conversation.is_group !== isGroup) {
+          inconsistencyFound = true;
+          log("validation-failed", { 
+            msg: "Conversation group status mismatch", 
+            jid: normalizedJid, 
+            conv_is_group: conversation.is_group, 
+            jid_is_group: isGroup 
+          });
+        }
       }
 
-      const { data: existing } = keyId
-        ? await supabase
-            .from("messages")
-            .select("id")
-            .eq("evolution_message_id", keyId)
-            .maybeSingle()
-        : { data: null };
+      if (isGroup) decision += "_group";
 
-      log("message-event", {
-        direction,
-        is_group: isGroup,
-        remote_jid: remoteJid,
-        evolution_message_id: keyId,
-        conversation_id: conversation!.id,
-        already_persisted: Boolean(existing),
+      await logAudit({
+        instance_id: instance.id,
+        event_type: evNorm,
+        decision,
+        details: { 
+          contact_id: contact?.id, 
+          conversation_id: conversation?.id, 
+          is_group: isGroup,
+          direction,
+          content_preview: content?.slice(0, 50)
+        },
+        external_id: keyId,
+        inconsistency_found: inconsistencyFound
       });
 
-      if (!existing) {
-        let reconciledExistingOutbound = false;
+      let reconciledExistingOutbound = false;
 
-        if (direction === "outbound") {
-          const { data: pendingOutbound, error: pendingLookupError } = await supabase
+      if (direction === "outbound") {
+        const { data: pendingOutbound } = await supabase
+          .from("messages")
+          .select("id, metadata")
+          .eq("conversation_id", conversation!.id)
+          .eq("direction", "outbound")
+          .is("evolution_message_id", null)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (pendingOutbound?.id) {
+          const prevMeta = (pendingOutbound.metadata as Record<string, unknown>) ?? {};
+          await supabase
             .from("messages")
-            .select("id, metadata")
-            .eq("conversation_id", conversation!.id)
-            .eq("direction", "outbound")
-            .is("evolution_message_id", null)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
+            .update({
+              evolution_message_id: keyId,
+              metadata: {
+                ...prevMeta,
+                delivery_status: "sent",
+                sent_at: new Date().toISOString(),
+                webhook_request_id: requestId,
+              },
+            })
+            .eq("id", pendingOutbound.id);
+          
+          reconciledExistingOutbound = true;
+          log("reconciled", { message_id: pendingOutbound.id, evolution_message_id: keyId });
+        }
+      }
 
-          if (pendingLookupError) {
-            log("reconcile-lookup-failed", { error: pendingLookupError.message });
-          }
-
-          if (pendingOutbound?.id) {
-            const prevMeta = (pendingOutbound.metadata as Record<string, unknown>) ?? {};
-            const { error: reconcileError } = await supabase
-              .from("messages")
-              .update({
-                evolution_message_id: keyId,
-                metadata: {
-                  ...prevMeta,
+      if (!reconciledExistingOutbound) {
+        await supabase.from("messages").insert({
+          conversation_id: conversation!.id,
+          direction,
+          content,
+          evolution_message_id: keyId,
+          sender_name: pushName,
+          type: "whatsapp",
+          metadata:
+            direction === "outbound"
+              ? {
                   delivery_status: "sent",
                   sent_at: new Date().toISOString(),
                   webhook_request_id: requestId,
-                },
-              })
-              .eq("id", pendingOutbound.id);
-
-            if (reconcileError) {
-              log("reconcile-failed", {
-                error: reconcileError.message,
-                message_id: pendingOutbound.id,
-              });
-            } else {
-              reconciledExistingOutbound = true;
-              log("reconciled", {
-                message_id: pendingOutbound.id,
-                evolution_message_id: keyId,
-                prev_request_id: (prevMeta as any)?.request_id ?? null,
-              });
-            }
-          }
-        }
-
-        if (!reconciledExistingOutbound) {
-          await supabase.from("messages").insert({
-            conversation_id: conversation!.id,
-            direction,
-            content,
-            evolution_message_id: keyId,
-            sender_name: pushName,
-            type: "whatsapp",
-            metadata:
-              direction === "outbound"
-                ? {
-                    delivery_status: "sent",
-                    sent_at: new Date().toISOString(),
-                    webhook_request_id: requestId,
-                  }
-                : { webhook_request_id: requestId },
-          });
-          log("inserted", { direction, evolution_message_id: keyId });
-        }
+                }
+              : { webhook_request_id: requestId },
+        });
+        log("inserted", { direction, evolution_message_id: keyId });
       }
 
       await supabase
@@ -415,42 +454,6 @@ serve(async (req) => {
           unread_count: direction === "inbound" ? 1 : 0,
         })
         .eq("id", conversation!.id);
-    }
-
-    // Endpoint manual para disparar a limpeza de duplicatas via POST /evolution-webhook/cleanup
-    if (url.pathname.endsWith("/cleanup") && req.method === "POST") {
-      log("cleanup-triggered");
-      
-      const { data: conversations } = await supabase
-        .from("conversations")
-        .select("id, contact_id, instance_id, status")
-        .neq("status", "resolvida")
-        .order("created_at", { ascending: true });
-
-      if (conversations) {
-        const seen = new Map<string, string>();
-        const toDelete: string[] = [];
-
-        for (const conv of conversations) {
-          const key = `${conv.contact_id}:${conv.instance_id}`;
-          if (seen.has(key)) {
-            const primaryId = seen.get(key)!;
-            // Mover mensagens
-            await supabase.from("messages").update({ conversation_id: primaryId }).eq("conversation_id", conv.id);
-            toDelete.push(conv.id);
-          } else {
-            seen.set(key, conv.id);
-          }
-        }
-
-        if (toDelete.length > 0) {
-          await supabase.from("conversations").delete().in("id", toDelete);
-        }
-        
-        return new Response(JSON.stringify({ ok: true, merged: toDelete.length }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
     }
 
     return new Response(JSON.stringify({ ok: true, request_id: requestId }), {
