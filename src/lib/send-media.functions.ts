@@ -9,6 +9,7 @@ const schema = z.object({
   fileName: z.string().optional(),
   caption: z.string().optional(),
   senderName: z.string().optional(),
+  asSticker: z.boolean().optional(),
 });
 
 export const sendMedia = createServerFn({ method: "POST" })
