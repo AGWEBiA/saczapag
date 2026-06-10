@@ -310,6 +310,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
                 isGroup={isGroup}
                 highlight={searchTerm.trim().toLowerCase()}
                 isActiveMatch={msg.id === activeMatchId}
+                conversationId={conversationId}
               />
             ))
           )}
