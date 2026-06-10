@@ -6,6 +6,11 @@ type SendMessageInput = {
   conversationId: string;
   content: string;
   senderName?: string;
+  quoted?: {
+    evolutionMessageId: string;
+    sender?: string;
+    content?: string;
+  };
 };
 
 type MessageRow = {
