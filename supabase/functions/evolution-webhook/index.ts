@@ -95,6 +95,8 @@ function extractMedia(item: any, message: any): {
   media_type: string | null;
   has_media: boolean;
   ext: string;
+  file_name: string | null;
+  file_size: number | null;
 } {
   const inner = message?.ephemeralMessage?.message ?? message ?? {};
   const viewOnce = inner?.viewOnceMessage?.message || inner?.viewOnceMessageV2?.message;
@@ -117,6 +119,8 @@ function extractMedia(item: any, message: any): {
         media_type: c.node.mimetype || c.type,
         has_media: true,
         ext: c.ext,
+        file_name: c.node.fileName || c.node.title || null,
+        file_size: c.node.fileLength ? Number(c.node.fileLength) : null,
       };
     }
   }
@@ -126,6 +130,36 @@ function extractMedia(item: any, message: any): {
     media_type: fallbackUrl ? "file" : null,
     has_media: !!fallbackUrl,
     ext: "bin",
+    file_name: null,
+    file_size: null,
+  };
+}
+
+function extractQuoted(
+  message: any,
+): { sender: string | null; content: string | null } | null {
+  const inner = message?.ephemeralMessage?.message ?? message ?? {};
+  const ctx =
+    inner?.extendedTextMessage?.contextInfo ||
+    inner?.imageMessage?.contextInfo ||
+    inner?.videoMessage?.contextInfo ||
+    inner?.audioMessage?.contextInfo ||
+    inner?.documentMessage?.contextInfo ||
+    null;
+  const q = ctx?.quotedMessage;
+  if (!q) return null;
+  const content =
+    q.conversation ||
+    q.extendedTextMessage?.text ||
+    q.imageMessage?.caption ||
+    q.videoMessage?.caption ||
+    q.documentMessage?.fileName ||
+    (q.audioMessage ? "[Áudio]" : null) ||
+    (q.stickerMessage ? "[Sticker]" : null) ||
+    "[Mídia]";
+  return {
+    sender: ctx?.participant ? String(ctx.participant).split("@")[0] : null,
+    content,
   };
 }
 
