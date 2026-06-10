@@ -258,19 +258,30 @@ serve(async (req) => {
         .single();
       if (fetchErr) throw fetchErr;
 
-      // Skip updating status column as it may not exist
-      /*
-      const { error: profileError } = await supabaseClient
-        .from("profiles")
-        .update({ status: "inactive" })
-        .eq("id", id);
-      if (profileError) throw profileError;
-      */
+      const targetUserId = profileRow?.user_id;
 
-      if (profileRow?.user_id) {
-        await supabaseClient.auth.admin.updateUserById(profileRow.user_id, {
-          ban_duration: "876000h",
-        });
+      // 1) Remove mapeamentos de role
+      if (targetUserId) {
+        const { error: rolesErr } = await supabaseClient
+          .from("user_roles")
+          .delete()
+          .eq("user_id", targetUserId);
+        if (rolesErr) console.warn("Falha ao remover user_roles:", rolesErr.message);
+      }
+
+      // 2) Remove o profile (fonte da listagem na UI)
+      const { error: delProfileErr } = await supabaseClient
+        .from("profiles")
+        .delete()
+        .eq("id", id);
+      if (delProfileErr) throw delProfileErr;
+
+      // 3) Remove usuário do auth (não falha o request se já não existir)
+      if (targetUserId) {
+        const { error: authDelErr } = await supabaseClient.auth.admin.deleteUser(targetUserId);
+        if (authDelErr) {
+          console.warn("auth.admin.deleteUser falhou:", authDelErr.message);
+        }
       }
 
       return new Response(JSON.stringify({ success: true }), {
