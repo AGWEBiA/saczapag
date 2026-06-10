@@ -341,7 +341,64 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
             </Command>
           </PopoverContent>
         </Popover>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            const MAX = 25 * 1024 * 1024;
+            if (f.size > MAX) {
+              toast.error("Arquivo muito grande (máx 25MB)");
+              return;
+            }
+            setAttachedFile(f);
+          }}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading || isInternal}
+          className="text-xs gap-1"
+          title={isInternal ? "Anexos não disponíveis em notas internas" : "Anexar arquivo"}
+        >
+          <Paperclip className="h-3 w-3" /> Anexar
+        </Button>
       </div>
+
+      {attachedFile && (
+        <div className="flex items-center gap-2 p-2 bg-muted/40 rounded-xl border border-border/40">
+          {attachedFile.type.startsWith("image/") ? (
+            <ImageIcon className="h-4 w-4 text-primary" />
+          ) : attachedFile.type.startsWith("video/") ? (
+            <Video className="h-4 w-4 text-primary" />
+          ) : (
+            <FileText className="h-4 w-4 text-primary" />
+          )}
+          <span className="text-xs font-medium truncate flex-1">{attachedFile.name}</span>
+          <span className="text-[10px] text-muted-foreground">
+            {(attachedFile.size / 1024 / 1024).toFixed(2)} MB
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => {
+              setAttachedFile(null);
+              if (fileInputRef.current) fileInputRef.current.value = "";
+            }}
+          >
+            <XIcon className="h-3 w-3" />
+          </Button>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="flex gap-2 items-end">
         <div className="flex-1 relative group">
           {mentionQuery !== null && mentionCandidates.length > 0 && (
@@ -377,14 +434,16 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
           <Input
             ref={inputRef}
             placeholder={
-              isInternal
-                ? "Digite uma nota apenas para a equipe... (cite com @)"
-                : "Escreva sua mensagem aqui... (cite com @ para notificar o time)"
+              attachedFile
+                ? "Adicione uma legenda (opcional)..."
+                : isInternal
+                  ? "Digite uma nota apenas para a equipe... (cite com @)"
+                  : "Escreva sua mensagem aqui... (cite com @ para notificar o time)"
             }
             value={content}
             onChange={handleContentChange}
             onKeyDown={handleKeyDown}
-            disabled={sendMutation.isPending}
+            disabled={sendMutation.isPending || uploading}
             className={cn(
               "flex-1 min-h-[44px] py-3 lg:h-12 lg:px-6 bg-muted/50 border-transparent focus-visible:bg-background focus-visible:ring-primary/20 transition-all rounded-2xl lg:rounded-3xl shadow-inner",
               isInternal && "border-yellow-300 focus-visible:ring-yellow-400 bg-yellow-50/50",
@@ -394,7 +453,7 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
         <Button
           type="submit"
           size="icon"
-          disabled={!content.trim() || sendMutation.isPending}
+          disabled={(!content.trim() && !attachedFile) || sendMutation.isPending || uploading}
           className={cn(
             "h-11 w-11 lg:h-12 lg:w-12 rounded-2xl lg:rounded-full shrink-0 shadow-lg transition-all duration-300 active:scale-95",
             isInternal
@@ -402,7 +461,7 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
               : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/20 hover:shadow-primary/30",
           )}
         >
-          {sendMutation.isPending ? (
+          {sendMutation.isPending || uploading ? (
             <Loader2 className="h-5 w-5 animate-spin" />
           ) : (
             <Send className="h-5 w-5" />
