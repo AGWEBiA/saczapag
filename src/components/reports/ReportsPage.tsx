@@ -487,7 +487,7 @@ function SettingsPanel() {
       return;
     }
     setSaving(true);
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("sla_settings")
       .upsert({ id: 1, green_seconds: green, yellow_seconds: yellow, updated_at: new Date().toISOString() });
     setSaving(false);
