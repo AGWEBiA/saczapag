@@ -28,9 +28,17 @@ import { useServerFn } from "@tanstack/react-start";
 import { reactMessage as reactMessageFn } from "@/lib/react-message.functions";
 import { toast } from "sonner";
 
+type ReplyTarget = {
+  id: string;
+  evolutionMessageId: string | null;
+  sender: string;
+  content: string;
+};
+
 interface MessageListProps {
   conversationId: string;
   isGroup?: boolean;
+  onReply?: (target: ReplyTarget) => void;
 }
 
 const PAGE_SIZE = 30;
