@@ -404,6 +404,10 @@ const MessageBubble = React.memo(
     const reactMessage = useServerFn(reactMessageFn);
     const [reactPopoverOpen, setReactPopoverOpen] = React.useState(false);
     const [forwardOpen, setForwardOpen] = React.useState(false);
+    const [editOpen, setEditOpen] = React.useState(false);
+    const [editText, setEditText] = React.useState("");
+    const [deleteOpen, setDeleteOpen] = React.useState(false);
+    const [actionBusy, setActionBusy] = React.useState(false);
     const reactions = Array.isArray(msg.metadata?.reactions)
       ? (msg.metadata!.reactions as Array<{ by: string; emoji: string }>)
       : [];
@@ -412,6 +416,24 @@ const MessageBubble = React.memo(
       for (const r of reactions) map.set(r.emoji, (map.get(r.emoji) ?? 0) + 1);
       return Array.from(map.entries());
     }, [reactions]);
+
+    const callManage = async (action: "edit" | "delete", newText?: string) => {
+      setActionBusy(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("manage-message", {
+          body: { messageId: msg.id, action, newText },
+        });
+        if (error) throw error;
+        if (data && (data as any).ok === false) throw new Error((data as any).error || "Falha");
+        toast.success(action === "edit" ? "Mensagem editada" : "Mensagem apagada");
+        setEditOpen(false);
+        setDeleteOpen(false);
+      } catch (e: any) {
+        toast.error("Falha: " + (e?.message || String(e)));
+      } finally {
+        setActionBusy(false);
+      }
+    };
 
     const handleReact = async (emoji: string) => {
       setReactPopoverOpen(false);
