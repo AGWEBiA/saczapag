@@ -348,18 +348,52 @@ function highlightText(text: string, term: string): React.ReactNode {
   return parts;
 }
 
+const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
 const MessageBubble = React.memo(
   ({
     msg,
     isGroup,
     highlight,
     isActiveMatch,
+    conversationId,
   }: {
     msg: Msg;
     isGroup?: boolean;
     highlight?: string;
     isActiveMatch?: boolean;
+    conversationId: string;
   }) => {
+    const reactMessage = useServerFn(reactMessageFn);
+    const [reactPopoverOpen, setReactPopoverOpen] = React.useState(false);
+    const reactions = Array.isArray(msg.metadata?.reactions)
+      ? (msg.metadata!.reactions as Array<{ by: string; emoji: string }>)
+      : [];
+    const reactionGroups = React.useMemo(() => {
+      const map = new Map<string, number>();
+      for (const r of reactions) map.set(r.emoji, (map.get(r.emoji) ?? 0) + 1);
+      return Array.from(map.entries());
+    }, [reactions]);
+
+    const handleReact = async (emoji: string) => {
+      setReactPopoverOpen(false);
+      if (!msg.evolution_message_id) {
+        toast.error("Não é possível reagir a esta mensagem ainda.");
+        return;
+      }
+      try {
+        await reactMessage({
+          data: {
+            conversationId,
+            evolutionMessageId: msg.evolution_message_id,
+            emoji,
+          },
+        });
+      } catch (e: any) {
+        toast.error("Falha ao reagir: " + (e?.message || String(e)));
+      }
+    };
+
     const deliveryStatus = msg.metadata?.delivery_status as string | undefined;
     const deliveryError = msg.metadata?.error as string | undefined;
     const quoted = msg.metadata?.quoted as
