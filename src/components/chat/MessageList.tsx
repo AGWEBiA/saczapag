@@ -615,6 +615,17 @@ const MessageBubble = React.memo(
             </div>
           )}
         </div>
+        <ForwardMessageDialog
+          open={forwardOpen}
+          onOpenChange={setForwardOpen}
+          source={{
+            conversationId,
+            content: msg.content,
+            mediaUrl: msg.media_url ?? null,
+            mediaType: msg.media_type ?? null,
+            fileName: (msg.metadata as any)?.file_name ?? null,
+          }}
+        />
       </div>
     );
   },
