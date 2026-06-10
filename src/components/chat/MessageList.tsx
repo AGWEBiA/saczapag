@@ -23,7 +23,9 @@ import {
   ZoomIn,
   ZoomOut,
   Download,
+  Forward,
 } from "lucide-react";
+import { ForwardMessageDialog } from "./ForwardMessageDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -381,6 +383,7 @@ const MessageBubble = React.memo(
   }) => {
     const reactMessage = useServerFn(reactMessageFn);
     const [reactPopoverOpen, setReactPopoverOpen] = React.useState(false);
+    const [forwardOpen, setForwardOpen] = React.useState(false);
     const reactions = Array.isArray(msg.metadata?.reactions)
       ? (msg.metadata!.reactions as Array<{ by: string; emoji: string }>)
       : [];
@@ -500,6 +503,14 @@ const MessageBubble = React.memo(
                 <Reply className="h-3 w-3" />
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setForwardOpen(true)}
+              className="h-6 w-6 rounded-full bg-card border shadow-sm flex items-center justify-center hover:bg-accent"
+              title="Encaminhar"
+            >
+              <Forward className="h-3 w-3" />
+            </button>
             <Popover open={reactPopoverOpen} onOpenChange={setReactPopoverOpen}>
               <PopoverTrigger asChild>
                 <button
@@ -604,6 +615,17 @@ const MessageBubble = React.memo(
             </div>
           )}
         </div>
+        <ForwardMessageDialog
+          open={forwardOpen}
+          onOpenChange={setForwardOpen}
+          source={{
+            conversationId,
+            content: msg.content,
+            mediaUrl: msg.media_url ?? null,
+            mediaType: msg.media_type ?? null,
+            fileName: (msg.metadata as any)?.file_name ?? null,
+          }}
+        />
       </div>
     );
   },
@@ -693,10 +715,23 @@ function MediaAttachment({
   metadata?: Record<string, any> | null;
 }) {
   const t = (type || "").toLowerCase();
-  const isImage = t.startsWith("image") || /\.(png|jpe?g|gif|webp)(\?|$)/i.test(url);
+  const isSticker =
+    Boolean(metadata?.is_sticker) || t === "image/webp" || /\.webp(\?|$)/i.test(url);
+  const isImage = !isSticker && (t.startsWith("image") || /\.(png|jpe?g|gif)(\?|$)/i.test(url));
   const isVideo = t.startsWith("video") || /\.(mp4|webm|mov)(\?|$)/i.test(url);
   const isAudio = t.startsWith("audio") || /\.(mp3|ogg|wav|m4a|opus)(\?|$)/i.test(url);
 
+  if (isSticker) {
+    return (
+      <img
+        src={url}
+        alt="sticker"
+        className="max-h-40 max-w-[160px] my-1 bg-transparent select-none"
+        loading="lazy"
+        draggable={false}
+      />
+    );
+  }
   if (isImage) {
     return <ImageLightbox url={url} />;
   }

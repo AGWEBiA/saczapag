@@ -3,7 +3,7 @@ import { useMutation, useQueryClient, useQuery, type InfiniteData } from "@tanst
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Loader2, Zap, AtSign, Paperclip, X as XIcon, Image as ImageIcon, FileText, Video, Mic, Square } from "lucide-react";
+import { Send, Loader2, Zap, AtSign, Paperclip, X as XIcon, Image as ImageIcon, FileText, Video, Mic, Sticker } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -59,6 +59,7 @@ export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const stickerInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const sendMessage = useServerFn(sendMessageFn);
   const sendMedia = useServerFn(sendMediaFn);
@@ -220,7 +221,12 @@ export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }
     },
   });
 
-  const uploadAndSendMedia = async (file: File, caption: string, senderName: string) => {
+  const uploadAndSendMedia = async (
+    file: File,
+    caption: string,
+    senderName: string,
+    asSticker = false,
+  ) => {
     setUploading(true);
     try {
       const ext = file.name.split(".").pop() || "bin";
@@ -235,17 +241,18 @@ export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }
         data: {
           conversationId,
           mediaUrl: pub.publicUrl,
-          mimeType: file.type || "application/octet-stream",
+          mimeType: file.type || (asSticker ? "image/webp" : "application/octet-stream"),
           fileName: file.name,
           caption,
           senderName,
+          asSticker: asSticker || undefined,
         },
       });
       queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
-      toast.success("Arquivo enviado");
+      toast.success(asSticker ? "Sticker enviado" : "Arquivo enviado");
     } catch (e: any) {
-      toast.error("Falha ao enviar arquivo: " + (e?.message || String(e)));
+      toast.error("Falha ao enviar: " + (e?.message || String(e)));
     } finally {
       setUploading(false);
     }
@@ -483,6 +490,24 @@ export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }
             setAttachedFile(f);
           }}
         />
+        <input
+          ref={stickerInputRef}
+          type="file"
+          className="hidden"
+          accept="image/webp"
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            if (stickerInputRef.current) stickerInputRef.current.value = "";
+            if (!f) return;
+            if (f.size > 1 * 1024 * 1024) {
+              toast.error("Sticker deve ter no máximo 1MB (.webp)");
+              return;
+            }
+            const { data: { user } } = await supabase.auth.getUser();
+            const senderName = profile?.full_name || user?.email?.split("@")[0] || "Agente";
+            await uploadAndSendMedia(f, "", senderName, true);
+          }}
+        />
         <Button
           type="button"
           variant="ghost"
@@ -493,6 +518,18 @@ export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }
           title={isInternal ? "Anexos não disponíveis em notas internas" : "Anexar arquivo"}
         >
           <Paperclip className="h-3 w-3" /> Anexar
+        </Button>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => stickerInputRef.current?.click()}
+          disabled={uploading || isInternal}
+          className="text-xs gap-1"
+          title={isInternal ? "Stickers não disponíveis em notas internas" : "Enviar sticker (.webp)"}
+        >
+          <Sticker className="h-3 w-3" /> Sticker
         </Button>
 
         {!isRecording ? (
