@@ -45,7 +45,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
       let q = supabase
         .from("messages")
         .select(
-          "id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata",
+          "id, content, created_at, direction, sender_name, is_internal, evolution_message_id, media_url, media_type, metadata",
         )
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: false })
