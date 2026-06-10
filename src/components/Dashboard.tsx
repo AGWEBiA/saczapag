@@ -181,8 +181,8 @@ export function Dashboard() {
                 ["Instâncias Ativas", `${stats.activeInstances}/${stats.totalInstances}`],
                 ["Inbox Aberta", String(stats.open)],
                 ["Sem Atribuição", String(stats.unassigned)],
-                ["Resolvidas (período)", String(stats.resolved ?? 0)],
-                ["Total Contatos", String(stats.contacts ?? 0)],
+                ["Resolvidas", String(stats.closed)],
+                ["Total Contatos", String(stats.totalContacts)],
               ];
               const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
               const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
