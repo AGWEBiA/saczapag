@@ -694,16 +694,7 @@ function MediaAttachment({
   const isAudio = t.startsWith("audio") || /\.(mp3|ogg|wav|m4a|opus)(\?|$)/i.test(url);
 
   if (isImage) {
-    return (
-      <a href={url} target="_blank" rel="noopener noreferrer" className="block mb-1 -mx-1.5 -mt-1">
-        <img
-          src={url}
-          alt="mídia"
-          className="rounded-md max-h-80 w-full object-cover"
-          loading="lazy"
-        />
-      </a>
-    );
+    return <ImageLightbox url={url} />;
   }
   if (isVideo) {
     return (
