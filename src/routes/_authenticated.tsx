@@ -176,9 +176,8 @@ function MobileNav({ navItems, onLogout }: { navItems: NavItem[]; onLogout: () =
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="p-0 w-72 max-w-[85vw] flex flex-col">
-        <VisuallyHidden>
-          <SheetTitle>Menu de navegação</SheetTitle>
-        </VisuallyHidden>
+        <SheetTitle className="sr-only">Menu de navegação</SheetTitle>
+        <SheetDescription className="sr-only">Links principais do sistema</SheetDescription>
         <div className="p-5 border-b flex items-center gap-2.5">
           <img src={agwebiIcon} alt="AG WEBi" className="w-9 h-9 object-contain" />
           <span className="font-bold text-lg tracking-tight">
