@@ -102,7 +102,7 @@ function useSlaSettings() {
     queryKey: [QK.sla],
     staleTime: 60_000,
     queryFn: async () => {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("sla_settings")
         .select("*")
         .eq("id", 1)
