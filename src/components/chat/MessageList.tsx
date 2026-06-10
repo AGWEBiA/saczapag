@@ -632,9 +632,17 @@ const MessageBubble = React.memo(
             <MediaAttachment url={msg.media_url} type={msg.media_type} metadata={msg.metadata} />
           )}
           {msg.content && msg.content !== "[Mídia]" && (
-            <p className="text-[14.2px] leading-[19px] whitespace-pre-wrap break-words pr-16">
+            <p
+              className={cn(
+                "text-[14.2px] leading-[19px] whitespace-pre-wrap break-words pr-16",
+                msg.metadata?.deleted && "italic opacity-70",
+              )}
+            >
               {highlight ? highlightText(msg.content, highlight) : msg.content}
             </p>
+          )}
+          {msg.metadata?.edited && !msg.metadata?.deleted && (
+            <span className="text-[10px] wa-meta italic mr-1">editada</span>
           )}
           <div className="flex items-center justify-end gap-1 -mt-0.5 ml-2 float-right">
             <span className="text-[11px] wa-meta leading-none">{messageTime}</span>
