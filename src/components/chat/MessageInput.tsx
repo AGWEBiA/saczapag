@@ -394,6 +394,28 @@ export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }
 
   return (
     <div className="p-4 lg:p-8 border-t bg-card/60 backdrop-blur-2xl space-y-4">
+      {replyTo && (
+        <div className="flex items-stretch gap-2 -mb-2 rounded-md bg-emerald-50 dark:bg-emerald-950/30 border-l-4 border-emerald-500 px-3 py-2">
+          <div className="flex-1 min-w-0">
+            <div className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+              Respondendo a {replyTo.sender}
+            </div>
+            <div className="text-xs text-muted-foreground line-clamp-2">
+              {replyTo.content || "[Mídia]"}
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 self-start"
+            onClick={onCancelReply}
+            title="Cancelar resposta"
+          >
+            <XIcon className="h-3 w-3" />
+          </Button>
+        </div>
+      )}
       <div className="flex flex-wrap gap-2 items-center">
         <Button
           type="button"
