@@ -479,6 +479,23 @@ const MessageBubble = React.memo(
           )}
         >
           <div className="absolute -top-3 -right-2 opacity-0 group-hover/bubble:opacity-100 transition-opacity flex items-center gap-1 z-10">
+            {onReply && (
+              <button
+                type="button"
+                onClick={() =>
+                  onReply({
+                    id: msg.id,
+                    evolutionMessageId: msg.evolution_message_id ?? null,
+                    sender: msg.sender_name || (isOutbound ? "Você" : "Contato"),
+                    content: msg.content || (msg.media_url ? "[Mídia]" : ""),
+                  })
+                }
+                className="h-6 w-6 rounded-full bg-card border shadow-sm flex items-center justify-center hover:bg-accent"
+                title="Responder"
+              >
+                <Reply className="h-3 w-3" />
+              </button>
+            )}
             <Popover open={reactPopoverOpen} onOpenChange={setReactPopoverOpen}>
               <PopoverTrigger asChild>
                 <button
