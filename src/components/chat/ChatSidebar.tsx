@@ -89,7 +89,8 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
           is_group,
           contact:contacts(id, name, phone_number, avatar_url)
         `)
-        .order("last_message_at", { ascending: false })
+        .order("last_message_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
         .limit(50);
 
       if (filter === "mine" && profile?.id) {
