@@ -2,7 +2,7 @@ import { createFileRoute, redirect, Outlet, Link, useRouter, useRouterState } fr
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Users2, Activity, ClipboardList, BarChart3, Menu } from "lucide-react";
+import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Users2, Activity, ClipboardList, BarChart3, Menu, PanelLeftClose, PanelLeft } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { HelpGuide } from "@/components/shared/HelpGuide";
@@ -60,18 +60,39 @@ function AuthenticatedLayout() {
     { to: "/settings", label: "Ajustes", icon: Settings },
   ];
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("sidebar-collapsed") === "1";
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sidebar-collapsed", sidebarCollapsed ? "1" : "0");
+    }
+  }, [sidebarCollapsed]);
+
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-background">
       <MentionNotificationHandler />
 
       {/* Sidebar — escondida no mobile, vira drawer */}
-      <DesktopSidebar navItems={navItems} onLogout={handleLogout} />
+      <DesktopSidebar navItems={navItems} onLogout={handleLogout} collapsed={sidebarCollapsed} />
 
       <div className="flex-1 flex flex-col min-w-0 bg-muted/5 relative">
         {/* Top Header */}
         <header className="h-14 md:h-16 border-b bg-card/50 backdrop-blur-md flex items-center justify-between gap-2 px-3 md:px-6 lg:px-8 z-20 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <MobileNav navItems={navItems} onLogout={handleLogout} />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hidden md:inline-flex h-9 w-9"
+              onClick={() => setSidebarCollapsed((v) => !v)}
+              title={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+              aria-label={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+            >
+              {sidebarCollapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+            </Button>
             <div className="flex items-center gap-2 md:hidden min-w-0">
               <img src={agwebiIcon} alt="AG WEBi" className="w-7 h-7 object-contain shrink-0" />
               <span className="font-bold text-base truncate">
@@ -110,13 +131,26 @@ function AuthenticatedLayout() {
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
 
-function DesktopSidebar({ navItems, onLogout }: { navItems: NavItem[]; onLogout: () => void }) {
+function DesktopSidebar({ navItems, onLogout, collapsed }: { navItems: NavItem[]; onLogout: () => void; collapsed?: boolean }) {
+  const asideCls = collapsed
+    ? "hidden md:flex w-20 border-r bg-card flex-col transition-all duration-300 z-30 shrink-0"
+    : "hidden md:flex w-20 lg:w-64 border-r bg-card flex-col transition-all duration-300 z-30 shrink-0";
+  const labelCls = collapsed ? "hidden" : "hidden lg:inline";
+  const tooltipCls = collapsed
+    ? "absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-xl border"
+    : "lg:hidden absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-xl border";
+  const logoutLabelCls = collapsed ? "hidden" : "hidden lg:inline font-medium";
+  const logoutBtnCls = collapsed
+    ? "w-full justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl px-3 min-h-[44px]"
+    : "w-full justify-center lg:justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl px-3 min-h-[44px]";
+  const logoutIconCls = collapsed ? "h-5 w-5 shrink-0" : "h-5 w-5 lg:mr-3 shrink-0";
+
   return (
-    <aside className="hidden md:flex w-20 lg:w-64 border-r bg-card flex-col transition-all duration-300 z-30 shrink-0">
+    <aside className={asideCls}>
       <div className="p-4 lg:p-6 border-b flex flex-col items-center lg:items-start overflow-hidden">
         <div className="flex items-center gap-2.5">
           <img src={agwebiIcon} alt="AG WEBi" className="w-9 h-9 object-contain shrink-0" />
-          <span className="hidden lg:inline font-bold text-lg tracking-tight text-foreground">
+          <span className={collapsed ? "hidden" : "hidden lg:inline font-bold text-lg tracking-tight text-foreground"}>
             AG <span className="text-primary">WEBi</span>
           </span>
         </div>
@@ -132,8 +166,8 @@ function DesktopSidebar({ navItems, onLogout }: { navItems: NavItem[]; onLogout:
             activeProps={{ className: "bg-primary text-primary-foreground shadow-md shadow-primary/20 font-semibold" }}
           >
             <item.icon className="h-5 w-5 shrink-0" />
-            <span className="hidden lg:inline">{item.label}</span>
-            <div className="lg:hidden absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-xl border">
+            <span className={labelCls}>{item.label}</span>
+            <div className={tooltipCls}>
               {item.label}
             </div>
           </Link>
@@ -143,11 +177,11 @@ function DesktopSidebar({ navItems, onLogout }: { navItems: NavItem[]; onLogout:
       <div className="p-4 border-t">
         <Button
           variant="ghost"
-          className="w-full justify-center lg:justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl px-3 min-h-[44px]"
+          className={logoutBtnCls}
           onClick={onLogout}
         >
-          <LogOut className="h-5 w-5 lg:mr-3 shrink-0" />
-          <span className="hidden lg:inline font-medium">Sair</span>
+          <LogOut className={logoutIconCls} />
+          <span className={logoutLabelCls}>Sair</span>
         </Button>
       </div>
     </aside>
