@@ -383,6 +383,7 @@ const MessageBubble = React.memo(
   }) => {
     const reactMessage = useServerFn(reactMessageFn);
     const [reactPopoverOpen, setReactPopoverOpen] = React.useState(false);
+    const [forwardOpen, setForwardOpen] = React.useState(false);
     const reactions = Array.isArray(msg.metadata?.reactions)
       ? (msg.metadata!.reactions as Array<{ by: string; emoji: string }>)
       : [];
