@@ -413,8 +413,13 @@ export function ChatInterface() {
               />
             </div>
 
-            {/* Right Sidebar: Contact Details & Assignment */}
-            <div className="w-72 flex-shrink-0 bg-card p-6 overflow-y-auto hidden lg:block">
+            {/* Coluna 3 — Detalhes do contato (recolhível) */}
+            <aside className={cn(
+              "shrink-0 border-l bg-card overflow-y-auto transition-all duration-200",
+              "hidden lg:block",
+              detailsOpen ? "w-72 xl:w-80 p-5" : "w-0 p-0 border-l-0"
+            )}>
+              <div className={cn(detailsOpen ? "block" : "hidden")}>
               <div className="flex flex-col items-center text-center mb-8">
                 <Avatar className="h-20 w-20 mb-4">
                   <AvatarFallback className="text-2xl"><User size={40} /></AvatarFallback>
