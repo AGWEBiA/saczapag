@@ -3,7 +3,7 @@ import { useMutation, useQueryClient, useQuery, type InfiniteData } from "@tanst
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Loader2, Zap, AtSign, Paperclip, X as XIcon, Image as ImageIcon, FileText, Video, Mic, Square } from "lucide-react";
+import { Send, Loader2, Zap, AtSign, Paperclip, X as XIcon, Image as ImageIcon, FileText, Video, Mic, Sticker } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
