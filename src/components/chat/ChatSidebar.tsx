@@ -267,18 +267,18 @@ const ChatItem = React.memo(({ conv, selectedId, onSelect }: { conv: any, select
         <div className="flex justify-between items-baseline mb-0.5">
           <div className="flex items-center gap-1.5 min-w-0">
             {conv.is_group && <Users className="h-3 w-3 text-primary flex-shrink-0" />}
-            <h3 className={cn("truncate text-sm tracking-tight", conv.unread_count > 0 ? "text-foreground font-black" : "text-foreground/80 font-bold")}>
+            <h3 className={cn("truncate text-sm tracking-tight", conv.unread_count > 0 ? "text-foreground font-black" : "text-muted-foreground font-medium")}>
               {conv.contact?.name || "Sem Nome"}
             </h3>
           </div>
           {conv.last_message_at && (
-            <span className="text-[10px] text-muted-foreground/60 whitespace-nowrap ml-2 font-medium">
+            <span className={cn("text-[10px] whitespace-nowrap ml-2", conv.unread_count > 0 ? "text-primary font-bold" : "text-muted-foreground/50 font-normal")}>
               {formatDistanceToNow(new Date(conv.last_message_at), { addSuffix: false, locale: ptBR })}
             </span>
           )}
         </div>
         <div className="flex flex-col gap-0.5">
-          <p className={cn("text-xs truncate transition-colors", conv.unread_count > 0 ? "text-foreground font-black" : "text-muted-foreground font-medium")}>
+          <p className={cn("text-xs truncate transition-colors", conv.unread_count > 0 ? "text-foreground font-bold" : "text-muted-foreground/70 font-normal")}>
             {conv.last_message_content || conv.contact?.phone_number}
           </p>
         </div>
