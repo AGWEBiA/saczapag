@@ -339,6 +339,7 @@ serve(async (req) => {
         .select("id, is_group")
         .eq("contact_id", contact!.id)
         .eq("instance_id", instance.id)
+        .eq("is_group", isGroup)
         .neq("status", "resolvida")
         .order("created_at", { ascending: false })
         .limit(1)
