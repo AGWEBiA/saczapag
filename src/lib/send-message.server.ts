@@ -56,6 +56,11 @@ async function queueMessageViaEdgeFunction(payload: {
   phone: string;
   senderName?: string;
   senderUserId: string;
+  quoted?: {
+    evolutionMessageId: string;
+    sender?: string;
+    content?: string;
+  };
 }) {
   const supabaseUrl =
     process.env.SUPABASE_URL ||
