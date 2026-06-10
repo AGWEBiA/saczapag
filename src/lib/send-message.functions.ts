@@ -7,6 +7,13 @@ const sendMessageSchema = z.object({
   conversationId: z.string().uuid(),
   content: z.string().min(1).max(4000),
   senderName: z.string().min(1).max(120).optional(),
+  quoted: z
+    .object({
+      evolutionMessageId: z.string().min(1),
+      sender: z.string().max(200).optional(),
+      content: z.string().max(2000).optional(),
+    })
+    .optional(),
 });
 
 export const sendMessage = createServerFn({ method: "POST" })

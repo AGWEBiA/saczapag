@@ -387,6 +387,11 @@ async function sendViaEvolution(params: {
   skipPreflight?: boolean;
   contactId?: string;
   contactName?: string | null;
+  quoted?: {
+    evolutionMessageId: string;
+    sender?: string;
+    content?: string;
+  } | null;
 }) {
   const startTime = Date.now();
   const {
@@ -398,6 +403,7 @@ async function sendViaEvolution(params: {
     skipPreflight = false,
     contactId,
     contactName,
+    quoted,
   } = params;
   const { apiUrl, apiKey } = await resolveEvolutionConfig(supabase);
 
@@ -439,12 +445,24 @@ async function sendViaEvolution(params: {
   });
 
   const sendUrl = `${apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
-  const payload = {
+  const payload: Record<string, unknown> = {
     number: normalizedRecipient,
     text: content,
     delay: 0,
     linkPreview: false,
   };
+  if (quoted?.evolutionMessageId) {
+    payload.quoted = {
+      key: {
+        id: quoted.evolutionMessageId,
+        remoteJid: normalizedRecipient,
+        fromMe: false,
+      },
+      message: {
+        conversation: quoted.content || "",
+      },
+    };
+  }
 
   const result = (await postEvolutionText(sendUrl, apiKey, payload, 35000)) as any;
 
@@ -467,14 +485,20 @@ async function sendToWhatsApp(params: {
   phone: string;
   content: string;
   isGroup?: boolean;
+  quoted?: {
+    evolutionMessageId: string;
+    sender?: string;
+    content?: string;
+  } | null;
 }) {
-  const { supabase, instance, phone, content, isGroup = false } = params;
+  const { supabase, instance, phone, content, isGroup = false, quoted } = params;
 
   if (instance?.evolution_instance_name) {
     console.log("[send-message] sending via Evolution", {
       instanceName: instance.evolution_instance_name,
       phone,
       isGroup,
+      hasQuoted: Boolean(quoted?.evolutionMessageId),
     });
 
     return await sendViaEvolution({
@@ -486,6 +510,7 @@ async function sendToWhatsApp(params: {
       skipPreflight: false,
       contactId: instance.contactId,
       contactName: instance.contactName,
+      quoted,
     });
   }
 
@@ -529,8 +554,13 @@ async function processWhatsAppSend(params: {
   phone: string;
   content: string;
   isGroup?: boolean;
+  quoted?: {
+    evolutionMessageId: string;
+    sender?: string;
+    content?: string;
+  } | null;
 }) {
-  const { supabase, messageId, instance, phone, content, isGroup = false } = params;
+  const { supabase, messageId, instance, phone, content, isGroup = false, quoted } = params;
 
   const sendingMetadata = {
     delivery_status: "sending",
@@ -545,6 +575,7 @@ async function processWhatsAppSend(params: {
       phone,
       content,
       isGroup,
+      quoted,
     });
 
     const sentMetadata = {
@@ -602,10 +633,15 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const { conversationId, content, phone, senderName, senderUserId, existingMessageId } =
+    const { conversationId, content, phone, senderName, senderUserId, existingMessageId, quoted } =
       await req.json();
 
-    log("received", { conversationId, phone, existingMessageId: existingMessageId ?? null });
+    log("received", {
+      conversationId,
+      phone,
+      existingMessageId: existingMessageId ?? null,
+      hasQuoted: Boolean(quoted?.evolutionMessageId),
+    });
 
     if (!conversationId || !content || !phone) {
       throw new Error("Conversation, content and phone are required");
@@ -619,10 +655,21 @@ serve(async (req) => {
 
     if (convError || !conversation) throw new Error("Conversation not found");
 
+    const quotedMeta = quoted?.evolutionMessageId
+      ? {
+          quoted: {
+            evolution_message_id: quoted.evolutionMessageId,
+            sender: quoted.sender ?? null,
+            content: quoted.content ?? null,
+          },
+        }
+      : {};
+
     const queuedMetadata = {
       delivery_status: "queued",
       queued_at: new Date().toISOString(),
       request_id: requestId,
+      ...quotedMeta,
     };
 
     const messageQuery = existingMessageId
@@ -676,6 +723,7 @@ serve(async (req) => {
       phone,
       content,
       isGroup: Boolean(conversation.is_group),
+      quoted: quoted ?? null,
     });
 
     log("done", {

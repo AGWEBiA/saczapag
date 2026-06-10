@@ -22,6 +22,13 @@ import {
 interface MessageInputProps {
   conversationId: string;
   isGroup?: boolean;
+  replyTo?: {
+    id: string;
+    evolutionMessageId: string | null;
+    sender: string;
+    content: string;
+  } | null;
+  onCancelReply?: () => void;
 }
 
 type CachedMessage = {
@@ -37,7 +44,7 @@ type CachedMessage = {
 
 type CachedMessages = InfiniteData<CachedMessage[], string | null>;
 
-export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
+export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }: MessageInputProps) {
   const [content, setContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
   const [openQuickReplies, setOpenQuickReplies] = useState(false);
@@ -105,7 +112,18 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
     },
   });
 
-  type SendVars = { text: string; internal: boolean; senderName: string; jobTitle: string; userId: string };
+  type SendVars = {
+    text: string;
+    internal: boolean;
+    senderName: string;
+    jobTitle: string;
+    userId: string;
+    quoted?: {
+      evolutionMessageId: string;
+      sender: string;
+      content: string;
+    };
+  };
 
   const sendMutation = useMutation({
     onMutate: async (vars: SendVars) => {
@@ -120,7 +138,13 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
         sender_name: vars.senderName,
         is_internal: vars.internal,
         evolution_message_id: null,
-        metadata: { delivery_status: "pending", optimistic: true },
+        metadata: {
+          delivery_status: "pending",
+          optimistic: true,
+          ...(vars.quoted
+            ? { quoted: { sender: vars.quoted.sender, content: vars.quoted.content } }
+            : {}),
+        },
       };
       queryClient.setQueryData<CachedMessages>(["messages", conversationId], (old) => {
         if (!old) {
@@ -155,6 +179,7 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
           conversationId,
           content: finalContent,
           senderName: vars.senderName,
+          quoted: vars.quoted,
         },
       });
 
@@ -307,7 +332,16 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
     }
 
     setContent("");
-    sendMutation.mutate({ text, internal: isInternal, senderName, jobTitle, userId: user.id });
+    const quoted =
+      replyTo && replyTo.evolutionMessageId && !isInternal
+        ? {
+            evolutionMessageId: replyTo.evolutionMessageId,
+            sender: replyTo.sender,
+            content: replyTo.content,
+          }
+        : undefined;
+    onCancelReply?.();
+    sendMutation.mutate({ text, internal: isInternal, senderName, jobTitle, userId: user.id, quoted });
   };
 
   const handleContentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -360,6 +394,28 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
 
   return (
     <div className="p-4 lg:p-8 border-t bg-card/60 backdrop-blur-2xl space-y-4">
+      {replyTo && (
+        <div className="flex items-stretch gap-2 -mb-2 rounded-md bg-emerald-50 dark:bg-emerald-950/30 border-l-4 border-emerald-500 px-3 py-2">
+          <div className="flex-1 min-w-0">
+            <div className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+              Respondendo a {replyTo.sender}
+            </div>
+            <div className="text-xs text-muted-foreground line-clamp-2">
+              {replyTo.content || "[Mídia]"}
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 self-start"
+            onClick={onCancelReply}
+            title="Cancelar resposta"
+          >
+            <XIcon className="h-3 w-3" />
+          </Button>
+        </div>
+      )}
       <div className="flex flex-wrap gap-2 items-center">
         <Button
           type="button"

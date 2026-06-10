@@ -30,12 +30,24 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 
+export type ReplyTarget = {
+  id: string;
+  evolutionMessageId: string | null;
+  sender: string;
+  content: string;
+};
+
 export function ChatInterface() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
   const [internalNote, setInternalNote] = useState("");
   const [newTag, setNewTag] = useState("");
   const [mobileView, setMobileView] = useState<"list" | "chat">("list");
   const [presence, setPresence] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
+
+  useEffect(() => {
+    setReplyTo(null);
+  }, [selectedConversationId]);
 
   useEffect(() => {
     setPresence(null);
@@ -342,11 +354,14 @@ export function ChatInterface() {
               <MessageList 
                 conversationId={selectedConversationId} 
                 isGroup={!!selectedConversation?.is_group} 
+                onReply={setReplyTo}
               />
               
               <MessageInput 
                 conversationId={selectedConversationId} 
                 isGroup={!!selectedConversation?.is_group} 
+                replyTo={replyTo}
+                onCancelReply={() => setReplyTo(null)}
               />
             </div>
 

@@ -6,6 +6,11 @@ type SendMessageInput = {
   conversationId: string;
   content: string;
   senderName?: string;
+  quoted?: {
+    evolutionMessageId: string;
+    sender?: string;
+    content?: string;
+  };
 };
 
 type MessageRow = {
@@ -51,6 +56,11 @@ async function queueMessageViaEdgeFunction(payload: {
   phone: string;
   senderName?: string;
   senderUserId: string;
+  quoted?: {
+    evolutionMessageId: string;
+    sender?: string;
+    content?: string;
+  };
 }) {
   const supabaseUrl =
     process.env.SUPABASE_URL ||
@@ -118,5 +128,6 @@ export async function sendMessageServer(
     phone,
     senderName: input.senderName || "Agente",
     senderUserId: userId,
+    quoted: input.quoted,
   });
 }
