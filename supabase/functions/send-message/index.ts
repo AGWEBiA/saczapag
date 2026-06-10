@@ -633,10 +633,15 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const { conversationId, content, phone, senderName, senderUserId, existingMessageId } =
+    const { conversationId, content, phone, senderName, senderUserId, existingMessageId, quoted } =
       await req.json();
 
-    log("received", { conversationId, phone, existingMessageId: existingMessageId ?? null });
+    log("received", {
+      conversationId,
+      phone,
+      existingMessageId: existingMessageId ?? null,
+      hasQuoted: Boolean(quoted?.evolutionMessageId),
+    });
 
     if (!conversationId || !content || !phone) {
       throw new Error("Conversation, content and phone are required");
@@ -650,10 +655,21 @@ serve(async (req) => {
 
     if (convError || !conversation) throw new Error("Conversation not found");
 
+    const quotedMeta = quoted?.evolutionMessageId
+      ? {
+          quoted: {
+            evolution_message_id: quoted.evolutionMessageId,
+            sender: quoted.sender ?? null,
+            content: quoted.content ?? null,
+          },
+        }
+      : {};
+
     const queuedMetadata = {
       delivery_status: "queued",
       queued_at: new Date().toISOString(),
       request_id: requestId,
+      ...quotedMeta,
     };
 
     const messageQuery = existingMessageId
@@ -707,6 +723,7 @@ serve(async (req) => {
       phone,
       content,
       isGroup: Boolean(conversation.is_group),
+      quoted: quoted ?? null,
     });
 
     log("done", {
