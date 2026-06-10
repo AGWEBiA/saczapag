@@ -21,6 +21,8 @@ type Msg = {
   sender_name: string | null;
   is_internal: boolean | null;
   evolution_message_id?: string | null;
+  media_url?: string | null;
+  media_type?: string | null;
   metadata?: Record<string, unknown> | null;
 };
 
