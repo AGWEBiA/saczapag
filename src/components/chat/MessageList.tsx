@@ -467,7 +467,30 @@ const MessageBubble = React.memo(
             isActiveMatch && "ring-2 ring-yellow-400",
           )}
         >
-          <div className="absolute -top-2 -right-2 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
+          <div className="absolute -top-3 -right-2 opacity-0 group-hover/bubble:opacity-100 transition-opacity flex items-center gap-1 z-10">
+            <Popover open={reactPopoverOpen} onOpenChange={setReactPopoverOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="h-6 w-6 rounded-full bg-card border shadow-sm flex items-center justify-center hover:bg-accent"
+                  title="Reagir"
+                >
+                  <SmilePlus className="h-3 w-3" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="p-1 w-auto flex gap-0.5" align="end">
+                {REACTION_EMOJIS.map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    onClick={() => handleReact(e)}
+                    className="h-8 w-8 rounded-full hover:bg-accent text-lg flex items-center justify-center transition-transform hover:scale-125"
+                  >
+                    {e}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
             <CreateTaskDialog messageId={msg.id} initialContent={msg.content || ""} />
           </div>
           {isGroup && !isOutbound && msg.sender_name && (
