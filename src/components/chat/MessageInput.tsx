@@ -490,6 +490,24 @@ export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }
             setAttachedFile(f);
           }}
         />
+        <input
+          ref={stickerInputRef}
+          type="file"
+          className="hidden"
+          accept="image/webp"
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            if (stickerInputRef.current) stickerInputRef.current.value = "";
+            if (!f) return;
+            if (f.size > 1 * 1024 * 1024) {
+              toast.error("Sticker deve ter no máximo 1MB (.webp)");
+              return;
+            }
+            const { data: { user } } = await supabase.auth.getUser();
+            const senderName = profile?.full_name || user?.email?.split("@")[0] || "Agente";
+            await uploadAndSendMedia(f, "", senderName, true);
+          }}
+        />
         <Button
           type="button"
           variant="ghost"
@@ -500,6 +518,18 @@ export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }
           title={isInternal ? "Anexos não disponíveis em notas internas" : "Anexar arquivo"}
         >
           <Paperclip className="h-3 w-3" /> Anexar
+        </Button>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => stickerInputRef.current?.click()}
+          disabled={uploading || isInternal}
+          className="text-xs gap-1"
+          title={isInternal ? "Stickers não disponíveis em notas internas" : "Enviar sticker (.webp)"}
+        >
+          <Sticker className="h-3 w-3" /> Sticker
         </Button>
 
         {!isRecording ? (
