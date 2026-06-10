@@ -176,3 +176,56 @@
   animation: progress-bar 2s ease-out infinite;
 }
 
+/* ============= WhatsApp-style chat tokens ============= */
+:root {
+  --wa-bg: #efeae2;
+  --wa-bubble-out: #d9fdd3;
+  --wa-bubble-out-fg: #111b21;
+  --wa-bubble-in: #ffffff;
+  --wa-bubble-in-fg: #111b21;
+  --wa-tick: #53bdeb;
+  --wa-meta: #667781;
+  --wa-panel: #f0f2f5;
+  --wa-divider: #e9edef;
+}
+.dark {
+  --wa-bg: #0b141a;
+  --wa-bubble-out: #005c4b;
+  --wa-bubble-out-fg: #e9edef;
+  --wa-bubble-in: #202c33;
+  --wa-bubble-in-fg: #e9edef;
+  --wa-tick: #53bdeb;
+  --wa-meta: #8696a0;
+  --wa-panel: #202c33;
+  --wa-divider: #2a3942;
+}
+
+.wa-chat-bg {
+  background-color: var(--wa-bg);
+  background-image:
+    radial-gradient(circle at 25% 15%, rgba(0,0,0,0.025) 1px, transparent 1px),
+    radial-gradient(circle at 75% 75%, rgba(0,0,0,0.025) 1px, transparent 1px);
+  background-size: 22px 22px, 22px 22px;
+}
+.dark .wa-chat-bg {
+  background-image:
+    radial-gradient(circle at 25% 15%, rgba(255,255,255,0.02) 1px, transparent 1px),
+    radial-gradient(circle at 75% 75%, rgba(255,255,255,0.02) 1px, transparent 1px);
+}
+
+.wa-bubble-out {
+  background: var(--wa-bubble-out);
+  color: var(--wa-bubble-out-fg);
+  border-radius: 8px 8px 2px 8px;
+  box-shadow: 0 1px 0.5px rgba(11,20,26,0.13);
+}
+.wa-bubble-in {
+  background: var(--wa-bubble-in);
+  color: var(--wa-bubble-in-fg);
+  border-radius: 8px 8px 8px 2px;
+  box-shadow: 0 1px 0.5px rgba(11,20,26,0.13);
+}
+.wa-meta { color: var(--wa-meta); font-size: 11px; }
+.wa-tick { color: var(--wa-tick); }
+.wa-panel { background: var(--wa-panel); }
+

@@ -185,16 +185,16 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
   }
 
   return (
-    <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto p-4 bg-muted/30">
+    <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto p-4 wa-chat-bg">
       <div ref={topSentinelRef} />
       {isFetchingNextPage && (
         <div className="flex justify-center py-2">
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          <Loader2 className="h-4 w-4 animate-spin wa-meta" />
         </div>
       )}
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
         {messages.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="text-center py-8 wa-meta">
             Inicie a conversa enviando uma mensagem.
           </div>
         ) : (
@@ -224,8 +224,10 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
     minutesSinceCreated > 2;
   const failed = isOutbound && (deliveryStatus === "failed" || stalePending);
   const sending =
-    isOutbound && !failed && (deliveryStatus === "queued" || deliveryStatus === "sending");
-  const sent = isOutbound && (deliveryStatus === "sent" || !!msg.evolution_message_id);
+    isOutbound && !failed && (deliveryStatus === "queued" || deliveryStatus === "sending" || deliveryStatus === "pending");
+  const sent = isOutbound && !failed && !sending && (deliveryStatus === "sent" || !!msg.evolution_message_id);
+  const delivered = isOutbound && (deliveryStatus === "delivered" || deliveryStatus === "read");
+  const read = isOutbound && deliveryStatus === "read";
   const messageTime =
     createdAt && !Number.isNaN(createdAt.getTime())
       ? format(createdAt, "HH:mm", { locale: ptBR })
@@ -236,87 +238,69 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
       ? "Envio não confirmado pelo WhatsApp. Verifique se a instância está conectada."
       : null);
 
-  return (
-    <div className="group/bubble flex flex-col items-start w-full">
-        <div
-        className={cn(
-          "flex flex-col max-w-[85%] lg:max-w-[75%] rounded-3xl p-4 lg:p-5 shadow-sm transition-all animate-in fade-in slide-in-from-bottom-2 duration-500 relative",
-          msg.is_internal
-            ? "bg-yellow-50/90 border-yellow-200/50 self-center max-w-[95%] w-full border text-yellow-900 backdrop-blur-md mb-6 shadow-lg shadow-yellow-500/5"
-            : msg.direction === "outbound"
-              ? "bg-primary text-primary-foreground self-end rounded-tr-none shadow-lg shadow-primary/20 ring-1 ring-white/10"
-              : "bg-card self-start rounded-tl-none border-border/40 border shadow-xl shadow-black/5 ring-1 ring-black/5",
-        )}
-      >
-        <div className="absolute top-2 right-2 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
-          <CreateTaskDialog messageId={msg.id} initialContent={msg.content || ""} />
-        </div>
-        {msg.is_internal && (
-          <div className="flex items-center gap-1.5 mb-2 border-b border-yellow-200/50 pb-1">
-            <Info className="h-3 w-3 text-yellow-600" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-yellow-700">
-              Nota Interna
+  if (msg.is_internal) {
+    return (
+      <div className="flex justify-center my-2">
+        <div className="max-w-[85%] bg-yellow-100 border border-yellow-300 text-yellow-900 rounded-lg px-3 py-2 shadow-sm">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Info className="h-3 w-3 text-yellow-700" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-yellow-800">
+              Nota Interna {msg.sender_name ? `· ${msg.sender_name}` : ""}
             </span>
           </div>
+          {msg.content && (
+            <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+          )}
+          <div className="text-[10px] text-yellow-700/70 mt-1 text-right">{messageTime}</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("group/bubble flex w-full", isOutbound ? "justify-end" : "justify-start")}>
+      <div
+        className={cn(
+          "relative max-w-[85%] lg:max-w-[65%] px-2.5 pt-1.5 pb-1 animate-in fade-in slide-in-from-bottom-1 duration-200",
+          isOutbound ? "wa-bubble-out" : "wa-bubble-in",
         )}
-        {isGroup && msg.direction === "inbound" && msg.sender_name && (
-          <span className="text-[10px] font-black mb-1.5 text-primary tracking-wide uppercase">
-            {msg.sender_name}
-          </span>
-        )}
-        {msg.direction === "outbound" && msg.sender_name && (
-          <span className="text-[10px] font-black mb-1.5 text-primary-foreground/80 tracking-wide uppercase">
+      >
+        <div className="absolute -top-2 -right-2 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
+          <CreateTaskDialog messageId={msg.id} initialContent={msg.content || ""} />
+        </div>
+        {isGroup && !isOutbound && msg.sender_name && (
+          <span className="block text-[12.5px] font-semibold mb-0.5" style={{ color: "#06cf9c" }}>
             {msg.sender_name}
           </span>
         )}
         {msg.media_url && <MediaAttachment url={msg.media_url} type={msg.media_type} />}
         {msg.content && msg.content !== "[Mídia]" && (
-          <p className="text-sm lg:text-[15px] leading-relaxed whitespace-pre-wrap break-words font-medium">
+          <p className="text-[14.2px] leading-[19px] whitespace-pre-wrap break-words pr-16">
             {msg.content}
           </p>
         )}
-        <div className="flex items-center justify-between gap-3 mt-2 pt-1 border-t border-current/5">
-          <span
-            className={cn(
-              "text-[10px] font-bold opacity-60",
-              msg.is_internal
-                ? "text-yellow-600"
-                : msg.direction === "outbound"
-                  ? "text-primary-foreground"
-                  : "text-muted-foreground",
-            )}
-          >
-            {messageTime}
-          </span>
+        <div className="flex items-center justify-end gap-1 -mt-0.5 ml-2 float-right">
+          <span className="text-[11px] wa-meta leading-none">{messageTime}</span>
           {isOutbound && (
             <span
-              className={cn(
-                "inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-tighter opacity-80",
-                failed && "text-red-200 opacity-100",
-                !failed && "text-primary-foreground",
-              )}
-              title={visibleDeliveryError ?? undefined}
+              className="inline-flex items-center leading-none"
+              title={visibleDeliveryError ?? (read ? "Lida" : delivered ? "Entregue" : sent ? "Enviada" : sending ? "Enviando" : failed ? "Falha" : "")}
             >
               {failed ? (
-                <>
-                  <AlertTriangle className="h-3 w-3" /> Erro
-                </>
+                <AlertTriangle className="h-3 w-3 text-red-500" />
               ) : sending ? (
-                <>
-                  <Clock className="h-3 w-3 animate-pulse" /> Pendente
-                </>
-              ) : sent ? (
-                <>
-                  <CheckCheck className="h-3 w-3" /> Enviado
-                </>
+                <Clock className="h-3 w-3 wa-meta" />
+              ) : delivered || sent ? (
+                <CheckCheck className={cn("h-3.5 w-3.5", read ? "wa-tick" : "wa-meta")} />
               ) : null}
             </span>
           )}
         </div>
+        <div className="clear-both" />
         {failed && visibleDeliveryError && (
-          <span className="mt-2 text-[10px] leading-tight text-red-100 bg-red-900/20 p-2 rounded-lg font-medium border border-red-500/20">
+          <div className="mt-1 text-[11px] text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200">
             {visibleDeliveryError}
-          </span>
+          </div>
         )}
       </div>
     </div>
@@ -333,23 +317,23 @@ function MediaAttachment({ url, type }: { url: string; type?: string | null }) {
 
   if (isImage) {
     return (
-      <a href={url} target="_blank" rel="noopener noreferrer" className="block mb-2">
-        <img src={url} alt="mídia" className="rounded-xl max-h-80 object-cover" loading="lazy" />
+      <a href={url} target="_blank" rel="noopener noreferrer" className="block mb-1 -mx-1.5 -mt-1">
+        <img src={url} alt="mídia" className="rounded-md max-h-80 w-full object-cover" loading="lazy" />
       </a>
     );
   }
   if (isVideo) {
-    return <video src={url} controls className="rounded-xl max-h-80 mb-2" />;
+    return <video src={url} controls className="rounded-md max-h-80 mb-1 -mx-1.5 -mt-1 w-full" />;
   }
   if (isAudio) {
-    return <audio src={url} controls className="w-full mb-2" />;
+    return <audio src={url} controls className="w-full mb-1" />;
   }
   return (
     <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-2 text-xs font-semibold underline mb-2"
+      className="flex items-center gap-2 text-xs font-medium underline mb-1 bg-black/5 px-2 py-1.5 rounded"
     >
       📎 Abrir anexo
     </a>
