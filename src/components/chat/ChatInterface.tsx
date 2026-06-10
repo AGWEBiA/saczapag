@@ -35,6 +35,27 @@ export function ChatInterface() {
   const [internalNote, setInternalNote] = useState("");
   const [newTag, setNewTag] = useState("");
   const [mobileView, setMobileView] = useState<"list" | "chat">("list");
+  const [presence, setPresence] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPresence(null);
+    if (!selectedConversationId) return;
+    const ch = supabase.channel(`presence-${selectedConversationId}`);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    ch.on("broadcast", { event: "presence" }, ({ payload }) => {
+      const p = String(payload?.presence || "").toLowerCase();
+      if (p === "composing") setPresence("digitando...");
+      else if (p === "recording") setPresence("gravando áudio...");
+      else setPresence(null);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setPresence(null), 8000);
+    }).subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(ch);
+    };
+  }, [selectedConversationId]);
+
 
   const { data: selectedConversation, refetch } = useQuery({
     queryKey: ["conversation", selectedConversationId],
