@@ -383,7 +383,89 @@ serve(async (req) => {
       }
     }
 
-    if (evNorm === "messages.upsert" || evNorm === "send.message") {
+    // ===== Atualização de status de entrega/leitura (ticks reais) =====
+    if (evNorm === "messages.update" || evNorm === "message.update") {
+      const updates = Array.isArray(data) ? data : data?.updates || [data];
+      for (const upd of updates) {
+        const keyId =
+          upd?.keyId || upd?.key?.id || upd?.messageId || upd?.id || upd?.message?.key?.id;
+        const rawStatus = String(
+          upd?.status || upd?.update?.status || upd?.messageStatus || "",
+        ).toUpperCase();
+        if (!keyId || !rawStatus) continue;
+        let delivery_status: string | null = null;
+        if (rawStatus.includes("READ") || rawStatus === "4") delivery_status = "read";
+        else if (rawStatus.includes("DELIVER") || rawStatus === "3") delivery_status = "delivered";
+        else if (rawStatus.includes("SERVER") || rawStatus.includes("SENT") || rawStatus === "2")
+          delivery_status = "sent";
+        if (!delivery_status) continue;
+
+        const { data: existing } = await supabase
+          .from("messages")
+          .select("id, metadata")
+          .eq("evolution_message_id", keyId)
+          .maybeSingle();
+        if (!existing) continue;
+        const prev = (existing.metadata as Record<string, unknown>) ?? {};
+        await supabase
+          .from("messages")
+          .update({
+            metadata: {
+              ...prev,
+              delivery_status,
+              [`${delivery_status}_at`]: new Date().toISOString(),
+            },
+          })
+          .eq("id", existing.id);
+      }
+      return new Response(JSON.stringify({ ok: true, request_id: requestId }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ===== Presença (digitando, gravando áudio, online) =====
+    if (evNorm === "presence.update") {
+      const remoteJid: string | null =
+        data?.id || data?.remoteJid || data?.jid || data?.chatId || null;
+      const presences = data?.presences || {};
+      let presence: string | null = null;
+      if (typeof presences === "object") {
+        for (const k of Object.keys(presences)) {
+          presence = presences[k]?.lastKnownPresence || presence;
+        }
+      }
+      presence = presence || data?.presence || data?.state || null;
+      if (remoteJid && presence) {
+        const normalizedJid = normalizeJid(remoteJid);
+        const { data: contact } = await supabase
+          .from("contacts")
+          .select("id")
+          .eq("phone_number", normalizedJid)
+          .maybeSingle();
+        if (contact) {
+          const { data: conv } = await supabase
+            .from("conversations")
+            .select("id")
+            .eq("contact_id", contact.id)
+            .neq("status", "resolvida")
+            .order("last_message_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (conv) {
+            const channel = supabase.channel(`presence-${conv.id}`);
+            await channel.send({
+              type: "broadcast",
+              event: "presence",
+              payload: { presence, at: Date.now() },
+            });
+          }
+        }
+      }
+      return new Response(JSON.stringify({ ok: true, request_id: requestId }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
       const item = unwrapMessageData(data);
       const keyId = extractMessageKeyId(item);
       const remoteJid: string | null = extractRemoteJid(item, data);
