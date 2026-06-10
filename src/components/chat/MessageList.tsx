@@ -715,10 +715,23 @@ function MediaAttachment({
   metadata?: Record<string, any> | null;
 }) {
   const t = (type || "").toLowerCase();
-  const isImage = t.startsWith("image") || /\.(png|jpe?g|gif|webp)(\?|$)/i.test(url);
+  const isSticker =
+    Boolean(metadata?.is_sticker) || t === "image/webp" || /\.webp(\?|$)/i.test(url);
+  const isImage = !isSticker && (t.startsWith("image") || /\.(png|jpe?g|gif)(\?|$)/i.test(url));
   const isVideo = t.startsWith("video") || /\.(mp4|webm|mov)(\?|$)/i.test(url);
   const isAudio = t.startsWith("audio") || /\.(mp3|ogg|wav|m4a|opus)(\?|$)/i.test(url);
 
+  if (isSticker) {
+    return (
+      <img
+        src={url}
+        alt="sticker"
+        className="max-h-40 max-w-[160px] my-1 bg-transparent select-none"
+        loading="lazy"
+        draggable={false}
+      />
+    );
+  }
   if (isImage) {
     return <ImageLightbox url={url} />;
   }
