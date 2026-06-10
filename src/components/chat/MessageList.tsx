@@ -324,3 +324,34 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
 });
 
 MessageBubble.displayName = "MessageBubble";
+
+function MediaAttachment({ url, type }: { url: string; type?: string | null }) {
+  const t = (type || "").toLowerCase();
+  const isImage = t.startsWith("image") || /\.(png|jpe?g|gif|webp)(\?|$)/i.test(url);
+  const isVideo = t.startsWith("video") || /\.(mp4|webm|mov)(\?|$)/i.test(url);
+  const isAudio = t.startsWith("audio") || /\.(mp3|ogg|wav|m4a|opus)(\?|$)/i.test(url);
+
+  if (isImage) {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" className="block mb-2">
+        <img src={url} alt="mídia" className="rounded-xl max-h-80 object-cover" loading="lazy" />
+      </a>
+    );
+  }
+  if (isVideo) {
+    return <video src={url} controls className="rounded-xl max-h-80 mb-2" />;
+  }
+  if (isAudio) {
+    return <audio src={url} controls className="w-full mb-2" />;
+  }
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-2 text-xs font-semibold underline mb-2"
+    >
+      📎 Abrir anexo
+    </a>
+  );
+}
