@@ -35,6 +35,27 @@ export function ChatInterface() {
   const [internalNote, setInternalNote] = useState("");
   const [newTag, setNewTag] = useState("");
   const [mobileView, setMobileView] = useState<"list" | "chat">("list");
+  const [presence, setPresence] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPresence(null);
+    if (!selectedConversationId) return;
+    const ch = supabase.channel(`presence-${selectedConversationId}`);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    ch.on("broadcast", { event: "presence" }, ({ payload }) => {
+      const p = String(payload?.presence || "").toLowerCase();
+      if (p === "composing") setPresence("digitando...");
+      else if (p === "recording") setPresence("gravando áudio...");
+      else setPresence(null);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setPresence(null), 8000);
+    }).subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(ch);
+    };
+  }, [selectedConversationId]);
+
 
   const { data: selectedConversation, refetch } = useQuery({
     queryKey: ["conversation", selectedConversationId],
@@ -235,7 +256,7 @@ export function ChatInterface() {
                       <Badge variant="outline" className="text-[8px] h-3 px-1 border-green-500/50 text-green-600 bg-green-50 uppercase font-black tracking-widest">WhatsApp</Badge>
                     </div>
                     <div className="flex items-center gap-2">
-                      <p className="text-[10px] lg:text-xs text-muted-foreground font-medium truncate">{selectedConversation?.contact?.phone_number}</p>
+                      <p className={cn("text-[10px] lg:text-xs font-medium truncate", presence ? "text-emerald-600 italic" : "text-muted-foreground")}>{presence || selectedConversation?.contact?.phone_number}</p>
                       {selectedConversation?.assigned_to ? (
                         <Badge variant="secondary" className="text-[9px] lg:text-[10px] h-4 py-0 font-bold uppercase tracking-wider bg-primary/10 text-primary hover:bg-primary/20 transition-colors border-none">
                           {agents?.find(a => a.id === selectedConversation.assigned_to)?.full_name?.split(' ')[0] || "Agente"}
