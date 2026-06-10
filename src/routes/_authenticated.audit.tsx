@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,9 @@ function AuditPage() {
     const { data, error } = await query;
     if (error) {
       console.error("Audit fetch error:", error);
+      if (error.message.includes("webhook_audits")) {
+        toast.error("Tabela de auditoria não encontrada. Por favor, execute o SQL de criação no Supabase.");
+      }
     } else {
       setRows((data as unknown as AuditRow[]) || []);
     }
