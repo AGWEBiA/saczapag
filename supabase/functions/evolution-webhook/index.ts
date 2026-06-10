@@ -580,14 +580,18 @@ serve(async (req) => {
           type: "whatsapp",
           media_url,
           media_type,
-          metadata:
-            direction === "outbound"
+          metadata: {
+            ...(direction === "outbound"
               ? {
                   delivery_status: "sent",
                   sent_at: new Date().toISOString(),
-                  webhook_request_id: requestId,
                 }
-              : { webhook_request_id: requestId },
+              : {}),
+            webhook_request_id: requestId,
+            ...(mediaInfo.file_name ? { file_name: mediaInfo.file_name } : {}),
+            ...(mediaInfo.file_size ? { file_size: mediaInfo.file_size } : {}),
+            ...(quoted ? { quoted } : {}),
+          },
         });
         log("inserted", { direction, evolution_message_id: keyId });
       }
