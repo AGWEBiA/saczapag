@@ -25,7 +25,7 @@ import {
   Download,
   Forward,
 } from "lucide-react";
-import { ForwardMessageDialog, type ForwardSource } from "./ForwardMessageDialog";
+import { ForwardMessageDialog } from "./ForwardMessageDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
