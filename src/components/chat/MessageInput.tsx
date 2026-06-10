@@ -193,6 +193,54 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
     sendMutation.mutate({ text, internal: isInternal, senderName, jobTitle, userId: user.id });
   };
 
+  const handleContentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setContent(value);
+    const caret = e.target.selectionStart ?? value.length;
+    const upToCaret = value.slice(0, caret);
+    const match = upToCaret.match(/(?:^|\s)@(\w*)$/);
+    if (match) {
+      setMentionQuery(match[1]);
+      setMentionIndex(0);
+    } else {
+      setMentionQuery(null);
+    }
+  };
+
+  const insertMention = (handle: string) => {
+    const input = inputRef.current;
+    const caret = input?.selectionStart ?? content.length;
+    const before = content.slice(0, caret);
+    const after = content.slice(caret);
+    const newBefore = before.replace(/(^|\s)@\w*$/, `$1@${handle} `);
+    const newValue = newBefore + after;
+    setContent(newValue);
+    setMentionQuery(null);
+    setTimeout(() => {
+      input?.focus();
+      const pos = newBefore.length;
+      input?.setSelectionRange(pos, pos);
+    }, 0);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (mentionQuery === null || mentionCandidates.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setMentionIndex((i) => (i + 1) % mentionCandidates.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setMentionIndex((i) => (i - 1 + mentionCandidates.length) % mentionCandidates.length);
+    } else if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      const m: any = mentionCandidates[mentionIndex];
+      const handle = (m.email || "").split("@")[0];
+      insertMention(handle);
+    } else if (e.key === "Escape") {
+      setMentionQuery(null);
+    }
+  };
+
   return (
     <div className="p-4 lg:p-8 border-t bg-card/60 backdrop-blur-2xl space-y-4">
       <div className="flex flex-wrap gap-2 items-center">
