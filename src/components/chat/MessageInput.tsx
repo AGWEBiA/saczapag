@@ -332,7 +332,16 @@ export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }
     }
 
     setContent("");
-    sendMutation.mutate({ text, internal: isInternal, senderName, jobTitle, userId: user.id });
+    const quoted =
+      replyTo && replyTo.evolutionMessageId && !isInternal
+        ? {
+            evolutionMessageId: replyTo.evolutionMessageId,
+            sender: replyTo.sender,
+            content: replyTo.content,
+          }
+        : undefined;
+    onCancelReply?.();
+    sendMutation.mutate({ text, internal: isInternal, senderName, jobTitle, userId: user.id, quoted });
   };
 
   const handleContentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
