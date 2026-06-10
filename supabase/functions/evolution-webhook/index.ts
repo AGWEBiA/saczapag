@@ -466,6 +466,7 @@ serve(async (req) => {
       });
     }
 
+    if (evNorm === "messages.upsert" || evNorm === "send.message") {
       const item = unwrapMessageData(data);
       const keyId = extractMessageKeyId(item);
       const remoteJid: string | null = extractRemoteJid(item, data);
