@@ -360,6 +360,47 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_audits: {
+        Row: {
+          created_at: string | null
+          decision: string
+          details: Json | null
+          event_type: string
+          external_id: string | null
+          id: string
+          inconsistency_found: boolean | null
+          instance_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          decision: string
+          details?: Json | null
+          event_type: string
+          external_id?: string | null
+          id?: string
+          inconsistency_found?: boolean | null
+          instance_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          decision?: string
+          details?: Json | null
+          event_type?: string
+          external_id?: string | null
+          id?: string
+          inconsistency_found?: boolean | null
+          instance_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_audits_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_instances: {
         Row: {
           auto_assign_enabled: boolean | null
