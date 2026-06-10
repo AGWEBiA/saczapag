@@ -2,7 +2,7 @@ import { createFileRoute, redirect, Outlet, Link, useRouter } from "@tanstack/re
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Users2, Activity, Bell, Search, ClipboardList } from "lucide-react";
+import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Users2, Activity, Bell, Search, ClipboardList, BarChart3 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { HelpGuide } from "@/components/shared/HelpGuide";
@@ -54,6 +54,7 @@ function AuthenticatedLayout() {
     { to: "/instances", label: "Conexões", icon: Smartphone },
     { to: "/contacts", label: "Contatos", icon: Users },
     { to: "/team", label: "Equipe", icon: Users2 },
+    { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
     { to: "/diagnostics", label: "Sistema", icon: Activity },
     { to: "/audit", label: "Auditoria", icon: ClipboardList },
     { to: "/settings", label: "Ajustes", icon: Settings },

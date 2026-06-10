@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTeamRouteImport } from './routes/_authenticated.team'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
+import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated.relatorios'
 import { Route as AuthenticatedInstancesRouteImport } from './routes/_authenticated.instances'
 import { Route as AuthenticatedDiagnosticsRouteImport } from './routes/_authenticated.diagnostics'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
@@ -43,6 +44,11 @@ const AuthenticatedTeamRoute = AuthenticatedTeamRouteImport.update({
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
+  id: '/relatorios',
+  path: '/relatorios',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedInstancesRoute = AuthenticatedInstancesRouteImport.update({
@@ -86,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/diagnostics': typeof AuthenticatedDiagnosticsRoute
   '/instances': typeof AuthenticatedInstancesRoute
+  '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/team': typeof AuthenticatedTeamRoute
 }
@@ -98,6 +105,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/diagnostics': typeof AuthenticatedDiagnosticsRoute
   '/instances': typeof AuthenticatedInstancesRoute
+  '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/team': typeof AuthenticatedTeamRoute
 }
@@ -112,6 +120,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/diagnostics': typeof AuthenticatedDiagnosticsRoute
   '/_authenticated/instances': typeof AuthenticatedInstancesRoute
+  '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/team': typeof AuthenticatedTeamRoute
 }
@@ -126,6 +135,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/diagnostics'
     | '/instances'
+    | '/relatorios'
     | '/settings'
     | '/team'
   fileRoutesByTo: FileRoutesByTo
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/diagnostics'
     | '/instances'
+    | '/relatorios'
     | '/settings'
     | '/team'
   id:
@@ -151,6 +162,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/diagnostics'
     | '/_authenticated/instances'
+    | '/_authenticated/relatorios'
     | '/_authenticated/settings'
     | '/_authenticated/team'
   fileRoutesById: FileRoutesById
@@ -196,6 +208,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/relatorios': {
+      id: '/_authenticated/relatorios'
+      path: '/relatorios'
+      fullPath: '/relatorios'
+      preLoaderRoute: typeof AuthenticatedRelatoriosRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/instances': {
@@ -250,6 +269,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDiagnosticsRoute: typeof AuthenticatedDiagnosticsRoute
   AuthenticatedInstancesRoute: typeof AuthenticatedInstancesRoute
+  AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedTeamRoute: typeof AuthenticatedTeamRoute
 }
@@ -261,6 +281,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDiagnosticsRoute: AuthenticatedDiagnosticsRoute,
   AuthenticatedInstancesRoute: AuthenticatedInstancesRoute,
+  AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedTeamRoute: AuthenticatedTeamRoute,
 }
