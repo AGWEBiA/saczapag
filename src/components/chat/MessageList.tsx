@@ -19,9 +19,14 @@ import {
   Pause,
   Mic,
   Reply,
+  SmilePlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useServerFn } from "@tanstack/react-start";
+import { reactMessage as reactMessageFn } from "@/lib/react-message.functions";
+import { toast } from "sonner";
 
 interface MessageListProps {
   conversationId: string;
