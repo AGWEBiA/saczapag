@@ -551,6 +551,21 @@ const MessageBubble = React.memo(
             )}
           </div>
           <div className="clear-both" />
+          {reactionGroups.length > 0 && (
+            <div
+              className={cn(
+                "absolute -bottom-2 flex gap-0.5 bg-card border rounded-full px-1.5 py-0.5 shadow-sm text-xs",
+                isOutbound ? "right-2" : "left-2",
+              )}
+            >
+              {reactionGroups.map(([emoji, count]) => (
+                <span key={emoji} className="inline-flex items-center gap-0.5">
+                  <span>{emoji}</span>
+                  {count > 1 && <span className="text-[10px] wa-meta">{count}</span>}
+                </span>
+              ))}
+            </div>
+          )}
           {failed && visibleDeliveryError && (
             <div className="mt-1 text-[11px] text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200">
               {visibleDeliveryError}
