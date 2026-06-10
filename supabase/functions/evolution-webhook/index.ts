@@ -92,25 +92,38 @@ function extractContent(item: any, message: any) {
 
 function extractMedia(item: any, message: any): { media_url: string | null; media_type: string | null } {
   const inner = message?.ephemeralMessage?.message ?? message ?? {};
+  
+  // Se for mensagem de visualização única (viewOnce), ela vem aninhada
+  const viewOnce = inner?.viewOnceMessage?.message || inner?.viewOnceMessageV2?.message;
+  const msgBody = viewOnce || inner;
+
   const candidates: Array<{ node: any; type: string }> = [
-    { node: inner?.imageMessage, type: "image" },
-    { node: inner?.videoMessage, type: "video" },
-    { node: inner?.audioMessage, type: "audio" },
-    { node: inner?.documentMessage, type: "document" },
-    { node: inner?.stickerMessage, type: "image" },
+    { node: msgBody?.imageMessage, type: "image" },
+    { node: msgBody?.videoMessage, type: "video" },
+    { node: msgBody?.audioMessage, type: "audio" },
+    { node: msgBody?.documentMessage, type: "document" },
+    { node: msgBody?.stickerMessage, type: "image" },
   ];
+
   for (const c of candidates) {
     if (c.node) {
-      // Prioritize evolution's mediaUrl/base64 if available, otherwise use original path
+      // Evolution v2 nested structure for mediaUrl
       const url =
         item?.mediaUrl ||
         item?.message?.mediaUrl ||
+        c.node.mediaUrl ||
         c.node.url ||
         c.node.directPath ||
         null;
-      return { media_url: url, media_type: c.node.mimetype || c.type };
+      
+      return { 
+        media_url: url, 
+        media_type: c.node.mimetype || c.type 
+      };
     }
   }
+
+  // Fallback for cases where mediaUrl is at the root but no specific message type was matched
   const fallbackUrl = item?.mediaUrl || item?.message?.mediaUrl || null;
   return { media_url: fallbackUrl, media_type: fallbackUrl ? "file" : null };
 }
