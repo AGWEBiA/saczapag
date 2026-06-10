@@ -250,16 +250,6 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="flex h-[100dvh] lg:h-full overflow-hidden bg-background lg:m-4 lg:rounded-2xl lg:border lg:shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-700 ease-out">
-      <div className={cn(
-        "w-full lg:w-80 xl:w-96 flex-shrink-0 border-r bg-card/30 backdrop-blur-xl transition-all duration-500 ease-in-out",
-        mobileView === "chat" && "hidden lg:flex"
-      )}>
-        <ChatSidebar 
-          selectedId={selectedConversationId} 
-          onSelect={setSelectedConversationId} 
-        />
-      </div>
     <div className="flex h-[100dvh] lg:h-full overflow-hidden bg-background animate-in fade-in duration-300">
       {/* Coluna 1 — Lista de conversas */}
       <aside className={cn(
@@ -555,8 +545,8 @@ export function ChatInterface() {
             </div>
           </div>
         )}
-      </div>
       </section>
+    </div>
   );
 }
 
