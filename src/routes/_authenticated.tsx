@@ -54,6 +54,7 @@ function AuthenticatedLayout() {
     { to: "/instances", label: "Conexões", icon: Smartphone },
     { to: "/contacts", label: "Contatos", icon: Users },
     { to: "/team", label: "Equipe", icon: Users2 },
+    { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
     { to: "/diagnostics", label: "Sistema", icon: Activity },
     { to: "/audit", label: "Auditoria", icon: ClipboardList },
     { to: "/settings", label: "Ajustes", icon: Settings },
