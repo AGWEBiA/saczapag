@@ -1,10 +1,27 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { AlertTriangle, CheckCheck, Clock, Loader2, Info } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCheck,
+  Clock,
+  Loader2,
+  Info,
+  Search,
+  X,
+  ChevronUp,
+  ChevronDown,
+  FileText,
+  Play,
+  Pause,
+  Mic,
+  Reply,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface MessageListProps {
   conversationId: string;
@@ -23,7 +40,7 @@ type Msg = {
   evolution_message_id?: string | null;
   media_url?: string | null;
   media_type?: string | null;
-  metadata?: Record<string, unknown> | null;
+  metadata?: Record<string, any> | null;
 };
 
 type MessagesInfiniteData = InfiniteData<Msg[], string | null>;
@@ -34,6 +51,10 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
   const topSentinelRef = useRef<HTMLDivElement>(null);
   const lastScrollHeightRef = useRef<number>(0);
   const initialScrollDone = useRef(false);
+
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [matchIdx, setMatchIdx] = useState(0);
 
   const queryKey = useMemo(() => ["messages", conversationId] as const, [conversationId]);
 
@@ -51,9 +72,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE);
 
-      if (pageParam) {
-        q = q.lt("created_at", pageParam);
-      }
+      if (pageParam) q = q.lt("created_at", pageParam);
 
       const { data, error } = await q;
       if (error) throw error;
@@ -65,10 +84,9 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
     },
   });
 
-  // Mensagens em ordem cronológica
   const messages: Msg[] = data ? data.pages.flat().slice().reverse() : [];
 
-  // Realtime: anexa novas mensagens à primeira "página" sem refetch completo
+  // Realtime
   useEffect(() => {
     const channel = supabase
       .channel(`chat-${conversationId}`)
@@ -86,7 +104,6 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
             if (!old) return old;
             const pages = [...old.pages];
             const first = pages[0] ?? [];
-            // first page é DESC: prepend
             if (first.some((m: Msg) => m.id === newMsg.id)) return old;
             pages[0] = [newMsg, ...first];
             return { ...old, pages };
@@ -119,7 +136,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
     };
   }, [conversationId, queryClient, queryKey]);
 
-  // IntersectionObserver no topo: dispara fetchNextPage
+  // Paginação por scroll
   useEffect(() => {
     const sentinel = topSentinelRef.current;
     const container = scrollContainerRef.current;
@@ -143,7 +160,6 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  // Mantém scroll position ao prepender mensagens antigas
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -154,7 +170,6 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
     }
   }, [data?.pages.length]);
 
-  // Scroll inicial e ao receber nova mensagem
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container || messages.length === 0) return;
@@ -163,18 +178,34 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
       initialScrollDone.current = true;
       return;
     }
-    // Se está perto do fim, faz auto-scroll
     const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
-    if (nearBottom) {
-      container.scrollTop = container.scrollHeight;
-    }
+    if (nearBottom) container.scrollTop = container.scrollHeight;
   }, [messages.length]);
 
-  // Reset ao trocar de conversa
   useEffect(() => {
     initialScrollDone.current = false;
     lastScrollHeightRef.current = 0;
+    setSearchOpen(false);
+    setSearchTerm("");
   }, [conversationId]);
+
+  // Matches da busca
+  const matchIds = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return [] as string[];
+    return messages.filter((m) => (m.content || "").toLowerCase().includes(term)).map((m) => m.id);
+  }, [messages, searchTerm]);
+
+  useEffect(() => {
+    setMatchIdx(0);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (!matchIds.length) return;
+    const id = matchIds[matchIds.length - 1 - matchIdx]; // mais recente primeiro
+    const el = document.getElementById(`msg-${id}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [matchIdx, matchIds]);
 
   if (isLoading) {
     return (
@@ -184,22 +215,100 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
     );
   }
 
+  const activeMatchId = matchIds.length ? matchIds[matchIds.length - 1 - matchIdx] : null;
+
   return (
-    <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto p-4 wa-chat-bg">
-      <div ref={topSentinelRef} />
-      {isFetchingNextPage && (
-        <div className="flex justify-center py-2">
-          <Loader2 className="h-4 w-4 animate-spin wa-meta" />
-        </div>
-      )}
-      <div className="flex flex-col gap-1.5">
-        {messages.length === 0 ? (
-          <div className="text-center py-8 wa-meta">
-            Inicie a conversa enviando uma mensagem.
+    <div className="flex-1 flex flex-col min-h-0">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b bg-card/40">
+        {searchOpen ? (
+          <div className="flex items-center gap-2 w-full">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <Input
+              autoFocus
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar nesta conversa..."
+              className="h-7 text-xs border-none bg-transparent focus-visible:ring-0 px-0"
+            />
+            {searchTerm && (
+              <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                {matchIds.length ? `${matchIdx + 1}/${matchIds.length}` : "0/0"}
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              disabled={!matchIds.length}
+              onClick={() => setMatchIdx((i) => (i + 1) % matchIds.length)}
+            >
+              <ChevronUp className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              disabled={!matchIds.length}
+              onClick={() =>
+                setMatchIdx((i) => (i - 1 + matchIds.length) % matchIds.length)
+              }
+            >
+              <ChevronDown className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => {
+                setSearchOpen(false);
+                setSearchTerm("");
+              }}
+            >
+              <X className="h-3 w-3" />
+            </Button>
           </div>
         ) : (
-          messages.map((msg) => <MessageBubble key={msg.id} msg={msg} isGroup={isGroup} />)
+          <>
+            <span className="text-[11px] text-muted-foreground">
+              {messages.length} mensagens carregadas
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs gap-1"
+              onClick={() => setSearchOpen(true)}
+            >
+              <Search className="h-3 w-3" />
+              Buscar
+            </Button>
+          </>
         )}
+      </div>
+
+      <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto p-4 wa-chat-bg">
+        <div ref={topSentinelRef} />
+        {isFetchingNextPage && (
+          <div className="flex justify-center py-2">
+            <Loader2 className="h-4 w-4 animate-spin wa-meta" />
+          </div>
+        )}
+        <div className="flex flex-col gap-1.5">
+          {messages.length === 0 ? (
+            <div className="text-center py-8 wa-meta">
+              Inicie a conversa enviando uma mensagem.
+            </div>
+          ) : (
+            messages.map((msg) => (
+              <MessageBubble
+                key={msg.id}
+                msg={msg}
+                isGroup={isGroup}
+                highlight={searchTerm.trim().toLowerCase()}
+                isActiveMatch={msg.id === activeMatchId}
+              />
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
@@ -208,108 +317,271 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
 import * as React from "react";
 import { CreateTaskDialog } from "./CreateTaskDialog";
 
-const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolean }) => {
-  const deliveryStatus = msg.metadata?.delivery_status as string | undefined;
-  const deliveryError = msg.metadata?.error as string | undefined;
-  const isOutbound = msg.direction === "outbound" && !msg.is_internal;
-  const createdAt = msg.created_at ? new Date(msg.created_at) : null;
-  const minutesSinceCreated =
-    createdAt && !Number.isNaN(createdAt.getTime())
-      ? (Date.now() - createdAt.getTime()) / 60000
-      : 0;
-  const stalePending =
-    isOutbound &&
-    !msg.evolution_message_id &&
-    (deliveryStatus === "queued" || deliveryStatus === "sending") &&
-    minutesSinceCreated > 2;
-  const failed = isOutbound && (deliveryStatus === "failed" || stalePending);
-  const sending =
-    isOutbound && !failed && (deliveryStatus === "queued" || deliveryStatus === "sending" || deliveryStatus === "pending");
-  const sent = isOutbound && !failed && !sending && (deliveryStatus === "sent" || !!msg.evolution_message_id);
-  const delivered = isOutbound && (deliveryStatus === "delivered" || deliveryStatus === "read");
-  const read = isOutbound && deliveryStatus === "read";
-  const messageTime =
-    createdAt && !Number.isNaN(createdAt.getTime())
-      ? format(createdAt, "HH:mm", { locale: ptBR })
-      : "--:--";
-  const visibleDeliveryError =
-    deliveryError ||
-    (stalePending
-      ? "Envio não confirmado pelo WhatsApp. Verifique se a instância está conectada."
-      : null);
+function highlightText(text: string, term: string): React.ReactNode {
+  if (!term) return text;
+  const lower = text.toLowerCase();
+  const parts: React.ReactNode[] = [];
+  let i = 0;
+  while (i < text.length) {
+    const idx = lower.indexOf(term, i);
+    if (idx === -1) {
+      parts.push(text.slice(i));
+      break;
+    }
+    if (idx > i) parts.push(text.slice(i, idx));
+    parts.push(
+      <mark
+        key={idx}
+        className="bg-yellow-300 text-yellow-900 rounded px-0.5"
+      >
+        {text.slice(idx, idx + term.length)}
+      </mark>,
+    );
+    i = idx + term.length;
+  }
+  return parts;
+}
 
-  if (msg.is_internal) {
-    return (
-      <div className="flex justify-center my-2">
-        <div className="max-w-[85%] bg-yellow-100 border border-yellow-300 text-yellow-900 rounded-lg px-3 py-2 shadow-sm">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Info className="h-3 w-3 text-yellow-700" />
-            <span className="text-[10px] font-bold uppercase tracking-wider text-yellow-800">
-              Nota Interna {msg.sender_name ? `· ${msg.sender_name}` : ""}
-            </span>
+const MessageBubble = React.memo(
+  ({
+    msg,
+    isGroup,
+    highlight,
+    isActiveMatch,
+  }: {
+    msg: Msg;
+    isGroup?: boolean;
+    highlight?: string;
+    isActiveMatch?: boolean;
+  }) => {
+    const deliveryStatus = msg.metadata?.delivery_status as string | undefined;
+    const deliveryError = msg.metadata?.error as string | undefined;
+    const quoted = msg.metadata?.quoted as
+      | { sender?: string; content?: string }
+      | undefined;
+    const isOutbound = msg.direction === "outbound" && !msg.is_internal;
+    const createdAt = msg.created_at ? new Date(msg.created_at) : null;
+    const minutesSinceCreated =
+      createdAt && !Number.isNaN(createdAt.getTime())
+        ? (Date.now() - createdAt.getTime()) / 60000
+        : 0;
+    const stalePending =
+      isOutbound &&
+      !msg.evolution_message_id &&
+      (deliveryStatus === "queued" || deliveryStatus === "sending") &&
+      minutesSinceCreated > 2;
+    const failed = isOutbound && (deliveryStatus === "failed" || stalePending);
+    const sending =
+      isOutbound &&
+      !failed &&
+      (deliveryStatus === "queued" ||
+        deliveryStatus === "sending" ||
+        deliveryStatus === "pending");
+    const sent =
+      isOutbound &&
+      !failed &&
+      !sending &&
+      (deliveryStatus === "sent" || !!msg.evolution_message_id);
+    const delivered = isOutbound && (deliveryStatus === "delivered" || deliveryStatus === "read");
+    const read = isOutbound && deliveryStatus === "read";
+    const messageTime =
+      createdAt && !Number.isNaN(createdAt.getTime())
+        ? format(createdAt, "HH:mm", { locale: ptBR })
+        : "--:--";
+    const visibleDeliveryError =
+      deliveryError ||
+      (stalePending
+        ? "Envio não confirmado pelo WhatsApp. Verifique se a instância está conectada."
+        : null);
+
+    if (msg.is_internal) {
+      return (
+        <div id={`msg-${msg.id}`} className="flex justify-center my-2">
+          <div className="max-w-[85%] bg-yellow-100 border border-yellow-300 text-yellow-900 rounded-lg px-3 py-2 shadow-sm">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Info className="h-3 w-3 text-yellow-700" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-yellow-800">
+                Nota Interna {msg.sender_name ? `· ${msg.sender_name}` : ""}
+              </span>
+            </div>
+            {msg.content && (
+              <p className="text-sm whitespace-pre-wrap break-words">
+                {highlight ? highlightText(msg.content, highlight) : msg.content}
+              </p>
+            )}
+            <div className="text-[10px] text-yellow-700/70 mt-1 text-right">{messageTime}</div>
           </div>
-          {msg.content && (
-            <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        id={`msg-${msg.id}`}
+        className={cn("group/bubble flex w-full", isOutbound ? "justify-end" : "justify-start")}
+      >
+        <div
+          className={cn(
+            "relative max-w-[85%] lg:max-w-[65%] px-2.5 pt-1.5 pb-1 animate-in fade-in slide-in-from-bottom-1 duration-200",
+            isOutbound ? "wa-bubble-out" : "wa-bubble-in",
+            isActiveMatch && "ring-2 ring-yellow-400",
           )}
-          <div className="text-[10px] text-yellow-700/70 mt-1 text-right">{messageTime}</div>
+        >
+          <div className="absolute -top-2 -right-2 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
+            <CreateTaskDialog messageId={msg.id} initialContent={msg.content || ""} />
+          </div>
+          {isGroup && !isOutbound && msg.sender_name && (
+            <span
+              className="block text-[12.5px] font-semibold mb-0.5"
+              style={{ color: "#06cf9c" }}
+            >
+              {msg.sender_name}
+            </span>
+          )}
+          {quoted && (quoted.content || quoted.sender) && (
+            <div className="mb-1 -mx-0.5 px-2 py-1 rounded bg-black/5 dark:bg-white/5 border-l-2 border-emerald-500">
+              <div className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                <Reply className="h-2.5 w-2.5" />
+                {quoted.sender || "Mensagem citada"}
+              </div>
+              <div className="text-[11px] line-clamp-2 wa-meta">
+                {quoted.content || "Mídia"}
+              </div>
+            </div>
+          )}
+          {msg.media_url && (
+            <MediaAttachment url={msg.media_url} type={msg.media_type} metadata={msg.metadata} />
+          )}
+          {msg.content && msg.content !== "[Mídia]" && (
+            <p className="text-[14.2px] leading-[19px] whitespace-pre-wrap break-words pr-16">
+              {highlight ? highlightText(msg.content, highlight) : msg.content}
+            </p>
+          )}
+          <div className="flex items-center justify-end gap-1 -mt-0.5 ml-2 float-right">
+            <span className="text-[11px] wa-meta leading-none">{messageTime}</span>
+            {isOutbound && (
+              <span
+                className="inline-flex items-center leading-none"
+                title={
+                  visibleDeliveryError ??
+                  (read
+                    ? "Lida"
+                    : delivered
+                      ? "Entregue"
+                      : sent
+                        ? "Enviada"
+                        : sending
+                          ? "Enviando"
+                          : failed
+                            ? "Falha"
+                            : "")
+                }
+              >
+                {failed ? (
+                  <AlertTriangle className="h-3 w-3 text-red-500" />
+                ) : sending ? (
+                  <Clock className="h-3 w-3 wa-meta" />
+                ) : delivered || sent ? (
+                  <CheckCheck className={cn("h-3.5 w-3.5", read ? "wa-tick" : "wa-meta")} />
+                ) : null}
+              </span>
+            )}
+          </div>
+          <div className="clear-both" />
+          {failed && visibleDeliveryError && (
+            <div className="mt-1 text-[11px] text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200">
+              {visibleDeliveryError}
+            </div>
+          )}
         </div>
       </div>
     );
-  }
-
-  return (
-    <div className={cn("group/bubble flex w-full", isOutbound ? "justify-end" : "justify-start")}>
-      <div
-        className={cn(
-          "relative max-w-[85%] lg:max-w-[65%] px-2.5 pt-1.5 pb-1 animate-in fade-in slide-in-from-bottom-1 duration-200",
-          isOutbound ? "wa-bubble-out" : "wa-bubble-in",
-        )}
-      >
-        <div className="absolute -top-2 -right-2 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
-          <CreateTaskDialog messageId={msg.id} initialContent={msg.content || ""} />
-        </div>
-        {isGroup && !isOutbound && msg.sender_name && (
-          <span className="block text-[12.5px] font-semibold mb-0.5" style={{ color: "#06cf9c" }}>
-            {msg.sender_name}
-          </span>
-        )}
-        {msg.media_url && <MediaAttachment url={msg.media_url} type={msg.media_type} />}
-        {msg.content && msg.content !== "[Mídia]" && (
-          <p className="text-[14.2px] leading-[19px] whitespace-pre-wrap break-words pr-16">
-            {msg.content}
-          </p>
-        )}
-        <div className="flex items-center justify-end gap-1 -mt-0.5 ml-2 float-right">
-          <span className="text-[11px] wa-meta leading-none">{messageTime}</span>
-          {isOutbound && (
-            <span
-              className="inline-flex items-center leading-none"
-              title={visibleDeliveryError ?? (read ? "Lida" : delivered ? "Entregue" : sent ? "Enviada" : sending ? "Enviando" : failed ? "Falha" : "")}
-            >
-              {failed ? (
-                <AlertTriangle className="h-3 w-3 text-red-500" />
-              ) : sending ? (
-                <Clock className="h-3 w-3 wa-meta" />
-              ) : delivered || sent ? (
-                <CheckCheck className={cn("h-3.5 w-3.5", read ? "wa-tick" : "wa-meta")} />
-              ) : null}
-            </span>
-          )}
-        </div>
-        <div className="clear-both" />
-        {failed && visibleDeliveryError && (
-          <div className="mt-1 text-[11px] text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200">
-            {visibleDeliveryError}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-});
+  },
+);
 
 MessageBubble.displayName = "MessageBubble";
 
-function MediaAttachment({ url, type }: { url: string; type?: string | null }) {
+function formatBytes(bytes: number): string {
+  if (!bytes || isNaN(bytes)) return "";
+  const units = ["B", "KB", "MB", "GB"];
+  let val = bytes;
+  let i = 0;
+  while (val >= 1024 && i < units.length - 1) {
+    val /= 1024;
+    i++;
+  }
+  return `${val.toFixed(val >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+function PttAudio({ url }: { url: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [current, setCurrent] = useState(0);
+
+  const toggle = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (playing) {
+      a.pause();
+    } else {
+      a.play();
+    }
+  };
+
+  const fmt = (s: number) => {
+    if (!isFinite(s)) return "0:00";
+    const m = Math.floor(s / 60);
+    const r = Math.floor(s % 60);
+    return `${m}:${r.toString().padStart(2, "0")}`;
+  };
+
+  return (
+    <div className="flex items-center gap-2 my-1 min-w-[220px]">
+      <button
+        onClick={toggle}
+        className="h-9 w-9 rounded-full bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 transition-colors"
+      >
+        {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+      </button>
+      <div className="flex-1 min-w-0">
+        <div className="h-1 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-emerald-500 transition-all"
+            style={{ width: duration ? `${(current / duration) * 100}%` : "0%" }}
+          />
+        </div>
+        <div className="flex items-center gap-1 mt-1 wa-meta text-[10px]">
+          <Mic className="h-2.5 w-2.5" />
+          <span>{fmt(playing || current > 0 ? current : duration)}</span>
+        </div>
+      </div>
+      <audio
+        ref={audioRef}
+        src={url}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => {
+          setPlaying(false);
+          setCurrent(0);
+        }}
+        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+        onTimeUpdate={(e) => setCurrent(e.currentTarget.currentTime || 0)}
+        preload="metadata"
+      />
+    </div>
+  );
+}
+
+function MediaAttachment({
+  url,
+  type,
+  metadata,
+}: {
+  url: string;
+  type?: string | null;
+  metadata?: Record<string, any> | null;
+}) {
   const t = (type || "").toLowerCase();
   const isImage = t.startsWith("image") || /\.(png|jpe?g|gif|webp)(\?|$)/i.test(url);
   const isVideo = t.startsWith("video") || /\.(mp4|webm|mov)(\?|$)/i.test(url);
@@ -318,24 +590,48 @@ function MediaAttachment({ url, type }: { url: string; type?: string | null }) {
   if (isImage) {
     return (
       <a href={url} target="_blank" rel="noopener noreferrer" className="block mb-1 -mx-1.5 -mt-1">
-        <img src={url} alt="mídia" className="rounded-md max-h-80 w-full object-cover" loading="lazy" />
+        <img
+          src={url}
+          alt="mídia"
+          className="rounded-md max-h-80 w-full object-cover"
+          loading="lazy"
+        />
       </a>
     );
   }
   if (isVideo) {
-    return <video src={url} controls className="rounded-md max-h-80 mb-1 -mx-1.5 -mt-1 w-full" />;
+    return (
+      <video src={url} controls className="rounded-md max-h-80 mb-1 -mx-1.5 -mt-1 w-full" />
+    );
   }
   if (isAudio) {
-    return <audio src={url} controls className="w-full mb-1" />;
+    return <PttAudio url={url} />;
   }
+
+  const fileName =
+    (metadata?.file_name as string | undefined) ||
+    (metadata?.filename as string | undefined) ||
+    decodeURIComponent(url.split("/").pop()?.split("?")[0] || "documento");
+  const fileSize = metadata?.file_size as number | undefined;
+  const ext = fileName.split(".").pop()?.toUpperCase().slice(0, 4) || "DOC";
+
   return (
     <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-2 text-xs font-medium underline mb-1 bg-black/5 px-2 py-1.5 rounded"
+      className="flex items-center gap-2 mb-1 bg-black/5 dark:bg-white/5 px-2.5 py-2 rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors min-w-[220px]"
     >
-      📎 Abrir anexo
+      <div className="h-9 w-9 rounded bg-emerald-600 text-white flex items-center justify-center flex-shrink-0">
+        <FileText className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-xs font-medium truncate">{fileName}</div>
+        <div className="text-[10px] wa-meta">
+          {ext}
+          {fileSize ? ` · ${formatBytes(fileSize)}` : ""}
+        </div>
+      </div>
     </a>
   );
 }
