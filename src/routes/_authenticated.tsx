@@ -7,8 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { HelpGuide } from "@/components/shared/HelpGuide";
 import { MentionNotificationHandler } from "@/components/chat/MentionNotificationHandler";
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import agwebiIcon from "@/assets/agwebi-icon.png";
 
 
