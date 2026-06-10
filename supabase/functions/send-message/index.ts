@@ -485,14 +485,20 @@ async function sendToWhatsApp(params: {
   phone: string;
   content: string;
   isGroup?: boolean;
+  quoted?: {
+    evolutionMessageId: string;
+    sender?: string;
+    content?: string;
+  } | null;
 }) {
-  const { supabase, instance, phone, content, isGroup = false } = params;
+  const { supabase, instance, phone, content, isGroup = false, quoted } = params;
 
   if (instance?.evolution_instance_name) {
     console.log("[send-message] sending via Evolution", {
       instanceName: instance.evolution_instance_name,
       phone,
       isGroup,
+      hasQuoted: Boolean(quoted?.evolutionMessageId),
     });
 
     return await sendViaEvolution({
@@ -504,6 +510,7 @@ async function sendToWhatsApp(params: {
       skipPreflight: false,
       contactId: instance.contactId,
       contactName: instance.contactName,
+      quoted,
     });
   }
 
@@ -547,8 +554,13 @@ async function processWhatsAppSend(params: {
   phone: string;
   content: string;
   isGroup?: boolean;
+  quoted?: {
+    evolutionMessageId: string;
+    sender?: string;
+    content?: string;
+  } | null;
 }) {
-  const { supabase, messageId, instance, phone, content, isGroup = false } = params;
+  const { supabase, messageId, instance, phone, content, isGroup = false, quoted } = params;
 
   const sendingMetadata = {
     delivery_status: "sending",
@@ -563,6 +575,7 @@ async function processWhatsAppSend(params: {
       phone,
       content,
       isGroup,
+      quoted,
     });
 
     const sentMetadata = {
