@@ -226,6 +226,63 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
     }
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")
+          ? "audio/ogg;codecs=opus"
+          : "audio/webm";
+      const mr = new MediaRecorder(stream, { mimeType: mime });
+      recordChunksRef.current = [];
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) recordChunksRef.current.push(e.data);
+      };
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(recordChunksRef.current, { type: mime });
+        const ext = mime.includes("ogg") ? "ogg" : "webm";
+        const file = new File([blob], `audio-${Date.now()}.${ext}`, { type: mime });
+        const { data: { user } } = await supabase.auth.getUser();
+        const senderName = profile?.full_name || user?.email?.split("@")[0] || "Agente";
+        await uploadAndSendMedia(file, "", senderName);
+      };
+      mr.start();
+      mediaRecorderRef.current = mr;
+      setIsRecording(true);
+      setRecordSeconds(0);
+      recordTimerRef.current = setInterval(() => setRecordSeconds((s) => s + 1), 1000);
+    } catch (e: any) {
+      toast.error("Não foi possível acessar o microfone: " + (e?.message || String(e)));
+    }
+  };
+
+  const stopRecording = (cancel = false) => {
+    const mr = mediaRecorderRef.current;
+    if (recordTimerRef.current) {
+      clearInterval(recordTimerRef.current);
+      recordTimerRef.current = null;
+    }
+    setIsRecording(false);
+    setRecordSeconds(0);
+    if (!mr) return;
+    if (cancel) {
+      mr.ondataavailable = null;
+      mr.onstop = () => {
+        mr.stream.getTracks().forEach((t) => t.stop());
+      };
+    }
+    try {
+      mr.stop();
+    } catch {
+      /* noop */
+    }
+    mediaRecorderRef.current = null;
+  };
+
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = content.trim();
