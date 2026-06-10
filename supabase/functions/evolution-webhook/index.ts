@@ -317,6 +317,7 @@ serve(async (req) => {
         ? "Você"
         : item.pushName || item.participant || data.participant || "Contato";
       const content = extractContent(item, message);
+      const { media_url, media_type } = extractMedia(item, message);
 
       const { data: instance } = await supabase
         .from("whatsapp_instances")
