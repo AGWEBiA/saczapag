@@ -238,9 +238,9 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="flex h-[100dvh] lg:h-full overflow-hidden bg-background lg:shadow-[0_20px_50px_rgba(0,0,0,0.1)] lg:rounded-3xl lg:border lg:m-4 animate-in fade-in slide-in-from-bottom-4 duration-1000 ease-out">
+    <div className="flex h-[100dvh] lg:h-full overflow-hidden bg-background lg:m-4 lg:rounded-2xl lg:border lg:shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-700 ease-out">
       <div className={cn(
-        "w-full lg:w-80 xl:w-96 flex-shrink-0 border-r bg-card/40 backdrop-blur-2xl transition-all duration-500 ease-in-out",
+        "w-full lg:w-80 xl:w-96 flex-shrink-0 border-r bg-card/30 backdrop-blur-xl transition-all duration-500 ease-in-out",
         mobileView === "chat" && "hidden lg:flex"
       )}>
         <ChatSidebar 
@@ -255,35 +255,35 @@ export function ChatInterface() {
         {selectedConversationId ? (
           <div className="flex-1 flex min-w-0 min-h-0">
             <div className="flex-1 flex flex-col h-full min-h-0 border-r">
-              <div className="p-3 lg:p-4 border-b bg-card/50 backdrop-blur-md flex items-center justify-between sticky top-0 z-10">
-                <div className="flex items-center gap-2 lg:gap-3">
+              <div className="px-4 py-3 border-b bg-card/40 backdrop-blur-md flex items-center justify-between sticky top-0 z-10 shadow-sm">
+                <div className="flex items-center gap-3">
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="lg:hidden" 
+                    className="lg:hidden h-8 w-8" 
                     onClick={() => setMobileView("list")}
                   >
                     <ChevronLeft className="h-5 w-5" />
                   </Button>
-                  <div className="relative">
-                    <Avatar className="h-10 w-10 border-2 border-primary/10">
-                      <AvatarFallback className="bg-primary/5 text-primary"><User /></AvatarFallback>
+                  <div className="relative group cursor-pointer">
+                    <Avatar className="h-10 w-10 border border-primary/10 shadow-sm group-hover:border-primary/30 transition-colors">
+                      <AvatarFallback className="bg-primary/5 text-primary"><User className="h-5 w-5" /></AvatarFallback>
                     </Avatar>
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full" />
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full shadow-sm" />
                   </div>
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-sm lg:text-base truncate tracking-tight">{selectedConversation?.contact?.name || "Contato"}</h3>
-                      <Badge variant="outline" className="text-[8px] h-3 px-1 border-green-500/50 text-green-600 bg-green-50 uppercase font-black tracking-widest">WhatsApp</Badge>
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="font-bold text-sm lg:text-base truncate tracking-tight text-foreground/90">{selectedConversation?.contact?.name || "Contato"}</h3>
+                      <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-green-500/30 text-green-600 bg-green-50/50 uppercase font-bold tracking-wider">WhatsApp</Badge>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <p className={cn("text-[10px] lg:text-xs font-medium truncate", presence ? "text-emerald-600 italic" : "text-muted-foreground")}>{presence || selectedConversation?.contact?.phone_number}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className={cn("text-[10px] lg:text-xs font-medium truncate", presence ? "text-primary italic animate-pulse" : "text-muted-foreground/70")}>{presence || selectedConversation?.contact?.phone_number}</p>
                       {selectedConversation?.assigned_to ? (
-                        <Badge variant="secondary" className="text-[9px] lg:text-[10px] h-4 py-0 font-bold uppercase tracking-wider bg-primary/10 text-primary hover:bg-primary/20 transition-colors border-none">
+                        <Badge variant="secondary" className="text-[9px] h-4 py-0 font-bold uppercase tracking-wider bg-primary/5 text-primary/70 border-none">
                           {agents?.find(a => a.id === selectedConversation.assigned_to)?.full_name?.split(' ')[0] || "Agente"}
                         </Badge>
                       ) : (
-                        <Badge variant="destructive" className="text-[9px] lg:text-[10px] h-4 py-0 font-bold uppercase tracking-wider animate-pulse">
+                        <Badge variant="destructive" className="text-[9px] h-4 py-0 font-bold uppercase tracking-wider bg-red-50 text-red-600 border-none animate-pulse">
                           Aguardando
                         </Badge>
                       )}

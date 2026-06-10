@@ -178,28 +178,29 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
 
   return (
     <div className="flex flex-col h-full bg-transparent overflow-hidden">
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="px-4 py-6 lg:p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold tracking-tight">Inbox</h2>
-          <div className="flex items-center gap-1 justify-end">
+          <h2 className="text-2xl font-black tracking-tighter text-foreground/90">Inbox</h2>
+          <div className="flex items-center gap-1">
             <NewConversationDialog onCreated={(id) => onSelect(id)} />
             <GroupImportDialog />
             <NotificationCenter />
             <Button
               variant="ghost"
               size="icon"
-              title="Atualizar conversas"
+              title="Atualizar"
+              className="h-8 w-8 hover:bg-primary/5"
               onClick={() => refetch()}
               disabled={isFetching}
             >
-              <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+              <RefreshCw className={cn("h-4 w-4 text-muted-foreground", isFetching && "animate-spin")} />
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant={filter !== "all" ? "secondary" : "ghost"} size="icon" className="relative">
-                  <Filter className="h-4 w-4" />
+                <Button variant={filter !== "all" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 relative hover:bg-primary/5">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
                   {filter !== "all" && (
-                    <span className="absolute top-0 right-0 w-2 h-2 bg-primary rounded-full" />
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full ring-2 ring-background" />
                   )}
                 </Button>
               </DropdownMenuTrigger>
@@ -215,11 +216,11 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
             </DropdownMenu>
           </div>
         </div>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 transition-colors group-focus-within:text-primary" />
+        <div className="relative group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40 transition-colors group-focus-within:text-primary" />
           <Input 
-            placeholder="Pesquisar mensagens..." 
-            className="pl-9 h-10 bg-muted/50 border-transparent focus-visible:bg-background transition-all rounded-xl" 
+            placeholder="Pesquisar..." 
+            className="pl-9 h-11 bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-primary/20 transition-all rounded-2xl text-sm" 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -255,8 +256,10 @@ const ChatItem = React.memo(({ conv, selectedId, onSelect }: { conv: any, select
     <button
       onClick={() => onSelect(conv.id)}
       className={cn(
-        "w-full flex items-center gap-3 p-3 my-1 rounded-xl transition-all duration-300 text-left relative group border-2 border-transparent",
-        selectedId === conv.id ? "bg-primary/10 border-primary/20 shadow-sm" : "hover:bg-accent"
+        "w-full flex items-center gap-3 p-3 my-1 rounded-2xl transition-all duration-300 text-left relative group border border-transparent",
+        selectedId === conv.id 
+          ? "bg-primary/[0.08] border-primary/10 shadow-sm" 
+          : "hover:bg-muted/50"
       )}
     >
       <div className="relative shrink-0">

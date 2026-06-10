@@ -324,7 +324,7 @@ export function MessageList({ conversationId, isGroup, onReply }: MessageListPro
         )}
       </div>
 
-      <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto p-4 wa-chat-bg">
+      <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto p-4 wa-chat-bg bg-[#f0f2f5] dark:bg-muted/5">
         <div ref={topSentinelRef} />
         {isFetchingNextPage && (
           <div className="flex justify-center py-2">

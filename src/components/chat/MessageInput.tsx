@@ -400,7 +400,7 @@ export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }
   };
 
   return (
-    <div className="p-4 lg:p-8 border-t bg-card/60 backdrop-blur-2xl space-y-4">
+    <div className="p-3 lg:p-6 border-t bg-card/60 backdrop-blur-xl space-y-3">
       {replyTo && (
         <div className="flex items-stretch gap-2 -mb-2 rounded-md bg-emerald-50 dark:bg-emerald-950/30 border-l-4 border-emerald-500 px-3 py-2">
           <div className="flex-1 min-w-0">
@@ -430,13 +430,13 @@ export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }
           size="sm"
           onClick={() => setIsInternal(!isInternal)}
           className={cn(
-            "text-[10px] lg:text-xs font-bold uppercase tracking-widest px-4 h-8 rounded-full transition-all duration-300",
+            "text-[9px] font-bold uppercase tracking-wider px-3 h-7 rounded-full transition-all duration-300",
             isInternal
-              ? "bg-yellow-400 text-yellow-950 hover:bg-yellow-500 border-none shadow-lg shadow-yellow-500/20 ring-2 ring-yellow-400/50"
-              : "hover:bg-primary/5 hover:text-primary hover:border-primary/20",
+              ? "bg-yellow-400 text-yellow-950 hover:bg-yellow-500 border-none shadow-sm shadow-yellow-500/20 ring-1 ring-yellow-400/30"
+              : "text-muted-foreground/70 hover:bg-primary/5 hover:text-primary hover:border-primary/20",
           )}
         >
-          {isInternal ? "Modo: Nota Interna" : "Nota Interna"}
+          {isInternal ? "Nota Interna" : "Nota Interna"}
         </Button>
 
         <Popover open={openQuickReplies} onOpenChange={setOpenQuickReplies}>
