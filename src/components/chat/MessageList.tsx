@@ -24,7 +24,27 @@ import {
   ZoomOut,
   Download,
   Forward,
+  Pencil,
+  Trash2,
+  MoreVertical,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { ForwardMessageDialog } from "./ForwardMessageDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -384,6 +404,10 @@ const MessageBubble = React.memo(
     const reactMessage = useServerFn(reactMessageFn);
     const [reactPopoverOpen, setReactPopoverOpen] = React.useState(false);
     const [forwardOpen, setForwardOpen] = React.useState(false);
+    const [editOpen, setEditOpen] = React.useState(false);
+    const [editText, setEditText] = React.useState("");
+    const [deleteOpen, setDeleteOpen] = React.useState(false);
+    const [actionBusy, setActionBusy] = React.useState(false);
     const reactions = Array.isArray(msg.metadata?.reactions)
       ? (msg.metadata!.reactions as Array<{ by: string; emoji: string }>)
       : [];
@@ -392,6 +416,24 @@ const MessageBubble = React.memo(
       for (const r of reactions) map.set(r.emoji, (map.get(r.emoji) ?? 0) + 1);
       return Array.from(map.entries());
     }, [reactions]);
+
+    const callManage = async (action: "edit" | "delete", newText?: string) => {
+      setActionBusy(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("manage-message", {
+          body: { messageId: msg.id, action, newText },
+        });
+        if (error) throw error;
+        if (data && (data as any).ok === false) throw new Error((data as any).error || "Falha");
+        toast.success(action === "edit" ? "Mensagem editada" : "Mensagem apagada");
+        setEditOpen(false);
+        setDeleteOpen(false);
+      } catch (e: any) {
+        toast.error("Falha: " + (e?.message || String(e)));
+      } finally {
+        setActionBusy(false);
+      }
+    };
 
     const handleReact = async (emoji: string) => {
       setReactPopoverOpen(false);
@@ -535,6 +577,37 @@ const MessageBubble = React.memo(
               </PopoverContent>
             </Popover>
             <CreateTaskDialog messageId={msg.id} initialContent={msg.content || ""} />
+            {isOutbound && !msg.metadata?.deleted && msg.evolution_message_id && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="h-6 w-6 rounded-full bg-card border shadow-sm flex items-center justify-center hover:bg-accent"
+                    title="Mais"
+                  >
+                    <MoreVertical className="h-3 w-3" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {msg.content && !msg.media_url && (
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setEditText(msg.content || "");
+                        setEditOpen(true);
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-2" /> Editar
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    className="text-red-600 focus:text-red-600"
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-2" /> Apagar para todos
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
           {isGroup && !isOutbound && msg.sender_name && (
             <span
@@ -559,9 +632,17 @@ const MessageBubble = React.memo(
             <MediaAttachment url={msg.media_url} type={msg.media_type} metadata={msg.metadata} />
           )}
           {msg.content && msg.content !== "[Mídia]" && (
-            <p className="text-[14.2px] leading-[19px] whitespace-pre-wrap break-words pr-16">
+            <p
+              className={cn(
+                "text-[14.2px] leading-[19px] whitespace-pre-wrap break-words pr-16",
+                msg.metadata?.deleted && "italic opacity-70",
+              )}
+            >
               {highlight ? highlightText(msg.content, highlight) : msg.content}
             </p>
+          )}
+          {msg.metadata?.edited && !msg.metadata?.deleted && (
+            <span className="text-[10px] wa-meta italic mr-1">editada</span>
           )}
           <div className="flex items-center justify-end gap-1 -mt-0.5 ml-2 float-right">
             <span className="text-[11px] wa-meta leading-none">{messageTime}</span>
@@ -626,7 +707,59 @@ const MessageBubble = React.memo(
             fileName: (msg.metadata as any)?.file_name ?? null,
           }}
         />
+        <AlertDialog open={editOpen} onOpenChange={setEditOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Editar mensagem</AlertDialogTitle>
+              <AlertDialogDescription>
+                O WhatsApp permite editar mensagens enviadas há menos de 15 minutos.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <Textarea
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              rows={4}
+              autoFocus
+            />
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={actionBusy}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={actionBusy || !editText.trim() || editText.trim() === msg.content}
+                onClick={(e) => {
+                  e.preventDefault();
+                  callManage("edit", editText.trim());
+                }}
+              >
+                {actionBusy ? "Salvando..." : "Salvar"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Apagar para todos?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta mensagem será apagada para o destinatário no WhatsApp. A ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={actionBusy}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={actionBusy}
+                onClick={(e) => {
+                  e.preventDefault();
+                  callManage("delete");
+                }}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {actionBusy ? "Apagando..." : "Apagar"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
+
     );
   },
 );

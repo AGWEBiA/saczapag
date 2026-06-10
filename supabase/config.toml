@@ -6,3 +6,6 @@ verify_jwt = false
 
 [functions.mark-as-read]
 verify_jwt = false
+
+[functions.manage-message]
+verify_jwt = false
