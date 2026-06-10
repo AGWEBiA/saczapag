@@ -21,6 +21,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { NewConversationDialog } from "./NewConversationDialog";
 import { GroupImportDialog } from "./GroupImportDialog";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 
 interface ChatSidebarProps {
   selectedId?: string;
