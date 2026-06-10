@@ -438,7 +438,50 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
         >
           <Paperclip className="h-3 w-3" /> Anexar
         </Button>
+
+        {!isRecording ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={startRecording}
+            disabled={uploading || isInternal}
+            className="text-xs gap-1"
+            title={isInternal ? "Áudio não disponível em notas internas" : "Gravar áudio"}
+          >
+            <Mic className="h-3 w-3" /> Gravar
+          </Button>
+        ) : (
+          <div className="flex items-center gap-1.5 px-2 h-8 rounded-full bg-red-50 border border-red-200">
+            <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-xs font-mono text-red-700">
+              {String(Math.floor(recordSeconds / 60)).padStart(1, "0")}:
+              {String(recordSeconds % 60).padStart(2, "0")}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => stopRecording(true)}
+              title="Cancelar gravação"
+            >
+              <XIcon className="h-3 w-3" />
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              className="h-6 w-6 bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => stopRecording(false)}
+              title="Enviar áudio"
+            >
+              <Send className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
       </div>
+
+
 
       {attachedFile && (
         <div className="flex items-center gap-2 p-2 bg-muted/40 rounded-xl border border-border/40">
