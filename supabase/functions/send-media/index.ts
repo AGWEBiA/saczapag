@@ -28,7 +28,7 @@ serve(async (req) => {
   );
 
   try {
-    const { conversationId, mediaUrl, mimeType, fileName, caption, senderName, senderUserId } =
+    const { conversationId, mediaUrl, mimeType, fileName, caption, senderName, senderUserId, asSticker } =
       await req.json();
 
     if (!conversationId || !mediaUrl || !mimeType) {
