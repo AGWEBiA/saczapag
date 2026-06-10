@@ -36,7 +36,8 @@ export function MentionNotificationHandler() {
           const newMessage = payload.new as any;
           const content = newMessage.content || "";
           
-          // Enhanced mention detection
+          if (newMessage.direction !== 'inbound') return;
+
           const userIdentifier = user.email?.split("@")[0] || "";
           const fullName = profile.full_name || "";
           const firstName = fullName.split(" ")[0];
@@ -50,7 +51,6 @@ export function MentionNotificationHandler() {
           const isMentioned = mentions.some(m => content.toLowerCase().includes(m));
           
           if (isMentioned) {
-            // Create notification record
             const { error } = await supabase.from("notifications" as any).insert({
               user_id: user.id,
               title: "Você foi citado!",

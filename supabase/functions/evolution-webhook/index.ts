@@ -101,16 +101,17 @@ function extractMedia(item: any, message: any): { media_url: string | null; medi
   ];
   for (const c of candidates) {
     if (c.node) {
+      // Prioritize evolution's mediaUrl/base64 if available, otherwise use original path
       const url =
+        item?.mediaUrl ||
+        item?.message?.mediaUrl ||
         c.node.url ||
         c.node.directPath ||
-        item?.message?.mediaUrl ||
-        item?.mediaUrl ||
         null;
       return { media_url: url, media_type: c.node.mimetype || c.type };
     }
   }
-  const fallbackUrl = item?.message?.mediaUrl || item?.mediaUrl || null;
+  const fallbackUrl = item?.mediaUrl || item?.message?.mediaUrl || null;
   return { media_url: fallbackUrl, media_type: fallbackUrl ? "file" : null };
 }
 
