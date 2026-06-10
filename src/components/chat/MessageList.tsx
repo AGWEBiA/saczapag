@@ -577,6 +577,37 @@ const MessageBubble = React.memo(
               </PopoverContent>
             </Popover>
             <CreateTaskDialog messageId={msg.id} initialContent={msg.content || ""} />
+            {isOutbound && !msg.metadata?.deleted && msg.evolution_message_id && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="h-6 w-6 rounded-full bg-card border shadow-sm flex items-center justify-center hover:bg-accent"
+                    title="Mais"
+                  >
+                    <MoreVertical className="h-3 w-3" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {msg.content && !msg.media_url && (
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setEditText(msg.content || "");
+                        setEditOpen(true);
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-2" /> Editar
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    className="text-red-600 focus:text-red-600"
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-2" /> Apagar para todos
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
           {isGroup && !isOutbound && msg.sender_name && (
             <span
