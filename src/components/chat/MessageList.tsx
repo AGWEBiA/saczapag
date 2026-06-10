@@ -269,9 +269,12 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
             {msg.sender_name}
           </span>
         )}
-        <p className="text-sm lg:text-[15px] leading-relaxed whitespace-pre-wrap break-words font-medium">
-          {msg.content}
-        </p>
+        {msg.media_url && <MediaAttachment url={msg.media_url} type={msg.media_type} />}
+        {msg.content && msg.content !== "[Mídia]" && (
+          <p className="text-sm lg:text-[15px] leading-relaxed whitespace-pre-wrap break-words font-medium">
+            {msg.content}
+          </p>
+        )}
         <div className="flex items-center justify-between gap-3 mt-2 pt-1 border-t border-current/5">
           <span
             className={cn(
