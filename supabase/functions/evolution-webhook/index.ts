@@ -466,6 +466,45 @@ serve(async (req) => {
       });
     }
 
+    // ===== Reações em mensagens =====
+    if (evNorm === "messages.reaction" || evNorm === "message.reaction") {
+      const reactions = Array.isArray(data) ? data : [data];
+      for (const r of reactions) {
+        const targetId = r?.reaction?.key?.id || r?.key?.id || r?.messageId;
+        const emoji = String(r?.reaction?.text ?? r?.text ?? "").trim();
+        const reactor =
+          r?.reaction?.key?.participant ||
+          r?.key?.participant ||
+          r?.reaction?.key?.remoteJid ||
+          "unknown";
+        if (!targetId) continue;
+        const { data: target } = await supabase
+          .from("messages")
+          .select("id, metadata")
+          .eq("evolution_message_id", targetId)
+          .maybeSingle();
+        if (!target) continue;
+        const meta = (target.metadata as Record<string, any>) ?? {};
+        const list: Array<{ by: string; emoji: string; at: string }> = Array.isArray(
+          meta.reactions,
+        )
+          ? meta.reactions
+          : [];
+        const filtered = list.filter((x) => x.by !== reactor);
+        if (emoji) {
+          filtered.push({ by: reactor, emoji, at: new Date().toISOString() });
+        }
+        await supabase
+          .from("messages")
+          .update({ metadata: { ...meta, reactions: filtered } })
+          .eq("id", target.id);
+      }
+      return new Response(JSON.stringify({ ok: true, request_id: requestId }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+
     if (evNorm === "messages.upsert" || evNorm === "send.message") {
       const item = unwrapMessageData(data);
       const keyId = extractMessageKeyId(item);
