@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useMutation, useQueryClient, useQuery, type InfiniteData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Loader2, Zap } from "lucide-react";
+import { Send, Loader2, Zap, AtSign } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -40,8 +40,32 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
   const [content, setContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
   const [openQuickReplies, setOpenQuickReplies] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const sendMessage = useServerFn(sendMessageFn);
+
+  const { data: teamMembers } = useQuery({
+    queryKey: ["team-members"],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("id, full_name, email");
+      return data || [];
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const mentionCandidates = useMemo(() => {
+    if (mentionQuery === null) return [];
+    const q = mentionQuery.toLowerCase();
+    return (teamMembers || [])
+      .filter((m: any) => {
+        const name = (m.full_name || "").toLowerCase();
+        const handle = (m.email || "").split("@")[0].toLowerCase();
+        return !q || name.includes(q) || handle.includes(q);
+      })
+      .slice(0, 6);
+  }, [teamMembers, mentionQuery]);
 
   const { data: profile } = useQuery({
     queryKey: ["current_profile"],
