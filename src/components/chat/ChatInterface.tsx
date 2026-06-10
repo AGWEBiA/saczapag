@@ -44,6 +44,18 @@ export function ChatInterface() {
   const [mobileView, setMobileView] = useState<"list" | "chat">("list");
   const [presence, setPresence] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const stored = localStorage.getItem("chat-details-open");
+    if (stored !== null) return stored === "1";
+    return window.matchMedia("(min-width: 1280px)").matches;
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("chat-details-open", detailsOpen ? "1" : "0");
+    }
+  }, [detailsOpen]);
 
   useEffect(() => {
     setReplyTo(null);
