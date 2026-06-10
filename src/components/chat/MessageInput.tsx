@@ -1,9 +1,9 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useMutation, useQueryClient, useQuery, type InfiniteData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Loader2, Zap, AtSign, Paperclip, X as XIcon, Image as ImageIcon, FileText, Video } from "lucide-react";
+import { Send, Loader2, Zap, AtSign, Paperclip, X as XIcon, Image as ImageIcon, FileText, Video, Mic, Square } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -45,11 +45,23 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
   const [mentionIndex, setMentionIndex] = useState(0);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordChunksRef = useRef<Blob[]>([]);
+  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const sendMessage = useServerFn(sendMessageFn);
   const sendMedia = useServerFn(sendMediaFn);
+
+  useEffect(() => {
+    return () => {
+      if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+      mediaRecorderRef.current?.stream.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
 
   const { data: teamMembers } = useQuery({
     queryKey: ["team-members"],
@@ -214,6 +226,63 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
     }
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")
+          ? "audio/ogg;codecs=opus"
+          : "audio/webm";
+      const mr = new MediaRecorder(stream, { mimeType: mime });
+      recordChunksRef.current = [];
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) recordChunksRef.current.push(e.data);
+      };
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(recordChunksRef.current, { type: mime });
+        const ext = mime.includes("ogg") ? "ogg" : "webm";
+        const file = new File([blob], `audio-${Date.now()}.${ext}`, { type: mime });
+        const { data: { user } } = await supabase.auth.getUser();
+        const senderName = profile?.full_name || user?.email?.split("@")[0] || "Agente";
+        await uploadAndSendMedia(file, "", senderName);
+      };
+      mr.start();
+      mediaRecorderRef.current = mr;
+      setIsRecording(true);
+      setRecordSeconds(0);
+      recordTimerRef.current = setInterval(() => setRecordSeconds((s) => s + 1), 1000);
+    } catch (e: any) {
+      toast.error("Não foi possível acessar o microfone: " + (e?.message || String(e)));
+    }
+  };
+
+  const stopRecording = (cancel = false) => {
+    const mr = mediaRecorderRef.current;
+    if (recordTimerRef.current) {
+      clearInterval(recordTimerRef.current);
+      recordTimerRef.current = null;
+    }
+    setIsRecording(false);
+    setRecordSeconds(0);
+    if (!mr) return;
+    if (cancel) {
+      mr.ondataavailable = null;
+      mr.onstop = () => {
+        mr.stream.getTracks().forEach((t) => t.stop());
+      };
+    }
+    try {
+      mr.stop();
+    } catch {
+      /* noop */
+    }
+    mediaRecorderRef.current = null;
+  };
+
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = content.trim();
@@ -369,7 +438,50 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
         >
           <Paperclip className="h-3 w-3" /> Anexar
         </Button>
+
+        {!isRecording ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={startRecording}
+            disabled={uploading || isInternal}
+            className="text-xs gap-1"
+            title={isInternal ? "Áudio não disponível em notas internas" : "Gravar áudio"}
+          >
+            <Mic className="h-3 w-3" /> Gravar
+          </Button>
+        ) : (
+          <div className="flex items-center gap-1.5 px-2 h-8 rounded-full bg-red-50 border border-red-200">
+            <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-xs font-mono text-red-700">
+              {String(Math.floor(recordSeconds / 60)).padStart(1, "0")}:
+              {String(recordSeconds % 60).padStart(2, "0")}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => stopRecording(true)}
+              title="Cancelar gravação"
+            >
+              <XIcon className="h-3 w-3" />
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              className="h-6 w-6 bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => stopRecording(false)}
+              title="Enviar áudio"
+            >
+              <Send className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
       </div>
+
+
 
       {attachedFile && (
         <div className="flex items-center gap-2 p-2 bg-muted/40 rounded-xl border border-border/40">

@@ -19,9 +19,14 @@ import {
   Pause,
   Mic,
   Reply,
+  SmilePlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useServerFn } from "@tanstack/react-start";
+import { reactMessage as reactMessageFn } from "@/lib/react-message.functions";
+import { toast } from "sonner";
 
 interface MessageListProps {
   conversationId: string;
@@ -305,6 +310,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
                 isGroup={isGroup}
                 highlight={searchTerm.trim().toLowerCase()}
                 isActiveMatch={msg.id === activeMatchId}
+                conversationId={conversationId}
               />
             ))
           )}
@@ -342,18 +348,52 @@ function highlightText(text: string, term: string): React.ReactNode {
   return parts;
 }
 
+const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
 const MessageBubble = React.memo(
   ({
     msg,
     isGroup,
     highlight,
     isActiveMatch,
+    conversationId,
   }: {
     msg: Msg;
     isGroup?: boolean;
     highlight?: string;
     isActiveMatch?: boolean;
+    conversationId: string;
   }) => {
+    const reactMessage = useServerFn(reactMessageFn);
+    const [reactPopoverOpen, setReactPopoverOpen] = React.useState(false);
+    const reactions = Array.isArray(msg.metadata?.reactions)
+      ? (msg.metadata!.reactions as Array<{ by: string; emoji: string }>)
+      : [];
+    const reactionGroups = React.useMemo(() => {
+      const map = new Map<string, number>();
+      for (const r of reactions) map.set(r.emoji, (map.get(r.emoji) ?? 0) + 1);
+      return Array.from(map.entries());
+    }, [reactions]);
+
+    const handleReact = async (emoji: string) => {
+      setReactPopoverOpen(false);
+      if (!msg.evolution_message_id) {
+        toast.error("Não é possível reagir a esta mensagem ainda.");
+        return;
+      }
+      try {
+        await reactMessage({
+          data: {
+            conversationId,
+            evolutionMessageId: msg.evolution_message_id,
+            emoji,
+          },
+        });
+      } catch (e: any) {
+        toast.error("Falha ao reagir: " + (e?.message || String(e)));
+      }
+    };
+
     const deliveryStatus = msg.metadata?.delivery_status as string | undefined;
     const deliveryError = msg.metadata?.error as string | undefined;
     const quoted = msg.metadata?.quoted as
@@ -427,7 +467,30 @@ const MessageBubble = React.memo(
             isActiveMatch && "ring-2 ring-yellow-400",
           )}
         >
-          <div className="absolute -top-2 -right-2 opacity-0 group-hover/bubble:opacity-100 transition-opacity">
+          <div className="absolute -top-3 -right-2 opacity-0 group-hover/bubble:opacity-100 transition-opacity flex items-center gap-1 z-10">
+            <Popover open={reactPopoverOpen} onOpenChange={setReactPopoverOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="h-6 w-6 rounded-full bg-card border shadow-sm flex items-center justify-center hover:bg-accent"
+                  title="Reagir"
+                >
+                  <SmilePlus className="h-3 w-3" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="p-1 w-auto flex gap-0.5" align="end">
+                {REACTION_EMOJIS.map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    onClick={() => handleReact(e)}
+                    className="h-8 w-8 rounded-full hover:bg-accent text-lg flex items-center justify-center transition-transform hover:scale-125"
+                  >
+                    {e}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
             <CreateTaskDialog messageId={msg.id} initialContent={msg.content || ""} />
           </div>
           {isGroup && !isOutbound && msg.sender_name && (
@@ -488,6 +551,21 @@ const MessageBubble = React.memo(
             )}
           </div>
           <div className="clear-both" />
+          {reactionGroups.length > 0 && (
+            <div
+              className={cn(
+                "absolute -bottom-2 flex gap-0.5 bg-card border rounded-full px-1.5 py-0.5 shadow-sm text-xs",
+                isOutbound ? "right-2" : "left-2",
+              )}
+            >
+              {reactionGroups.map(([emoji, count]) => (
+                <span key={emoji} className="inline-flex items-center gap-0.5">
+                  <span>{emoji}</span>
+                  {count > 1 && <span className="text-[10px] wa-meta">{count}</span>}
+                </span>
+              ))}
+            </div>
+          )}
           {failed && visibleDeliveryError && (
             <div className="mt-1 text-[11px] text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200">
               {visibleDeliveryError}
