@@ -1,9 +1,9 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useMutation, useQueryClient, useQuery, type InfiniteData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Loader2, Zap, AtSign, Paperclip, X as XIcon, Image as ImageIcon, FileText, Video } from "lucide-react";
+import { Send, Loader2, Zap, AtSign, Paperclip, X as XIcon, Image as ImageIcon, FileText, Video, Mic, Square } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
