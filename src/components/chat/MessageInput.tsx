@@ -112,7 +112,18 @@ export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }
     },
   });
 
-  type SendVars = { text: string; internal: boolean; senderName: string; jobTitle: string; userId: string };
+  type SendVars = {
+    text: string;
+    internal: boolean;
+    senderName: string;
+    jobTitle: string;
+    userId: string;
+    quoted?: {
+      evolutionMessageId: string;
+      sender: string;
+      content: string;
+    };
+  };
 
   const sendMutation = useMutation({
     onMutate: async (vars: SendVars) => {
@@ -127,7 +138,13 @@ export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }
         sender_name: vars.senderName,
         is_internal: vars.internal,
         evolution_message_id: null,
-        metadata: { delivery_status: "pending", optimistic: true },
+        metadata: {
+          delivery_status: "pending",
+          optimistic: true,
+          ...(vars.quoted
+            ? { quoted: { sender: vars.quoted.sender, content: vars.quoted.content } }
+            : {}),
+        },
       };
       queryClient.setQueryData<CachedMessages>(["messages", conversationId], (old) => {
         if (!old) {
@@ -162,6 +179,7 @@ export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }
           conversationId,
           content: finalContent,
           senderName: vars.senderName,
+          quoted: vars.quoted,
         },
       });
 
