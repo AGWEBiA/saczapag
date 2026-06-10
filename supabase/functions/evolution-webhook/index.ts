@@ -462,6 +462,8 @@ serve(async (req) => {
           evolution_message_id: keyId,
           sender_name: pushName,
           type: "whatsapp",
+          media_url,
+          media_type,
           metadata:
             direction === "outbound"
               ? {
