@@ -171,11 +171,36 @@ export function Dashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="rounded-full">
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-full"
+            onClick={() => {
+              const rows = [
+                ["Métrica", "Valor"],
+                ["Instâncias Ativas", `${stats.activeInstances}/${stats.totalInstances}`],
+                ["Inbox Aberta", String(stats.open)],
+                ["Sem Atribuição", String(stats.unassigned)],
+                ["Resolvidas", String(stats.closed)],
+                ["Total Contatos", String(stats.totalContacts)],
+              ];
+              const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
+              const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `relatorio-agwebi-${format(new Date(), "yyyy-MM-dd")}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
             Exportar Relatório
           </Button>
-          <Button size="sm" className="rounded-full shadow-lg shadow-primary/20">
-            Nova Campanha
+          <Button asChild size="sm" className="rounded-full shadow-lg shadow-primary/20">
+            <Link to="/chat">
+              <Plus className="h-4 w-4 mr-1" />
+              Nova Conversa
+            </Link>
           </Button>
         </div>
       </div>

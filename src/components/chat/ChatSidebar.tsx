@@ -21,6 +21,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { NewConversationDialog } from "./NewConversationDialog";
 import { GroupImportDialog } from "./GroupImportDialog";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 
 interface ChatSidebarProps {
   selectedId?: string;
@@ -170,19 +171,7 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
           <div className="flex items-center gap-1 justify-end">
             <NewConversationDialog onCreated={(id) => onSelect(id)} />
             <GroupImportDialog />
-            <Button
-              variant="ghost"
-              size="icon"
-              title="Notificações"
-              onClick={() => {
-                // Future: show notification list dialog
-                toast.info("Em breve: Central de Notificações");
-              }}
-              className="relative"
-            >
-              <Bell className="h-4 w-4" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-background animate-pulse" />
-            </Button>
+            <NotificationCenter />
             <Button
               variant="ghost"
               size="icon"
