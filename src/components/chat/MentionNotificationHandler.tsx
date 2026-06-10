@@ -51,14 +51,14 @@ export function MentionNotificationHandler() {
           const isMentioned = mentions.some(m => content.toLowerCase().includes(m));
           
           if (isMentioned) {
-            const { error } = await supabase.from("notifications").insert({
+            const { error } = await supabase.from("notifications" as any).insert({
               user_id: user.id,
               title: "Você foi citado!",
               content: content.substring(0, 100),
               type: "mention",
               link: `/chat?id=${newMessage.conversation_id}`,
               read: false,
-            });
+            } as any);
 
             if (!error) {
               toast.info("Você foi citado em uma conversa!", {
