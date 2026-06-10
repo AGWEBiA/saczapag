@@ -82,10 +82,36 @@ function extractContent(item: any, message: any) {
     message?.ephemeralMessage?.message?.extendedTextMessage?.text ||
     message?.imageMessage?.caption ||
     message?.videoMessage?.caption ||
+    message?.documentMessage?.caption ||
+    message?.documentMessage?.fileName ||
     item?.text ||
     item?.content ||
     "[Mídia]"
   );
+}
+
+function extractMedia(item: any, message: any): { media_url: string | null; media_type: string | null } {
+  const inner = message?.ephemeralMessage?.message ?? message ?? {};
+  const candidates: Array<{ node: any; type: string }> = [
+    { node: inner?.imageMessage, type: "image" },
+    { node: inner?.videoMessage, type: "video" },
+    { node: inner?.audioMessage, type: "audio" },
+    { node: inner?.documentMessage, type: "document" },
+    { node: inner?.stickerMessage, type: "image" },
+  ];
+  for (const c of candidates) {
+    if (c.node) {
+      const url =
+        c.node.url ||
+        c.node.directPath ||
+        item?.message?.mediaUrl ||
+        item?.mediaUrl ||
+        null;
+      return { media_url: url, media_type: c.node.mimetype || c.type };
+    }
+  }
+  const fallbackUrl = item?.message?.mediaUrl || item?.mediaUrl || null;
+  return { media_url: fallbackUrl, media_type: fallbackUrl ? "file" : null };
 }
 
 serve(async (req) => {
@@ -291,6 +317,7 @@ serve(async (req) => {
         ? "Você"
         : item.pushName || item.participant || data.participant || "Contato";
       const content = extractContent(item, message);
+      const { media_url, media_type } = extractMedia(item, message);
 
       const { data: instance } = await supabase
         .from("whatsapp_instances")
@@ -435,6 +462,8 @@ serve(async (req) => {
           evolution_message_id: keyId,
           sender_name: pushName,
           type: "whatsapp",
+          media_url,
+          media_type,
           metadata:
             direction === "outbound"
               ? {

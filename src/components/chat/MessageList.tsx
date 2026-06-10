@@ -21,6 +21,8 @@ type Msg = {
   sender_name: string | null;
   is_internal: boolean | null;
   evolution_message_id?: string | null;
+  media_url?: string | null;
+  media_type?: string | null;
   metadata?: Record<string, unknown> | null;
 };
 
@@ -43,7 +45,7 @@ export function MessageList({ conversationId, isGroup }: MessageListProps) {
       let q = supabase
         .from("messages")
         .select(
-          "id, content, created_at, direction, sender_name, is_internal, evolution_message_id, metadata",
+          "id, content, created_at, direction, sender_name, is_internal, evolution_message_id, media_url, media_type, metadata",
         )
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: false })
@@ -267,9 +269,12 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
             {msg.sender_name}
           </span>
         )}
-        <p className="text-sm lg:text-[15px] leading-relaxed whitespace-pre-wrap break-words font-medium">
-          {msg.content}
-        </p>
+        {msg.media_url && <MediaAttachment url={msg.media_url} type={msg.media_type} />}
+        {msg.content && msg.content !== "[Mídia]" && (
+          <p className="text-sm lg:text-[15px] leading-relaxed whitespace-pre-wrap break-words font-medium">
+            {msg.content}
+          </p>
+        )}
         <div className="flex items-center justify-between gap-3 mt-2 pt-1 border-t border-current/5">
           <span
             className={cn(
@@ -319,3 +324,34 @@ const MessageBubble = React.memo(({ msg, isGroup }: { msg: Msg; isGroup?: boolea
 });
 
 MessageBubble.displayName = "MessageBubble";
+
+function MediaAttachment({ url, type }: { url: string; type?: string | null }) {
+  const t = (type || "").toLowerCase();
+  const isImage = t.startsWith("image") || /\.(png|jpe?g|gif|webp)(\?|$)/i.test(url);
+  const isVideo = t.startsWith("video") || /\.(mp4|webm|mov)(\?|$)/i.test(url);
+  const isAudio = t.startsWith("audio") || /\.(mp3|ogg|wav|m4a|opus)(\?|$)/i.test(url);
+
+  if (isImage) {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" className="block mb-2">
+        <img src={url} alt="mídia" className="rounded-xl max-h-80 object-cover" loading="lazy" />
+      </a>
+    );
+  }
+  if (isVideo) {
+    return <video src={url} controls className="rounded-xl max-h-80 mb-2" />;
+  }
+  if (isAudio) {
+    return <audio src={url} controls className="w-full mb-2" />;
+  }
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-2 text-xs font-semibold underline mb-2"
+    >
+      📎 Abrir anexo
+    </a>
+  );
+}
