@@ -707,7 +707,59 @@ const MessageBubble = React.memo(
             fileName: (msg.metadata as any)?.file_name ?? null,
           }}
         />
+        <AlertDialog open={editOpen} onOpenChange={setEditOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Editar mensagem</AlertDialogTitle>
+              <AlertDialogDescription>
+                O WhatsApp permite editar mensagens enviadas há menos de 15 minutos.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <Textarea
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              rows={4}
+              autoFocus
+            />
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={actionBusy}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={actionBusy || !editText.trim() || editText.trim() === msg.content}
+                onClick={(e) => {
+                  e.preventDefault();
+                  callManage("edit", editText.trim());
+                }}
+              >
+                {actionBusy ? "Salvando..." : "Salvar"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Apagar para todos?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta mensagem será apagada para o destinatário no WhatsApp. A ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={actionBusy}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={actionBusy}
+                onClick={(e) => {
+                  e.preventDefault();
+                  callManage("delete");
+                }}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {actionBusy ? "Apagando..." : "Apagar"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
+
     );
   },
 );
