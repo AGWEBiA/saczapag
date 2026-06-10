@@ -44,7 +44,7 @@ type CachedMessage = {
 
 type CachedMessages = InfiniteData<CachedMessage[], string | null>;
 
-export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
+export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }: MessageInputProps) {
   const [content, setContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
   const [openQuickReplies, setOpenQuickReplies] = useState(false);
