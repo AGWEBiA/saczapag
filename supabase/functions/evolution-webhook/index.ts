@@ -90,42 +90,96 @@ function extractContent(item: any, message: any) {
   );
 }
 
-function extractMedia(item: any, message: any): { media_url: string | null; media_type: string | null } {
+function extractMedia(item: any, message: any): {
+  media_url: string | null;
+  media_type: string | null;
+  has_media: boolean;
+  ext: string;
+} {
   const inner = message?.ephemeralMessage?.message ?? message ?? {};
-  
-  // Se for mensagem de visualização única (viewOnce), ela vem aninhada
   const viewOnce = inner?.viewOnceMessage?.message || inner?.viewOnceMessageV2?.message;
   const msgBody = viewOnce || inner;
 
-  const candidates: Array<{ node: any; type: string }> = [
-    { node: msgBody?.imageMessage, type: "image" },
-    { node: msgBody?.videoMessage, type: "video" },
-    { node: msgBody?.audioMessage, type: "audio" },
-    { node: msgBody?.documentMessage, type: "document" },
-    { node: msgBody?.stickerMessage, type: "image" },
+  const candidates: Array<{ node: any; type: string; ext: string }> = [
+    { node: msgBody?.imageMessage, type: "image", ext: "jpg" },
+    { node: msgBody?.videoMessage, type: "video", ext: "mp4" },
+    { node: msgBody?.audioMessage, type: "audio", ext: "ogg" },
+    { node: msgBody?.documentMessage, type: "document", ext: "bin" },
+    { node: msgBody?.stickerMessage, type: "image", ext: "webp" },
   ];
 
   for (const c of candidates) {
     if (c.node) {
-      // Evolution v2 nested structure for mediaUrl
       const url =
-        item?.mediaUrl ||
-        item?.message?.mediaUrl ||
-        c.node.mediaUrl ||
-        c.node.url ||
-        c.node.directPath ||
-        null;
-      
-      return { 
-        media_url: url, 
-        media_type: c.node.mimetype || c.type 
+        item?.mediaUrl || item?.message?.mediaUrl || c.node.mediaUrl || c.node.url || null;
+      return {
+        media_url: url,
+        media_type: c.node.mimetype || c.type,
+        has_media: true,
+        ext: c.ext,
       };
     }
   }
-
-  // Fallback for cases where mediaUrl is at the root but no specific message type was matched
   const fallbackUrl = item?.mediaUrl || item?.message?.mediaUrl || null;
-  return { media_url: fallbackUrl, media_type: fallbackUrl ? "file" : null };
+  return {
+    media_url: fallbackUrl,
+    media_type: fallbackUrl ? "file" : null,
+    has_media: !!fallbackUrl,
+    ext: "bin",
+  };
+}
+
+async function downloadAndStoreMedia(
+  supabase: any,
+  instanceName: string,
+  item: any,
+  keyId: string | null,
+  ext: string,
+  mime: string | null,
+): Promise<string | null> {
+  try {
+    const { data: configs } = await supabase
+      .from("evolution_configs")
+      .select("api_url, api_key, is_primary, priority")
+      .eq("is_active", true)
+      .order("is_primary", { ascending: false })
+      .order("priority", { ascending: true });
+    const chosen = configs?.[0];
+    const apiUrl = (chosen?.api_url ?? Deno.env.get("EVOLUTION_API_URL") ?? "").replace(/\/$/, "");
+    const apiKey = chosen?.api_key ?? Deno.env.get("EVOLUTION_API_KEY") ?? "";
+    if (!apiUrl || !apiKey) return null;
+
+    const res = await fetch(
+      `${apiUrl}/chat/getBase64FromMediaMessage/${encodeURIComponent(instanceName)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: apiKey },
+        body: JSON.stringify({ message: { key: item?.key }, convertToMp4: false }),
+      },
+    );
+    if (!res.ok) {
+      console.error("getBase64FromMediaMessage failed", res.status, await res.text());
+      return null;
+    }
+    const json = await res.json().catch(() => ({}));
+    const b64: string | undefined = json?.base64 || json?.media || json?.data;
+    if (!b64) return null;
+
+    const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const filename = `wa/${keyId || crypto.randomUUID()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("chat-media")
+      .upload(filename, bin, { contentType: mime || "application/octet-stream", upsert: true });
+    if (upErr) {
+      console.error("storage upload failed", upErr);
+      return null;
+    }
+    const { data: pub } = supabase.storage.from("chat-media").getPublicUrl(filename);
+    return pub?.publicUrl || null;
+  } catch (e) {
+    console.error("downloadAndStoreMedia error", e);
+    return null;
+  }
 }
 
 serve(async (req) => {
@@ -331,7 +385,20 @@ serve(async (req) => {
         ? "Você"
         : item.pushName || item.participant || data.participant || "Contato";
       const content = extractContent(item, message);
-      const { media_url, media_type } = extractMedia(item, message);
+      const mediaInfo = extractMedia(item, message);
+      let media_url = mediaInfo.media_url;
+      const media_type = mediaInfo.media_type;
+      if (mediaInfo.has_media) {
+        const stored = await downloadAndStoreMedia(
+          supabase,
+          instanceName,
+          item,
+          keyId,
+          mediaInfo.ext,
+          media_type,
+        );
+        if (stored) media_url = stored;
+      }
 
       const { data: instance } = await supabase
         .from("whatsapp_instances")
