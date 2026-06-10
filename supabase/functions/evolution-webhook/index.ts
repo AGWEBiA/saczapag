@@ -420,6 +420,7 @@ serve(async (req) => {
         : item.pushName || item.participant || data.participant || "Contato";
       const content = extractContent(item, message);
       const mediaInfo = extractMedia(item, message);
+      const quoted = extractQuoted(message);
       let media_url = mediaInfo.media_url;
       const media_type = mediaInfo.media_type;
       if (mediaInfo.has_media) {
