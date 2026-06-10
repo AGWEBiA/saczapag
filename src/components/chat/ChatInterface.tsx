@@ -52,11 +52,26 @@ export function ChatInterface() {
   });
 
   useEffect(() => {
-    if (selectedConversation) {
+    if (selectedConversation && selectedConversationId) {
       setInternalNote(selectedConversation.contact?.internal_note || "");
       setMobileView("chat");
+
+      // Mark as read when selecting the conversation
+      if (selectedConversation.unread_count > 0) {
+        supabase
+          .from("conversations")
+          .update({ unread_count: 0 })
+          .eq("id", selectedConversationId)
+          .then(() => {
+            // Update local query data to reflect changes immediately
+            supabase.from("messages")
+              .update({ is_read: true })
+              .eq("conversation_id", selectedConversationId)
+              .eq("is_read", false);
+          });
+      }
     }
-  }, [selectedConversation]);
+  }, [selectedConversation, selectedConversationId]);
 
   const { data: agents } = useQuery({
     queryKey: ["agents"],
