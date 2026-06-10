@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, Check, X, AlertCircle } from "lucide-react";
+import { Bell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,17 +18,16 @@ export function NotificationCenter() {
 
   useEffect(() => {
     fetchNotifications();
-    
-    const channel = supabase
-      .channel("notifications")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications" },
-        () => {
-          fetchNotifications();
-        }
-      )
-      .subscribe();
+
+    const channel = supabase.channel(`notifications-${crypto.randomUUID()}`);
+    channel.on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "notifications" },
+      () => {
+        fetchNotifications();
+      }
+    );
+    channel.subscribe();
 
     return () => {
       supabase.removeChannel(channel);
