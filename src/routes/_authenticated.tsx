@@ -2,7 +2,7 @@ import { createFileRoute, redirect, Outlet, Link, useRouter, useRouterState } fr
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Users2, Activity, ClipboardList, BarChart3, Menu } from "lucide-react";
+import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Users2, Activity, ClipboardList, BarChart3, Menu, PanelLeftClose, PanelLeft } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { HelpGuide } from "@/components/shared/HelpGuide";
