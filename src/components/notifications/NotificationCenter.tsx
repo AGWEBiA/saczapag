@@ -36,15 +36,19 @@ export function NotificationCenter() {
   }, []);
 
   const fetchNotifications = async () => {
-    const { data } = await supabase
-      .from("notifications" as any)
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(20);
-      
-    if (data) {
-      setNotifications(data);
-      setUnreadCount(data.filter((n: any) => !n.read).length);
+    try {
+      const { data, error } = await supabase
+        .from("notifications" as any)
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) return;
+      if (data) {
+        setNotifications(data);
+        setUnreadCount(data.filter((n: any) => !n.read).length);
+      }
+    } catch {
+      // tabela ausente ou sem permissão — silencioso
     }
   };
 
