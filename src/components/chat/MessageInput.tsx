@@ -43,9 +43,13 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
   const [openQuickReplies, setOpenQuickReplies] = useState(false);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const sendMessage = useServerFn(sendMessageFn);
+  const sendMedia = useServerFn(sendMediaFn);
 
   const { data: teamMembers } = useQuery({
     queryKey: ["team-members"],
@@ -179,10 +183,42 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
     },
   });
 
+  const uploadAndSendMedia = async (file: File, caption: string, senderName: string) => {
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "bin";
+      const path = `${conversationId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("chat-media").upload(path, file, {
+        contentType: file.type,
+        upsert: false,
+      });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("chat-media").getPublicUrl(path);
+      await sendMedia({
+        data: {
+          conversationId,
+          mediaUrl: pub.publicUrl,
+          mimeType: file.type || "application/octet-stream",
+          fileName: file.name,
+          caption,
+          senderName,
+        },
+      });
+      queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      toast.success("Arquivo enviado");
+    } catch (e: any) {
+      toast.error("Falha ao enviar arquivo: " + (e?.message || String(e)));
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = content.trim();
-    if (!text || sendMutation.isPending) return;
+    if (sendMutation.isPending || uploading) return;
+    if (!text && !attachedFile) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       toast.error("Usuário não autenticado");
@@ -190,6 +226,17 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
     }
     const senderName = profile?.full_name || user.email?.split("@")[0] || "Agente";
     const jobTitle = profile?.role || "Atendimento";
+
+    if (attachedFile) {
+      const file = attachedFile;
+      const caption = text;
+      setAttachedFile(null);
+      setContent("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      await uploadAndSendMedia(file, caption, senderName);
+      return;
+    }
+
     setContent("");
     sendMutation.mutate({ text, internal: isInternal, senderName, jobTitle, userId: user.id });
   };
