@@ -1,13 +1,13 @@
-import { createFileRoute, redirect, Outlet, Link, useRouter } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { createFileRoute, redirect, Outlet, Link, useRouter, useRouterState } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Users2, Activity, Bell, Search, ClipboardList, BarChart3 } from "lucide-react";
+import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Users2, Activity, ClipboardList, BarChart3, Menu } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { HelpGuide } from "@/components/shared/HelpGuide";
-import { Input } from "@/components/ui/input";
 import { MentionNotificationHandler } from "@/components/chat/MentionNotificationHandler";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import agwebiIcon from "@/assets/agwebi-icon.png";
 
 
@@ -61,77 +61,37 @@ function AuthenticatedLayout() {
   ];
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-[100dvh] overflow-hidden bg-background">
       <MentionNotificationHandler />
-      
-      {/* Sidebar */}
-      <aside className="w-20 lg:w-64 border-r bg-card flex flex-col transition-all duration-300 z-30">
-        <div className="p-4 lg:p-6 border-b flex flex-col items-center lg:items-start overflow-hidden">
-          <div className="flex items-center gap-2.5">
-            <img src={agwebiIcon} alt="AG WEBi" className="w-9 h-9 object-contain shrink-0" />
-            <span className="hidden lg:inline font-bold text-lg tracking-tight text-foreground animate-in fade-in slide-in-from-left-2">
-              AG <span className="text-primary">WEBi</span>
-            </span>
-          </div>
-        </div>
 
-
-        <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto">
-          {navItems.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              preload="intent"
-              className="flex items-center gap-3 px-3 py-3 lg:py-2.5 rounded-xl text-sm transition-all duration-200 hover:bg-accent group relative"
-              activeProps={{ className: "bg-primary text-primary-foreground shadow-md shadow-primary/20 font-semibold" }}
-            >
-              <item.icon className="h-5 w-5 shrink-0" />
-              <span className="hidden lg:inline">{item.label}</span>
-              
-              <div className="lg:hidden absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-xl border">
-                {item.label}
-              </div>
-            </Link>
-          ))}
-        </nav>
-
-        <div className="p-4 border-t space-y-4">
-          <Button
-            variant="ghost"
-            className="w-full justify-center lg:justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl px-3"
-            onClick={handleLogout}
-          >
-            <LogOut className="h-5 w-5 lg:mr-3 shrink-0" />
-            <span className="hidden lg:inline font-medium">Sair</span>
-          </Button>
-        </div>
-      </aside>
+      {/* Sidebar — escondida no mobile, vira drawer */}
+      <DesktopSidebar navItems={navItems} onLogout={handleLogout} />
 
       <div className="flex-1 flex flex-col min-w-0 bg-muted/5 relative">
         {/* Top Header */}
-        <header className="h-16 border-b bg-card/50 backdrop-blur-md flex items-center justify-between px-4 lg:px-8 z-20">
-          <div className="flex items-center gap-4 flex-1">
-            <div className="relative w-full max-w-md hidden md:block">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Pesquisar em tudo..." 
-                className="pl-9 bg-muted/30 border-none h-10 rounded-full focus-visible:ring-primary/20"
-              />
+        <header className="h-14 md:h-16 border-b bg-card/50 backdrop-blur-md flex items-center justify-between gap-2 px-3 md:px-6 lg:px-8 z-20 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <MobileNav navItems={navItems} onLogout={handleLogout} />
+            <div className="flex items-center gap-2 md:hidden min-w-0">
+              <img src={agwebiIcon} alt="AG WEBi" className="w-7 h-7 object-contain shrink-0" />
+              <span className="font-bold text-base truncate">
+                AG <span className="text-primary">WEBi</span>
+              </span>
             </div>
           </div>
-          
-          <div className="flex items-center gap-2 lg:gap-4">
+
+          <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
             <HelpGuide />
             <NotificationCenter />
-            
-            <div className="h-8 w-[1px] bg-border mx-2" />
-            
-            <div className="flex items-center gap-3 px-2 py-1 rounded-full bg-muted/50 border border-transparent hover:border-border transition-colors group cursor-pointer">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs uppercase shadow-sm">
+
+            <div className="hidden md:block h-8 w-px bg-border mx-1" />
+
+            <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-muted/50 border border-transparent hover:border-border transition-colors group cursor-pointer max-w-[200px]">
+              <div className="w-8 h-8 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs uppercase shadow-sm">
                 {user?.email?.charAt(0) || "U"}
               </div>
-              <div className="hidden lg:block">
-                <div className="text-xs font-bold leading-none">{user?.email?.split("@")[0]}</div>
+              <div className="hidden lg:block min-w-0">
+                <div className="text-xs font-bold leading-none truncate">{user?.email?.split("@")[0]}</div>
                 <div className="text-[10px] text-green-500 font-medium">Online</div>
               </div>
             </div>
@@ -145,5 +105,110 @@ function AuthenticatedLayout() {
         </main>
       </div>
     </div>
+  );
+}
+
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
+
+function DesktopSidebar({ navItems, onLogout }: { navItems: NavItem[]; onLogout: () => void }) {
+  return (
+    <aside className="hidden md:flex w-20 lg:w-64 border-r bg-card flex-col transition-all duration-300 z-30 shrink-0">
+      <div className="p-4 lg:p-6 border-b flex flex-col items-center lg:items-start overflow-hidden">
+        <div className="flex items-center gap-2.5">
+          <img src={agwebiIcon} alt="AG WEBi" className="w-9 h-9 object-contain shrink-0" />
+          <span className="hidden lg:inline font-bold text-lg tracking-tight text-foreground">
+            AG <span className="text-primary">WEBi</span>
+          </span>
+        </div>
+      </div>
+
+      <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto">
+        {navItems.map((item) => (
+          <Link
+            key={item.to}
+            to={item.to}
+            preload="intent"
+            className="flex items-center gap-3 px-3 py-3 lg:py-2.5 rounded-xl text-sm transition-all duration-200 hover:bg-accent group relative min-h-[44px]"
+            activeProps={{ className: "bg-primary text-primary-foreground shadow-md shadow-primary/20 font-semibold" }}
+          >
+            <item.icon className="h-5 w-5 shrink-0" />
+            <span className="hidden lg:inline">{item.label}</span>
+            <div className="lg:hidden absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-xl border">
+              {item.label}
+            </div>
+          </Link>
+        ))}
+      </nav>
+
+      <div className="p-4 border-t">
+        <Button
+          variant="ghost"
+          className="w-full justify-center lg:justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl px-3 min-h-[44px]"
+          onClick={onLogout}
+        >
+          <LogOut className="h-5 w-5 lg:mr-3 shrink-0" />
+          <span className="hidden lg:inline font-medium">Sair</span>
+        </Button>
+      </div>
+    </aside>
+  );
+}
+
+function MobileNav({ navItems, onLogout }: { navItems: NavItem[]; onLogout: () => void }) {
+  const [open, setOpen] = useState(false);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  // Fecha o drawer ao navegar
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden h-10 w-10"
+          aria-label="Abrir menu"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="left" className="p-0 w-72 max-w-[85vw] flex flex-col">
+        <SheetTitle className="sr-only">Menu de navegação</SheetTitle>
+        <SheetDescription className="sr-only">Links principais do sistema</SheetDescription>
+        <div className="p-5 border-b flex items-center gap-2.5">
+          <img src={agwebiIcon} alt="AG WEBi" className="w-9 h-9 object-contain" />
+          <span className="font-bold text-lg tracking-tight">
+            AG <span className="text-primary">WEBi</span>
+          </span>
+        </div>
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+          {navItems.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              preload="intent"
+              className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors hover:bg-accent min-h-[44px]"
+              activeProps={{ className: "bg-primary text-primary-foreground shadow-md font-semibold" }}
+            >
+              <item.icon className="h-5 w-5 shrink-0" />
+              <span>{item.label}</span>
+            </Link>
+          ))}
+        </nav>
+        <div className="p-3 border-t">
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl px-3 min-h-[44px]"
+            onClick={onLogout}
+          >
+            <LogOut className="h-5 w-5 mr-3" />
+            <span className="font-medium">Sair</span>
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

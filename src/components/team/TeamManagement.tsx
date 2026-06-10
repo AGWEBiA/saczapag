@@ -502,15 +502,16 @@ export function TeamManagement() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="overflow-x-auto -mx-2 sm:mx-0">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
-                <TableHead>E-mail</TableHead>
-                <TableHead>WhatsApp</TableHead>
-                <TableHead>Cargo</TableHead>
-                <TableHead>Acesso</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead className="hidden md:table-cell">E-mail</TableHead>
+                <TableHead className="hidden xl:table-cell">WhatsApp</TableHead>
+                <TableHead className="hidden xl:table-cell">Cargo</TableHead>
+                <TableHead className="hidden sm:table-cell">Acesso</TableHead>
+                <TableHead className="hidden lg:table-cell">Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -543,38 +544,45 @@ export function TeamManagement() {
               ) : (
                 teamMembers?.map((member) => (
                   <TableRow key={member.id} className={(member as any).status === 'inactive' ? 'opacity-50' : ''}>
-                    <TableCell className="font-medium">{member.full_name || "N/A"}</TableCell>
-                    <TableCell>{member.email}</TableCell>
-                    <TableCell>{(member as any).whatsapp_number || "N/A"}</TableCell>
-                    <TableCell>{(member as any).position || "N/A"}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex flex-col">
+                        <span className="truncate">{member.full_name || "N/A"}</span>
+                        <span className="md:hidden text-xs text-muted-foreground truncate">{member.email}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">{member.email}</TableCell>
+                    <TableCell className="hidden xl:table-cell">{(member as any).whatsapp_number || "N/A"}</TableCell>
+                    <TableCell className="hidden xl:table-cell">{(member as any).position || "N/A"}</TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       <span className="capitalize px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">
                         {member.role || "Agente"}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       <Badge variant={(member as any).status === 'inactive' ? 'secondary' : 'default'} className={(member as any).status === 'inactive' ? '' : 'bg-green-500'}>
                         {(member as any).status === 'inactive' ? 'Inativo' : 'Ativo'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="text-muted-foreground hover:text-primary"
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-primary h-9 w-9"
                           onClick={() => openEditModal(member)}
+                          aria-label="Editar membro"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="text-muted-foreground hover:text-destructive"
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-destructive h-9 w-9"
                           onClick={() => {
                             setSelectedMember(member);
                             setIsDeleteAlertOpen(true);
                           }}
+                          aria-label="Remover membro"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -585,6 +593,8 @@ export function TeamManagement() {
               )}
             </TableBody>
           </Table>
+          </div>
+
         </CardContent>
       </Card>
     </div>

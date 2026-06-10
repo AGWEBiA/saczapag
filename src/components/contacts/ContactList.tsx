@@ -109,13 +109,14 @@ export function ContactList() {
         </div>
       </CardHeader>
       <CardContent>
+        <div className="overflow-x-auto -mx-2 sm:mx-0">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[50px]"></TableHead>
               <TableHead>Nome</TableHead>
-              <TableHead>Telefone</TableHead>
-              <TableHead>Adicionado em</TableHead>
+              <TableHead className="hidden sm:table-cell">Telefone</TableHead>
+              <TableHead className="hidden lg:table-cell">Adicionado em</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -137,26 +138,32 @@ export function ContactList() {
                       </AvatarFallback>
                     </Avatar>
                   </TableCell>
-                  <TableCell className="font-medium">{contact.name}</TableCell>
-                  <TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex flex-col">
+                      <span className="truncate">{contact.name}</span>
+                      <span className="sm:hidden text-xs text-muted-foreground truncate">{contact.phone_number}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell">
                     <div className="flex items-center gap-2">
                       <Phone className="h-3 w-3 text-muted-foreground" />
                       {contact.phone_number}
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden lg:table-cell">
                     {new Date(contact.created_at).toLocaleDateString("pt-BR")}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10 h-9 w-9"
                       onClick={() => {
                         if (confirm(`Tem certeza que deseja remover o contato ${contact.name}?`)) {
                           deleteMutation.mutate(contact.id);
                         }
                       }}
+                      aria-label="Remover contato"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -166,6 +173,8 @@ export function ContactList() {
             )}
           </TableBody>
         </Table>
+        </div>
+
       </CardContent>
 
       <CreateContactDialog 
