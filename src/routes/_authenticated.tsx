@@ -60,18 +60,39 @@ function AuthenticatedLayout() {
     { to: "/settings", label: "Ajustes", icon: Settings },
   ];
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("sidebar-collapsed") === "1";
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sidebar-collapsed", sidebarCollapsed ? "1" : "0");
+    }
+  }, [sidebarCollapsed]);
+
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-background">
       <MentionNotificationHandler />
 
       {/* Sidebar — escondida no mobile, vira drawer */}
-      <DesktopSidebar navItems={navItems} onLogout={handleLogout} />
+      <DesktopSidebar navItems={navItems} onLogout={handleLogout} collapsed={sidebarCollapsed} />
 
       <div className="flex-1 flex flex-col min-w-0 bg-muted/5 relative">
         {/* Top Header */}
         <header className="h-14 md:h-16 border-b bg-card/50 backdrop-blur-md flex items-center justify-between gap-2 px-3 md:px-6 lg:px-8 z-20 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <MobileNav navItems={navItems} onLogout={handleLogout} />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hidden md:inline-flex h-9 w-9"
+              onClick={() => setSidebarCollapsed((v) => !v)}
+              title={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+              aria-label={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+            >
+              {sidebarCollapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+            </Button>
             <div className="flex items-center gap-2 md:hidden min-w-0">
               <img src={agwebiIcon} alt="AG WEBi" className="w-7 h-7 object-contain shrink-0" />
               <span className="font-bold text-base truncate">
