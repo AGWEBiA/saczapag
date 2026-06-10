@@ -20,10 +20,14 @@ import {
   Mic,
   Reply,
   SmilePlus,
+  ZoomIn,
+  ZoomOut,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useServerFn } from "@tanstack/react-start";
 import { reactMessage as reactMessageFn } from "@/lib/react-message.functions";
 import { toast } from "sonner";
@@ -694,16 +698,7 @@ function MediaAttachment({
   const isAudio = t.startsWith("audio") || /\.(mp3|ogg|wav|m4a|opus)(\?|$)/i.test(url);
 
   if (isImage) {
-    return (
-      <a href={url} target="_blank" rel="noopener noreferrer" className="block mb-1 -mx-1.5 -mt-1">
-        <img
-          src={url}
-          alt="mídia"
-          className="rounded-md max-h-80 w-full object-cover"
-          loading="lazy"
-        />
-      </a>
-    );
+    return <ImageLightbox url={url} />;
   }
   if (isVideo) {
     return (
@@ -739,5 +734,148 @@ function MediaAttachment({
         </div>
       </div>
     </a>
+  );
+}
+
+function ImageLightbox({ url }: { url: string }) {
+  const [open, setOpen] = useState(false);
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setScale(1);
+      setOffset({ x: 0, y: 0 });
+    }
+  }, [open]);
+
+  const zoomIn = () => setScale((s) => Math.min(s + 0.5, 5));
+  const zoomOut = () =>
+    setScale((s) => {
+      const next = Math.max(s - 0.5, 1);
+      if (next === 1) setOffset({ x: 0, y: 0 });
+      return next;
+    });
+
+  const onWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.25 : 0.25;
+    setScale((s) => {
+      const next = Math.max(1, Math.min(5, s + delta));
+      if (next === 1) setOffset({ x: 0, y: 0 });
+      return next;
+    });
+  };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (scale <= 1) return;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    dragRef.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y };
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!dragRef.current) return;
+    setOffset({
+      x: dragRef.current.ox + (e.clientX - dragRef.current.x),
+      y: dragRef.current.oy + (e.clientY - dragRef.current.y),
+    });
+  };
+
+  const onPointerUp = () => {
+    dragRef.current = null;
+  };
+
+  const onDoubleClick = () => {
+    if (scale === 1) setScale(2);
+    else {
+      setScale(1);
+      setOffset({ x: 0, y: 0 });
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="block mb-1 -mx-1.5 -mt-1 w-full"
+      >
+        <img
+          src={url}
+          alt="mídia"
+          className="rounded-md max-h-80 w-full object-cover cursor-zoom-in"
+          loading="lazy"
+        />
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent
+          className="max-w-[100vw] w-screen h-[100dvh] sm:h-screen p-0 bg-black/95 border-none rounded-none flex items-center justify-center overflow-hidden"
+        >
+          <div
+            className="absolute inset-0 overflow-hidden flex items-center justify-center"
+            onWheel={onWheel}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            onDoubleClick={onDoubleClick}
+          >
+            <img
+              src={url}
+              alt="mídia ampliada"
+              draggable={false}
+              className="max-w-full max-h-full select-none transition-transform duration-100"
+              style={{
+                transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+                cursor: scale > 1 ? "grab" : "zoom-in",
+              }}
+            />
+          </div>
+          <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
+            <Button
+              size="icon"
+              variant="secondary"
+              className="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white border-none backdrop-blur"
+              onClick={zoomOut}
+              title="Reduzir"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <span className="text-white text-xs font-mono min-w-[3rem] text-center">
+              {Math.round(scale * 100)}%
+            </span>
+            <Button
+              size="icon"
+              variant="secondary"
+              className="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white border-none backdrop-blur"
+              onClick={zoomIn}
+              title="Ampliar"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <a
+              href={url}
+              download
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur"
+              title="Baixar"
+            >
+              <Download className="h-4 w-4" />
+            </a>
+            <Button
+              size="icon"
+              variant="secondary"
+              className="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white border-none backdrop-blur"
+              onClick={() => setOpen(false)}
+              title="Fechar"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

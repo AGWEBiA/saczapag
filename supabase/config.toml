@@ -3,3 +3,6 @@ project_id = "tdfibiqtvvnmkxkswlwr"
 [functions.evolution-webhook]
 verify_jwt = false
 
+
+[functions.mark-as-read]
+verify_jwt = false
