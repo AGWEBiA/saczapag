@@ -58,7 +58,7 @@ type Msg = {
 
 type MessagesInfiniteData = InfiniteData<Msg[], string | null>;
 
-export function MessageList({ conversationId, isGroup }: MessageListProps) {
+export function MessageList({ conversationId, isGroup, onReply }: MessageListProps) {
   const queryClient = useQueryClient();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const topSentinelRef = useRef<HTMLDivElement>(null);
