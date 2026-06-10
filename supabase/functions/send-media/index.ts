@@ -65,7 +65,7 @@ serve(async (req) => {
         ? `${String(phone).replace(/\D/g, "")}@g.us`
         : `${normalizeBrPhone(phone)}@s.whatsapp.net`;
 
-    const mediatype = mediaTypeFor(mimeType);
+    const mediatype = asSticker ? "sticker" : mediaTypeFor(mimeType);
 
     // Insert local message first (queued)
     const { data: message, error: insErr } = await supabase
@@ -73,13 +73,17 @@ serve(async (req) => {
       .insert({
         conversation_id: conversationId,
         direction: "outbound",
-        content: caption || (fileName ? `[${mediatype}] ${fileName}` : `[${mediatype}]`),
+        content: asSticker
+          ? "[Sticker]"
+          : caption || (fileName ? `[${mediatype}] ${fileName}` : `[${mediatype}]`),
         media_url: mediaUrl,
         media_type: mimeType,
         sender_name: senderName || "Agente",
         sender_user_id: senderUserId ?? null,
         type: "whatsapp",
-        metadata: { delivery_status: "sending" },
+        metadata: asSticker
+          ? { delivery_status: "sending", is_sticker: true }
+          : { delivery_status: "sending" },
       })
       .select()
       .single();
@@ -88,19 +92,23 @@ serve(async (req) => {
     const endpoint =
       mediatype === "audio"
         ? `${apiUrl}/message/sendWhatsAppAudio/${encodeURIComponent(instanceName)}`
-        : `${apiUrl}/message/sendMedia/${encodeURIComponent(instanceName)}`;
+        : mediatype === "sticker"
+          ? `${apiUrl}/message/sendSticker/${encodeURIComponent(instanceName)}`
+          : `${apiUrl}/message/sendMedia/${encodeURIComponent(instanceName)}`;
 
     const payload: Record<string, unknown> =
       mediatype === "audio"
         ? { number: recipient, audio: mediaUrl, delay: 0 }
-        : {
-            number: recipient,
-            mediatype,
-            mimetype: mimeType,
-            media: mediaUrl,
-            fileName: fileName || "arquivo",
-            caption: caption || "",
-          };
+        : mediatype === "sticker"
+          ? { number: recipient, sticker: mediaUrl, delay: 0 }
+          : {
+              number: recipient,
+              mediatype,
+              mimetype: mimeType,
+              media: mediaUrl,
+              fileName: fileName || "arquivo",
+              caption: caption || "",
+            };
 
     const res = await fetch(endpoint, {
       method: "POST",
