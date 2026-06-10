@@ -96,11 +96,16 @@ export function ChatInterface() {
           .update({ unread_count: 0 })
           .eq("id", selectedConversationId)
           .then(() => {
-            // Update local query data to reflect changes immediately
-            supabase.from("messages")
+            // Update local DB
+            supabase
+              .from("messages")
               .update({ is_read: true })
               .eq("conversation_id", selectedConversationId)
               .eq("is_read", false);
+            // Sinaliza para o WhatsApp (ticks azuis para o contato)
+            supabase.functions
+              .invoke("mark-as-read", { body: { conversationId: selectedConversationId } })
+              .catch((e) => console.warn("[mark-as-read] falhou:", e));
           });
       }
     }
