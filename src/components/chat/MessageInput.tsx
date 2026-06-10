@@ -59,6 +59,7 @@ export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const stickerInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const sendMessage = useServerFn(sendMessageFn);
   const sendMedia = useServerFn(sendMediaFn);
