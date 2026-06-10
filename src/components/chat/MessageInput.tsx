@@ -221,7 +221,12 @@ export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }
     },
   });
 
-  const uploadAndSendMedia = async (file: File, caption: string, senderName: string) => {
+  const uploadAndSendMedia = async (
+    file: File,
+    caption: string,
+    senderName: string,
+    asSticker = false,
+  ) => {
     setUploading(true);
     try {
       const ext = file.name.split(".").pop() || "bin";
@@ -236,17 +241,18 @@ export function MessageInput({ conversationId, isGroup, replyTo, onCancelReply }
         data: {
           conversationId,
           mediaUrl: pub.publicUrl,
-          mimeType: file.type || "application/octet-stream",
+          mimeType: file.type || (asSticker ? "image/webp" : "application/octet-stream"),
           fileName: file.name,
           caption,
           senderName,
+          asSticker: asSticker || undefined,
         },
       });
       queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
-      toast.success("Arquivo enviado");
+      toast.success(asSticker ? "Sticker enviado" : "Arquivo enviado");
     } catch (e: any) {
-      toast.error("Falha ao enviar arquivo: " + (e?.message || String(e)));
+      toast.error("Falha ao enviar: " + (e?.message || String(e)));
     } finally {
       setUploading(false);
     }
