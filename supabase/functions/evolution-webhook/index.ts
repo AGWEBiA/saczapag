@@ -369,7 +369,7 @@ serve(async (req) => {
         .eq("instance_id", instance.id)
         .eq("is_group", isGroup)
         .neq("status", "resolvida")
-        .order("created_at", { ascending: false })
+        .order("last_message_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
@@ -477,13 +477,24 @@ serve(async (req) => {
         log("inserted", { direction, evolution_message_id: keyId });
       }
 
+      const updatePayload: any = {
+        last_message_at: new Date().toISOString(),
+        last_message_content: content,
+      };
+      
+      if (direction === "inbound") {
+        const { data: currentConv } = await supabase
+          .from("conversations")
+          .select("unread_count")
+          .eq("id", conversation!.id)
+          .single();
+        
+        updatePayload.unread_count = (currentConv?.unread_count || 0) + 1;
+      }
+
       await supabase
         .from("conversations")
-        .update({
-          last_message_at: new Date().toISOString(),
-          last_message_content: content,
-          unread_count: direction === "inbound" ? 1 : 0,
-        })
+        .update(updatePayload)
         .eq("id", conversation!.id);
     }
 
