@@ -503,6 +503,14 @@ const MessageBubble = React.memo(
                 <Reply className="h-3 w-3" />
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setForwardOpen(true)}
+              className="h-6 w-6 rounded-full bg-card border shadow-sm flex items-center justify-center hover:bg-accent"
+              title="Encaminhar"
+            >
+              <Forward className="h-3 w-3" />
+            </button>
             <Popover open={reactPopoverOpen} onOpenChange={setReactPopoverOpen}>
               <PopoverTrigger asChild>
                 <button
