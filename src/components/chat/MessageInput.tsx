@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useMutation, useQueryClient, useQuery, type InfiniteData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Loader2, Zap } from "lucide-react";
+import { Send, Loader2, Zap, AtSign } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -40,8 +40,32 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
   const [content, setContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
   const [openQuickReplies, setOpenQuickReplies] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const sendMessage = useServerFn(sendMessageFn);
+
+  const { data: teamMembers } = useQuery({
+    queryKey: ["team-members"],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("id, full_name, email");
+      return data || [];
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const mentionCandidates = useMemo(() => {
+    if (mentionQuery === null) return [];
+    const q = mentionQuery.toLowerCase();
+    return (teamMembers || [])
+      .filter((m: any) => {
+        const name = (m.full_name || "").toLowerCase();
+        const handle = (m.email || "").split("@")[0].toLowerCase();
+        return !q || name.includes(q) || handle.includes(q);
+      })
+      .slice(0, 6);
+  }, [teamMembers, mentionQuery]);
 
   const { data: profile } = useQuery({
     queryKey: ["current_profile"],
@@ -169,6 +193,54 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
     sendMutation.mutate({ text, internal: isInternal, senderName, jobTitle, userId: user.id });
   };
 
+  const handleContentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setContent(value);
+    const caret = e.target.selectionStart ?? value.length;
+    const upToCaret = value.slice(0, caret);
+    const match = upToCaret.match(/(?:^|\s)@(\w*)$/);
+    if (match) {
+      setMentionQuery(match[1]);
+      setMentionIndex(0);
+    } else {
+      setMentionQuery(null);
+    }
+  };
+
+  const insertMention = (handle: string) => {
+    const input = inputRef.current;
+    const caret = input?.selectionStart ?? content.length;
+    const before = content.slice(0, caret);
+    const after = content.slice(caret);
+    const newBefore = before.replace(/(^|\s)@\w*$/, `$1@${handle} `);
+    const newValue = newBefore + after;
+    setContent(newValue);
+    setMentionQuery(null);
+    setTimeout(() => {
+      input?.focus();
+      const pos = newBefore.length;
+      input?.setSelectionRange(pos, pos);
+    }, 0);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (mentionQuery === null || mentionCandidates.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setMentionIndex((i) => (i + 1) % mentionCandidates.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setMentionIndex((i) => (i - 1 + mentionCandidates.length) % mentionCandidates.length);
+    } else if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      const m: any = mentionCandidates[mentionIndex];
+      const handle = (m.email || "").split("@")[0];
+      insertMention(handle);
+    } else if (e.key === "Escape") {
+      setMentionQuery(null);
+    }
+  };
+
   return (
     <div className="p-4 lg:p-8 border-t bg-card/60 backdrop-blur-2xl space-y-4">
       <div className="flex flex-wrap gap-2 items-center">
@@ -224,14 +296,46 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
       </div>
       <form onSubmit={handleSubmit} className="flex gap-2 items-end">
         <div className="flex-1 relative group">
+          {mentionQuery !== null && mentionCandidates.length > 0 && (
+            <div className="absolute bottom-full left-0 right-0 mb-2 bg-popover border rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-bottom-2">
+              <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted/30 flex items-center gap-1.5">
+                <AtSign className="h-3 w-3" /> Mencionar membro do time
+              </div>
+              {mentionCandidates.map((member: any, i: number) => {
+                const handle = (member.email || "").split("@")[0];
+                return (
+                  <button
+                    key={member.id}
+                    type="button"
+                    onMouseEnter={() => setMentionIndex(i)}
+                    onClick={() => insertMention(handle)}
+                    className={cn(
+                      "w-full text-left px-3 py-2 flex items-center gap-2 text-sm transition-colors",
+                      i === mentionIndex ? "bg-primary/10" : "hover:bg-accent",
+                    )}
+                  >
+                    <div className="h-7 w-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
+                      {(member.full_name || handle).charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-semibold truncate">{member.full_name || handle}</span>
+                      <span className="text-[10px] text-muted-foreground">@{handle}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <Input
+            ref={inputRef}
             placeholder={
               isInternal
                 ? "Digite uma nota apenas para a equipe... (cite com @)"
                 : "Escreva sua mensagem aqui... (cite com @ para notificar o time)"
             }
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={handleContentChange}
+            onKeyDown={handleKeyDown}
             disabled={sendMutation.isPending}
             className={cn(
               "flex-1 min-h-[44px] py-3 lg:h-12 lg:px-6 bg-muted/50 border-transparent focus-visible:bg-background focus-visible:ring-primary/20 transition-all rounded-2xl lg:rounded-3xl shadow-inner",
