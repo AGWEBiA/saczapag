@@ -354,11 +354,14 @@ export function ChatInterface() {
               <MessageList 
                 conversationId={selectedConversationId} 
                 isGroup={!!selectedConversation?.is_group} 
+                onReply={setReplyTo}
               />
               
               <MessageInput 
                 conversationId={selectedConversationId} 
                 isGroup={!!selectedConversation?.is_group} 
+                replyTo={replyTo}
+                onCancelReply={() => setReplyTo(null)}
               />
             </div>
 
