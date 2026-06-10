@@ -22,6 +22,13 @@ import {
 interface MessageInputProps {
   conversationId: string;
   isGroup?: boolean;
+  replyTo?: {
+    id: string;
+    evolutionMessageId: string | null;
+    sender: string;
+    content: string;
+  } | null;
+  onCancelReply?: () => void;
 }
 
 type CachedMessage = {
