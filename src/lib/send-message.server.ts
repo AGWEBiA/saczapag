@@ -128,5 +128,6 @@ export async function sendMessageServer(
     phone,
     senderName: input.senderName || "Agente",
     senderUserId: userId,
+    quoted: input.quoted,
   });
 }
