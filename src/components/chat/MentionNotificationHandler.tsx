@@ -31,7 +31,6 @@ export function MentionNotificationHandler() {
           event: "INSERT",
           schema: "public",
           table: "messages",
-          filter: "direction=eq.inbound",
         },
         async (payload) => {
           const newMessage = payload.new as any;

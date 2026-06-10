@@ -130,16 +130,18 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'messages',
-          filter: 'direction=eq.inbound'
         },
         async (payload) => {
           const newMessage = payload.new as any;
+          
+          // Invalida conversas para atualizar o topo e contagem de não lidas
           queryClient.invalidateQueries({ queryKey: ["conversations"] });
 
-          if (newMessage.conversation_id !== selectedId || document.visibilityState !== 'visible') {
+          // Notificação de nova mensagem inbound
+          if (newMessage.direction === 'inbound' && (newMessage.conversation_id !== selectedId || document.visibilityState !== 'visible')) {
             const { data: conversations } = await supabase
               .from('conversations')
               .select('contact:contacts(name)')
