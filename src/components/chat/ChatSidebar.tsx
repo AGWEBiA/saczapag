@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -114,35 +114,43 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
     enabled: !!profile || filter === "all" || filter === "unassigned",
   });
 
+  // Refs estáveis evitam re-subscrição do canal a cada render
+  const selectedIdRef = useRef(selectedId);
+  const onSelectRef = useRef(onSelect);
+  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
+  useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
+
   useEffect(() => {
+    // Coalesce invalidações: várias mensagens em rajada => 1 refetch
+    let invalidateTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleInvalidate = () => {
+      if (invalidateTimer) return;
+      invalidateTimer = setTimeout(() => {
+        invalidateTimer = null;
+        queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      }, 300);
+    };
+
     const sidebarChannel = supabase
       .channel('sidebar-updates')
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'conversations'
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["conversations"] });
-        }
+        { event: '*', schema: 'public', table: 'conversations' },
+        () => scheduleInvalidate()
       )
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'messages',
-        },
+        { event: '*', schema: 'public', table: 'messages' },
         async (payload) => {
           const newMessage = payload.new as any;
-          
-          // Invalida conversas para atualizar o topo e contagem de não lidas
-          queryClient.invalidateQueries({ queryKey: ["conversations"] });
+          scheduleInvalidate();
 
-          // Notificação de nova mensagem inbound
-          if (newMessage.direction === 'inbound' && (newMessage.conversation_id !== selectedId || document.visibilityState !== 'visible')) {
+          // Notificação só para inbound em conversa não-aberta/aba oculta
+          if (
+            newMessage?.direction === 'inbound' &&
+            (newMessage.conversation_id !== selectedIdRef.current ||
+              document.visibilityState !== 'visible')
+          ) {
             const { data: conversations } = await supabase
               .from('conversations')
               .select('contact:contacts(name)')
@@ -153,7 +161,7 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
               description: newMessage.content,
               action: {
                 label: "Ver",
-                onClick: () => onSelect(newMessage.conversation_id)
+                onClick: () => onSelectRef.current(newMessage.conversation_id)
               }
             });
           }
@@ -162,9 +170,11 @@ export function ChatSidebar({ selectedId, onSelect }: ChatSidebarProps) {
       .subscribe();
 
     return () => {
+      if (invalidateTimer) clearTimeout(invalidateTimer);
       supabase.removeChannel(sidebarChannel);
     };
-  }, [queryClient, selectedId, onSelect]);
+  }, [queryClient]);
+
 
   return (
     <div className="flex flex-col h-full bg-transparent overflow-hidden">

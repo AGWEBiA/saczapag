@@ -113,14 +113,18 @@ export function ChatInterface() {
 
   const { data: agents } = useQuery({
     queryKey: ["agents"],
+    staleTime: 5 * 60 * 1000, // 5min — lista de agentes muda raramente
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("*");
+        .select("id, user_id, full_name, email, avatar_url, role");
       if (error) throw error;
       return data;
     },
   });
+
 
   const handleAssign = async (agentId: string | null) => {
     if (!selectedConversationId) return;

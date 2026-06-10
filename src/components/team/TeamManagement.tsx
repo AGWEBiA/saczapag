@@ -68,22 +68,23 @@ export function TeamManagement() {
 
   const { data: teamMembers, isLoading, error: queryError } = useQuery({
     queryKey: ["team_members"],
-    staleTime: 0,
+    staleTime: 30_000, // evita refetch a cada mount; mutações já invalidam
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
-      console.log("Fetching team members...");
       const { data, error } = await supabase
         .from("profiles")
-        .select("*")
+        .select("id, user_id, full_name, email, role, avatar_url, created_at")
         .order("created_at", { ascending: false });
-      
+
       if (error) {
         console.error("Error fetching team members:", error);
         throw error;
       }
-      console.log(`Fetched ${data?.length || 0} team members.`);
       return data;
     },
   });
+
 
   const manageMemberMutation = useMutation({
     mutationFn: async ({ action, data }: { action: string; data: any }) => {

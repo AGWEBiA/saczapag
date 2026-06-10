@@ -127,11 +127,15 @@ export type Database = {
           assigned_to: string | null
           contact_id: string
           created_at: string
+          first_response_at: string | null
+          first_response_seconds: number | null
           id: string
           instance_id: string
           is_group: boolean | null
+          last_inbound_at: string | null
           last_message_at: string | null
           last_message_content: string | null
+          pending_response: boolean
           status: Database["public"]["Enums"]["conversation_status"]
           unread_count: number
           updated_at: string
@@ -141,11 +145,15 @@ export type Database = {
           assigned_to?: string | null
           contact_id: string
           created_at?: string
+          first_response_at?: string | null
+          first_response_seconds?: number | null
           id?: string
           instance_id: string
           is_group?: boolean | null
+          last_inbound_at?: string | null
           last_message_at?: string | null
           last_message_content?: string | null
+          pending_response?: boolean
           status?: Database["public"]["Enums"]["conversation_status"]
           unread_count?: number
           updated_at?: string
@@ -155,11 +163,15 @@ export type Database = {
           assigned_to?: string | null
           contact_id?: string
           created_at?: string
+          first_response_at?: string | null
+          first_response_seconds?: number | null
           id?: string
           instance_id?: string
           is_group?: boolean | null
+          last_inbound_at?: string | null
           last_message_at?: string | null
           last_message_content?: string | null
+          pending_response?: boolean
           status?: Database["public"]["Enums"]["conversation_status"]
           unread_count?: number
           updated_at?: string
@@ -233,6 +245,7 @@ export type Database = {
           media_type: string | null
           media_url: string | null
           metadata: Json | null
+          response_time_seconds: number | null
           sender_name: string | null
           sender_user_id: string | null
           type: Database["public"]["Enums"]["message_type"] | null
@@ -249,6 +262,7 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           metadata?: Json | null
+          response_time_seconds?: number | null
           sender_name?: string | null
           sender_user_id?: string | null
           type?: Database["public"]["Enums"]["message_type"] | null
@@ -265,6 +279,7 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           metadata?: Json | null
+          response_time_seconds?: number | null
           sender_name?: string | null
           sender_user_id?: string | null
           type?: Database["public"]["Enums"]["message_type"] | null
@@ -336,6 +351,30 @@ export type Database = {
           id?: string
           shortcut?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      sla_settings: {
+        Row: {
+          business_hours_only: boolean
+          green_seconds: number
+          id: number
+          updated_at: string
+          yellow_seconds: number
+        }
+        Insert: {
+          business_hours_only?: boolean
+          green_seconds?: number
+          id?: number
+          updated_at?: string
+          yellow_seconds?: number
+        }
+        Update: {
+          business_hours_only?: boolean
+          green_seconds?: number
+          id?: number
+          updated_at?: string
+          yellow_seconds?: number
         }
         Relationships: []
       }
