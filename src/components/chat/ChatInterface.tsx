@@ -52,7 +52,7 @@ export function ChatInterface() {
   });
 
   useEffect(() => {
-    if (selectedConversation) {
+    if (selectedConversation && selectedConversationId) {
       setInternalNote(selectedConversation.contact?.internal_note || "");
       setMobileView("chat");
 
