@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { ChatSidebar } from "./ChatSidebar";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
-import { MessageSquare, User, Phone, Calendar, FileText, Info, HelpCircle, Tag, X, Plus, ChevronLeft, Menu, BookOpen } from "lucide-react";
+import { MessageSquare, User, Phone, Calendar, FileText, Info, HelpCircle, Tag, X, Plus, ChevronLeft, Menu, BookOpen, PanelRightOpen, PanelRightClose } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
@@ -44,6 +44,18 @@ export function ChatInterface() {
   const [mobileView, setMobileView] = useState<"list" | "chat">("list");
   const [presence, setPresence] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const stored = localStorage.getItem("chat-details-open");
+    if (stored !== null) return stored === "1";
+    return window.matchMedia("(min-width: 1280px)").matches;
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("chat-details-open", detailsOpen ? "1" : "0");
+    }
+  }, [detailsOpen]);
 
   useEffect(() => {
     setReplyTo(null);
@@ -238,76 +250,86 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="flex h-[100dvh] lg:h-full overflow-hidden bg-background lg:m-4 lg:rounded-2xl lg:border lg:shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-700 ease-out">
-      <div className={cn(
-        "w-full lg:w-80 xl:w-96 flex-shrink-0 border-r bg-card/30 backdrop-blur-xl transition-all duration-500 ease-in-out",
-        mobileView === "chat" && "hidden lg:flex"
+    <div className="flex h-[100dvh] lg:h-full overflow-hidden bg-background animate-in fade-in duration-300">
+      {/* Coluna 1 — Lista de conversas */}
+      <aside className={cn(
+        "w-full md:w-[320px] lg:w-[360px] shrink-0 border-r bg-card/40 backdrop-blur-xl",
+        mobileView === "chat" && "hidden md:flex"
       )}>
-        <ChatSidebar 
-          selectedId={selectedConversationId} 
-          onSelect={setSelectedConversationId} 
+        <ChatSidebar
+          selectedId={selectedConversationId}
+          onSelect={setSelectedConversationId}
         />
-      </div>
-      <div className={cn(
-        "flex-1 flex flex-col min-w-0 relative bg-muted/5 transition-all duration-300",
-        mobileView === "list" && "hidden lg:flex"
+      </aside>
+
+      {/* Coluna 2 — Conversa ativa */}
+      <section className={cn(
+        "flex-1 flex min-w-0 bg-muted/5",
+        mobileView === "list" && "hidden md:flex"
       )}>
         {selectedConversationId ? (
           <div className="flex-1 flex min-w-0 min-h-0">
-            <div className="flex-1 flex flex-col h-full min-h-0 border-r">
-              <div className="px-4 py-3 border-b bg-card/40 backdrop-blur-md flex items-center justify-between sticky top-0 z-10 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="lg:hidden h-8 w-8" 
+            <div className="flex-1 flex flex-col h-full min-h-0 min-w-0">
+              {/* Header da conversa */}
+              <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 md:px-4 py-2.5 border-b bg-card/60 backdrop-blur-md sticky top-0 z-10">
+                <div className="flex min-w-0 items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="md:hidden h-9 w-9 shrink-0"
                     onClick={() => setMobileView("list")}
+                    aria-label="Voltar"
                   >
                     <ChevronLeft className="h-5 w-5" />
                   </Button>
-                  <div className="relative group cursor-pointer">
-                    <Avatar className="h-10 w-10 border border-primary/10 shadow-sm group-hover:border-primary/30 transition-colors">
-                      <AvatarFallback className="bg-primary/5 text-primary"><User className="h-5 w-5" /></AvatarFallback>
+                  <div className="relative shrink-0">
+                    <Avatar className="h-10 w-10 border border-border/60">
+                      <AvatarFallback className="bg-primary/5 text-primary">
+                        <User className="h-5 w-5" />
+                      </AvatarFallback>
                     </Avatar>
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full shadow-sm" />
+                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-background rounded-full" />
                   </div>
                   <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <h3 className="font-bold text-sm lg:text-base truncate tracking-tight text-foreground/90">{selectedConversation?.contact?.name || "Contato"}</h3>
-                      <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-green-500/30 text-green-600 bg-green-50/50 uppercase font-bold tracking-wider">WhatsApp</Badge>
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <p className={cn("text-[10px] lg:text-xs font-medium truncate", presence ? "text-primary italic animate-pulse" : "text-muted-foreground/70")}>{presence || selectedConversation?.contact?.phone_number}</p>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <h3 className="truncate font-semibold text-sm md:text-base text-foreground">
+                        {selectedConversation?.contact?.name || "Contato"}
+                      </h3>
                       {selectedConversation?.assigned_to ? (
-                        <Badge variant="secondary" className="text-[9px] h-4 py-0 font-bold uppercase tracking-wider bg-primary/5 text-primary/70 border-none">
-                          {agents?.find(a => a.id === selectedConversation.assigned_to)?.full_name?.split(' ')[0] || "Agente"}
+                        <Badge variant="secondary" className="hidden sm:inline-flex h-5 px-1.5 text-[10px] font-medium bg-primary/10 text-primary border-none">
+                          {agents?.find(a => a.id === selectedConversation.assigned_to)?.full_name?.split(" ")[0] || "Agente"}
                         </Badge>
                       ) : (
-                        <Badge variant="destructive" className="text-[9px] h-4 py-0 font-bold uppercase tracking-wider bg-red-50 text-red-600 border-none animate-pulse">
+                        <Badge variant="outline" className="hidden sm:inline-flex h-5 px-1.5 text-[10px] font-medium border-amber-500/40 text-amber-600 bg-amber-50/50">
                           Aguardando
                         </Badge>
                       )}
                     </div>
+                    <p className={cn(
+                      "text-xs truncate mt-0.5",
+                      presence ? "text-primary italic" : "text-muted-foreground"
+                    )}>
+                      {presence || selectedConversation?.contact?.phone_number}
+                    </p>
                   </div>
                 </div>
-                
-                <div className="flex items-center gap-2">
+
+                <div className="flex items-center gap-1.5 shrink-0">
                   {!selectedConversation?.assigned_to && (
-                    <Button 
-                      size="sm" 
-                      className="h-8 bg-green-600 hover:bg-green-700"
+                    <Button
+                      size="sm"
+                      className="h-8 px-3 text-xs bg-green-600 hover:bg-green-700 text-white"
                       onClick={() => supabase.auth.getUser().then(({ data: { user } }) => {
                         if (user) handleAssign(user.id);
                       })}
                     >
-                      Assumir Conversa
+                      Assumir
                     </Button>
                   )}
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button variant="ghost" size="sm" className="gap-2">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Guia rápido">
                         <HelpCircle className="h-4 w-4" />
-                        <span className="hidden sm:inline">Guia Rápido</span>
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="max-w-2xl">
@@ -324,16 +346,14 @@ export function ChatInterface() {
                         <section>
                           <h4 className="font-bold mb-2">1. Como Responder</h4>
                           <p className="text-sm text-muted-foreground">
-                            Utilize o campo de texto na parte inferior para enviar mensagens de WhatsApp. 
-                            Você também pode enviar <strong>Notas Internas</strong> clicando no botão amarelo, 
+                            Utilize o campo de texto na parte inferior para enviar mensagens de WhatsApp.
+                            Você também pode enviar <strong>Notas Internas</strong> clicando no botão amarelo,
                             que são visíveis apenas para sua equipe.
                           </p>
                         </section>
                         <section>
                           <h4 className="font-bold mb-2">2. Filtros e Status</h4>
-                          <p className="text-sm text-muted-foreground">
-                            Na barra lateral, você pode filtrar por:
-                          </p>
+                          <p className="text-sm text-muted-foreground">Na barra lateral, você pode filtrar por:</p>
                           <ul className="text-sm text-muted-foreground list-disc pl-5 mt-1">
                             <li><strong>Minhas:</strong> Conversas atribuídas a você.</li>
                             <li><strong>Não Atribuídas:</strong> Conversas aguardando um agente.</li>
@@ -343,39 +363,53 @@ export function ChatInterface() {
                         <section>
                           <h4 className="font-bold mb-2">3. Atribuição</h4>
                           <p className="text-sm text-muted-foreground">
-                            Utilize o menu lateral direito para atribuir a conversa a si mesmo ou a outro agente. 
-                            Isso organiza a inbox e garante que cada cliente seja atendido.
+                            Utilize o menu lateral direito para atribuir a conversa a si mesmo ou a outro agente.
                           </p>
                         </section>
                         <section>
                           <h4 className="font-bold mb-2">4. Respostas Rápidas</h4>
                           <p className="text-sm text-muted-foreground">
-                            Clique no ícone de raio (Zap) no campo de texto ou digite <code>/</code> para ver 
+                            Clique no ícone de raio (Zap) no campo de texto ou digite <code>/</code> para ver
                             seus modelos de resposta pronta.
                           </p>
                         </section>
                       </div>
                     </DialogContent>
                   </Dialog>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="hidden lg:inline-flex h-8 w-8"
+                    onClick={() => setDetailsOpen((v) => !v)}
+                    aria-label={detailsOpen ? "Recolher painel de detalhes" : "Abrir painel de detalhes"}
+                    title={detailsOpen ? "Recolher detalhes" : "Abrir detalhes"}
+                  >
+                    {detailsOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+                  </Button>
                 </div>
-              </div>
-              
-              <MessageList 
-                conversationId={selectedConversationId} 
-                isGroup={!!selectedConversation?.is_group} 
+              </header>
+
+              <MessageList
+                conversationId={selectedConversationId}
+                isGroup={!!selectedConversation?.is_group}
                 onReply={setReplyTo}
               />
-              
-              <MessageInput 
-                conversationId={selectedConversationId} 
-                isGroup={!!selectedConversation?.is_group} 
+
+              <MessageInput
+                conversationId={selectedConversationId}
+                isGroup={!!selectedConversation?.is_group}
                 replyTo={replyTo}
                 onCancelReply={() => setReplyTo(null)}
               />
             </div>
 
-            {/* Right Sidebar: Contact Details & Assignment */}
-            <div className="w-72 flex-shrink-0 bg-card p-6 overflow-y-auto hidden lg:block">
+            {/* Coluna 3 — Detalhes do contato (recolhível) */}
+            <aside className={cn(
+              "shrink-0 border-l bg-card overflow-y-auto transition-all duration-200",
+              "hidden lg:block",
+              detailsOpen ? "w-72 xl:w-80 p-5" : "w-0 p-0 border-l-0"
+            )}>
+              <div className={cn(detailsOpen ? "block" : "hidden")}>
               <div className="flex flex-col items-center text-center mb-8">
                 <Avatar className="h-20 w-20 mb-4">
                   <AvatarFallback className="text-2xl"><User size={40} /></AvatarFallback>
@@ -493,7 +527,8 @@ export function ChatInterface() {
                   </div>
                 </div>
               </div>
-            </div>
+              </div>
+            </aside>
           </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center animate-in fade-in zoom-in duration-1000">
@@ -510,7 +545,7 @@ export function ChatInterface() {
             </div>
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }
