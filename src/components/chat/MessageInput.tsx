@@ -248,14 +248,46 @@ export function MessageInput({ conversationId, isGroup }: MessageInputProps) {
       </div>
       <form onSubmit={handleSubmit} className="flex gap-2 items-end">
         <div className="flex-1 relative group">
+          {mentionQuery !== null && mentionCandidates.length > 0 && (
+            <div className="absolute bottom-full left-0 right-0 mb-2 bg-popover border rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-bottom-2">
+              <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted/30 flex items-center gap-1.5">
+                <AtSign className="h-3 w-3" /> Mencionar membro do time
+              </div>
+              {mentionCandidates.map((member: any, i: number) => {
+                const handle = (member.email || "").split("@")[0];
+                return (
+                  <button
+                    key={member.id}
+                    type="button"
+                    onMouseEnter={() => setMentionIndex(i)}
+                    onClick={() => insertMention(handle)}
+                    className={cn(
+                      "w-full text-left px-3 py-2 flex items-center gap-2 text-sm transition-colors",
+                      i === mentionIndex ? "bg-primary/10" : "hover:bg-accent",
+                    )}
+                  >
+                    <div className="h-7 w-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
+                      {(member.full_name || handle).charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-semibold truncate">{member.full_name || handle}</span>
+                      <span className="text-[10px] text-muted-foreground">@{handle}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <Input
+            ref={inputRef}
             placeholder={
               isInternal
                 ? "Digite uma nota apenas para a equipe... (cite com @)"
                 : "Escreva sua mensagem aqui... (cite com @ para notificar o time)"
             }
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={handleContentChange}
+            onKeyDown={handleKeyDown}
             disabled={sendMutation.isPending}
             className={cn(
               "flex-1 min-h-[44px] py-3 lg:h-12 lg:px-6 bg-muted/50 border-transparent focus-visible:bg-background focus-visible:ring-primary/20 transition-all rounded-2xl lg:rounded-3xl shadow-inner",
