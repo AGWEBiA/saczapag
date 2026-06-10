@@ -387,6 +387,11 @@ async function sendViaEvolution(params: {
   skipPreflight?: boolean;
   contactId?: string;
   contactName?: string | null;
+  quoted?: {
+    evolutionMessageId: string;
+    sender?: string;
+    content?: string;
+  } | null;
 }) {
   const startTime = Date.now();
   const {
@@ -398,6 +403,7 @@ async function sendViaEvolution(params: {
     skipPreflight = false,
     contactId,
     contactName,
+    quoted,
   } = params;
   const { apiUrl, apiKey } = await resolveEvolutionConfig(supabase);
 
@@ -439,12 +445,24 @@ async function sendViaEvolution(params: {
   });
 
   const sendUrl = `${apiUrl}/message/sendText/${encodeURIComponent(instanceName)}`;
-  const payload = {
+  const payload: Record<string, unknown> = {
     number: normalizedRecipient,
     text: content,
     delay: 0,
     linkPreview: false,
   };
+  if (quoted?.evolutionMessageId) {
+    payload.quoted = {
+      key: {
+        id: quoted.evolutionMessageId,
+        remoteJid: normalizedRecipient,
+        fromMe: false,
+      },
+      message: {
+        conversation: quoted.content || "",
+      },
+    };
+  }
 
   const result = (await postEvolutionText(sendUrl, apiKey, payload, 35000)) as any;
 
