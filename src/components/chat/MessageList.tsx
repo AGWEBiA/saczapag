@@ -319,6 +319,7 @@ export function MessageList({ conversationId, isGroup, onReply }: MessageListPro
                 highlight={searchTerm.trim().toLowerCase()}
                 isActiveMatch={msg.id === activeMatchId}
                 conversationId={conversationId}
+                onReply={onReply}
               />
             ))
           )}
