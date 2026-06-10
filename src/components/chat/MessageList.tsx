@@ -366,12 +366,14 @@ const MessageBubble = React.memo(
     highlight,
     isActiveMatch,
     conversationId,
+    onReply,
   }: {
     msg: Msg;
     isGroup?: boolean;
     highlight?: string;
     isActiveMatch?: boolean;
     conversationId: string;
+    onReply?: (target: ReplyTarget) => void;
   }) => {
     const reactMessage = useServerFn(reactMessageFn);
     const [reactPopoverOpen, setReactPopoverOpen] = React.useState(false);
