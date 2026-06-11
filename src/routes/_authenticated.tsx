@@ -66,9 +66,6 @@ function AuthenticatedLayout() {
     { to: "/settings", label: "Ajustes", icon: Settings },
   ];
 
-  const navItems: NavItem[] = isAdmin
-    ? [...userNavItems, ...adminNavItems]
-    : userNavItems;
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
