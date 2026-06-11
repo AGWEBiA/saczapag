@@ -86,7 +86,7 @@ function AuthenticatedLayout() {
       <MentionNotificationHandler />
 
       {/* Sidebar — escondida no mobile, vira drawer */}
-      <DesktopSidebar navItems={navItems} onLogout={handleLogout} collapsed={sidebarCollapsed} />
+      <DesktopSidebar userItems={userNavItems} adminItems={isAdmin ? adminNavItems : []} onLogout={handleLogout} collapsed={sidebarCollapsed} />
 
       <div className="flex-1 flex flex-col min-w-0 bg-muted/5 relative">
         {/* Top Header */}
