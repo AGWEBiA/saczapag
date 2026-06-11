@@ -2,8 +2,9 @@ import { createFileRoute, redirect, Outlet, Link, useRouter, useRouterState } fr
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Users2, Activity, ClipboardList, BarChart3, Menu, PanelLeftClose, PanelLeft } from "lucide-react";
+import { LogOut, LayoutDashboard, Smartphone, Users, Settings, MessageSquare, Users2, Activity, ClipboardList, BarChart3, Menu, PanelLeftClose, PanelLeft, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useUserRole } from "@/hooks/use-user-role";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { HelpGuide } from "@/components/shared/HelpGuide";
 import { MentionNotificationHandler } from "@/components/chat/MentionNotificationHandler";
@@ -48,17 +49,23 @@ function AuthenticatedLayout() {
     router.navigate({ to: "/login" });
   };
 
-  const navItems = [
+  const { isAdmin } = useUserRole();
+
+  const userNavItems: NavItem[] = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { to: "/chat", label: "Chat WhatsApp", icon: MessageSquare },
-    { to: "/instances", label: "Conexões", icon: Smartphone },
     { to: "/contacts", label: "Contatos", icon: Users },
-    { to: "/team", label: "Equipe", icon: Users2 },
     { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
-    { to: "/diagnostics", label: "Sistema", icon: Activity },
+  ];
+
+  const adminNavItems: NavItem[] = [
+    { to: "/instances", label: "Conexões", icon: Smartphone },
+    { to: "/team", label: "Equipe", icon: Users2 },
     { to: "/audit", label: "Auditoria", icon: ClipboardList },
+    { to: "/diagnostics", label: "Sistema", icon: Activity },
     { to: "/settings", label: "Ajustes", icon: Settings },
   ];
+
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -76,13 +83,13 @@ function AuthenticatedLayout() {
       <MentionNotificationHandler />
 
       {/* Sidebar — escondida no mobile, vira drawer */}
-      <DesktopSidebar navItems={navItems} onLogout={handleLogout} collapsed={sidebarCollapsed} />
+      <DesktopSidebar userItems={userNavItems} adminItems={isAdmin ? adminNavItems : []} onLogout={handleLogout} collapsed={sidebarCollapsed} />
 
       <div className="flex-1 flex flex-col min-w-0 bg-muted/5 relative">
         {/* Top Header */}
         <header className="h-14 md:h-16 border-b bg-card/50 backdrop-blur-md flex items-center justify-between gap-2 px-3 md:px-6 lg:px-8 z-20 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <MobileNav navItems={navItems} onLogout={handleLogout} />
+            <MobileNav userItems={userNavItems} adminItems={isAdmin ? adminNavItems : []} onLogout={handleLogout} />
             <Button
               variant="ghost"
               size="icon"
@@ -131,7 +138,38 @@ function AuthenticatedLayout() {
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
 
-function DesktopSidebar({ navItems, onLogout, collapsed }: { navItems: NavItem[]; onLogout: () => void; collapsed?: boolean }) {
+function NavLinkItem({ item, labelCls, tooltipCls }: { item: NavItem; labelCls: string; tooltipCls: string }) {
+  return (
+    <Link
+      to={item.to}
+      preload="intent"
+      className="flex items-center gap-3 px-3 py-3 lg:py-2.5 rounded-xl text-sm transition-all duration-200 hover:bg-accent group relative min-h-[44px]"
+      activeProps={{ className: "bg-primary text-primary-foreground shadow-md shadow-primary/20 font-semibold" }}
+    >
+      <item.icon className="h-5 w-5 shrink-0" />
+      <span className={labelCls}>{item.label}</span>
+      <div className={tooltipCls}>{item.label}</div>
+    </Link>
+  );
+}
+
+function SectionLabel({ collapsed, icon: Icon, children }: { collapsed?: boolean; icon: typeof LayoutDashboard; children: React.ReactNode }) {
+  if (collapsed) {
+    return (
+      <div className="hidden lg:flex items-center justify-center py-2">
+        <div className="h-px w-8 bg-border" />
+      </div>
+    );
+  }
+  return (
+    <div className="hidden lg:flex items-center gap-1.5 px-3 pt-4 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+      <Icon className="h-3 w-3" />
+      {children}
+    </div>
+  );
+}
+
+function DesktopSidebar({ userItems, adminItems, onLogout, collapsed }: { userItems: NavItem[]; adminItems: NavItem[]; onLogout: () => void; collapsed?: boolean }) {
   const asideCls = collapsed
     ? "hidden md:flex w-20 border-r bg-card flex-col transition-all duration-300 z-30 shrink-0"
     : "hidden md:flex w-20 lg:w-64 border-r bg-card flex-col transition-all duration-300 z-30 shrink-0";
@@ -156,30 +194,24 @@ function DesktopSidebar({ navItems, onLogout, collapsed }: { navItems: NavItem[]
         </div>
       </div>
 
-      <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto">
-        {navItems.map((item) => (
-          <Link
-            key={item.to}
-            to={item.to}
-            preload="intent"
-            className="flex items-center gap-3 px-3 py-3 lg:py-2.5 rounded-xl text-sm transition-all duration-200 hover:bg-accent group relative min-h-[44px]"
-            activeProps={{ className: "bg-primary text-primary-foreground shadow-md shadow-primary/20 font-semibold" }}
-          >
-            <item.icon className="h-5 w-5 shrink-0" />
-            <span className={labelCls}>{item.label}</span>
-            <div className={tooltipCls}>
-              {item.label}
-            </div>
-          </Link>
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        <SectionLabel collapsed={collapsed} icon={LayoutDashboard}>Geral</SectionLabel>
+        {userItems.map((item) => (
+          <NavLinkItem key={item.to} item={item} labelCls={labelCls} tooltipCls={tooltipCls} />
         ))}
+
+        {adminItems.length > 0 && (
+          <>
+            <SectionLabel collapsed={collapsed} icon={ShieldCheck}>Administração</SectionLabel>
+            {adminItems.map((item) => (
+              <NavLinkItem key={item.to} item={item} labelCls={labelCls} tooltipCls={tooltipCls} />
+            ))}
+          </>
+        )}
       </nav>
 
       <div className="p-4 border-t">
-        <Button
-          variant="ghost"
-          className={logoutBtnCls}
-          onClick={onLogout}
-        >
+        <Button variant="ghost" className={logoutBtnCls} onClick={onLogout}>
           <LogOut className={logoutIconCls} />
           <span className={logoutLabelCls}>Sair</span>
         </Button>
@@ -188,11 +220,24 @@ function DesktopSidebar({ navItems, onLogout, collapsed }: { navItems: NavItem[]
   );
 }
 
-function MobileNav({ navItems, onLogout }: { navItems: NavItem[]; onLogout: () => void }) {
+function MobileNavLink({ item }: { item: NavItem }) {
+  return (
+    <Link
+      to={item.to}
+      preload="intent"
+      className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors hover:bg-accent min-h-[44px]"
+      activeProps={{ className: "bg-primary text-primary-foreground shadow-md font-semibold" }}
+    >
+      <item.icon className="h-5 w-5 shrink-0" />
+      <span>{item.label}</span>
+    </Link>
+  );
+}
+
+function MobileNav({ userItems, adminItems, onLogout }: { userItems: NavItem[]; adminItems: NavItem[]; onLogout: () => void }) {
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  // Fecha o drawer ao navegar
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
@@ -200,12 +245,7 @@ function MobileNav({ navItems, onLogout }: { navItems: NavItem[]; onLogout: () =
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="md:hidden h-10 w-10"
-          aria-label="Abrir menu"
-        >
+        <Button variant="ghost" size="icon" className="md:hidden h-10 w-10" aria-label="Abrir menu">
           <Menu className="h-5 w-5" />
         </Button>
       </SheetTrigger>
@@ -219,18 +259,19 @@ function MobileNav({ navItems, onLogout }: { navItems: NavItem[]; onLogout: () =
           </span>
         </div>
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {navItems.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              preload="intent"
-              className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors hover:bg-accent min-h-[44px]"
-              activeProps={{ className: "bg-primary text-primary-foreground shadow-md font-semibold" }}
-            >
-              <item.icon className="h-5 w-5 shrink-0" />
-              <span>{item.label}</span>
-            </Link>
-          ))}
+          <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1.5">
+            <LayoutDashboard className="h-3 w-3" /> Geral
+          </div>
+          {userItems.map((item) => <MobileNavLink key={item.to} item={item} />)}
+
+          {adminItems.length > 0 && (
+            <>
+              <div className="px-3 pt-4 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1.5">
+                <ShieldCheck className="h-3 w-3" /> Administração
+              </div>
+              {adminItems.map((item) => <MobileNavLink key={item.to} item={item} />)}
+            </>
+          )}
         </nav>
         <div className="p-3 border-t">
           <Button
