@@ -49,17 +49,26 @@ function AuthenticatedLayout() {
     router.navigate({ to: "/login" });
   };
 
-  const navItems = [
+  const { isAdmin } = useUserRole();
+
+  const userNavItems: NavItem[] = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { to: "/chat", label: "Chat WhatsApp", icon: MessageSquare },
-    { to: "/instances", label: "Conexões", icon: Smartphone },
     { to: "/contacts", label: "Contatos", icon: Users },
-    { to: "/team", label: "Equipe", icon: Users2 },
     { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
-    { to: "/diagnostics", label: "Sistema", icon: Activity },
+  ];
+
+  const adminNavItems: NavItem[] = [
+    { to: "/instances", label: "Conexões", icon: Smartphone },
+    { to: "/team", label: "Equipe", icon: Users2 },
     { to: "/audit", label: "Auditoria", icon: ClipboardList },
+    { to: "/diagnostics", label: "Sistema", icon: Activity },
     { to: "/settings", label: "Ajustes", icon: Settings },
   ];
+
+  const navItems: NavItem[] = isAdmin
+    ? [...userNavItems, ...adminNavItems]
+    : userNavItems;
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
