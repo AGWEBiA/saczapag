@@ -28,9 +28,13 @@ export function HelpGuide() {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2 border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary font-semibold shadow-sm"
+        >
           <HelpCircle className="h-4 w-4" />
-          <span className="hidden sm:inline">Ajuda</span>
+          <span className="hidden sm:inline">Manual / Ajuda</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
