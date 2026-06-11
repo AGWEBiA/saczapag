@@ -92,7 +92,7 @@ function AuthenticatedLayout() {
         {/* Top Header */}
         <header className="h-14 md:h-16 border-b bg-card/50 backdrop-blur-md flex items-center justify-between gap-2 px-3 md:px-6 lg:px-8 z-20 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <MobileNav navItems={navItems} onLogout={handleLogout} />
+            <MobileNav userItems={userNavItems} adminItems={isAdmin ? adminNavItems : []} onLogout={handleLogout} />
             <Button
               variant="ghost"
               size="icon"
