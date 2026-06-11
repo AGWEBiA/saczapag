@@ -4,7 +4,7 @@ import { MentionNotificationHandler } from "@/components/chat/MentionNotificatio
 
 export const Route = createFileRoute("/_authenticated/chat")({
   component: () => (
-    <div className="h-screen -m-8 overflow-hidden bg-background">
+    <div className="h-full overflow-hidden bg-background">
       <MentionNotificationHandler />
       <ChatInterface />
     </div>
